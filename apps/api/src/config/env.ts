@@ -1,4 +1,4 @@
-import { AUTH, RATE_LIMITS } from '@ctf/shared';
+import { AUTH, RATE_LIMITS, TERMINAL } from '@ctf/shared';
 import { config } from 'dotenv';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -47,5 +47,19 @@ export const env = {
   ),
   rateLimitSubmission: Number(
     process.env.RATE_LIMIT_SUBMISSION ?? RATE_LIMITS.SUBMISSION_PER_MIN_PER_USER,
+  ),
+  sandboxEnabled: process.env.SANDBOX_ENABLED !== 'false',
+  sandboxImage: process.env.SANDBOX_IMAGE ?? 'ctf-sandbox:latest',
+  sandboxSocketPath: process.env.DOCKER_SOCKET_PATH ?? '/var/run/docker.sock',
+  sandboxCreateConcurrency: Number(process.env.SANDBOX_CREATE_CONCURRENCY ?? 4),
+  sandboxMemoryMb: Number(process.env.SANDBOX_MEMORY_MB ?? 64),
+  sandboxCpus: Number(process.env.SANDBOX_CPUS ?? 0.5),
+  sandboxPidsLimit: Number(process.env.SANDBOX_PIDS_LIMIT ?? 64),
+  terminalTtlSeconds: Number(process.env.TERMINAL_TTL_SECONDS ?? TERMINAL.DEFAULT_TTL_SECONDS),
+  terminalMaxActive: Number(
+    process.env.TERMINAL_MAX_ACTIVE_PER_USER ?? TERMINAL.MAX_ACTIVE_PER_USER,
+  ),
+  terminalMaxOutput: Number(
+    process.env.TERMINAL_MAX_OUTPUT_LENGTH ?? TERMINAL.MAX_OUTPUT_LENGTH,
   ),
 };

@@ -43,5 +43,6 @@ export interface ReadyResponse {
   dependencies: {
     postgres: HealthDependency;
     redis: HealthDependency;
+    sandbox: HealthDependency;
   };
 }

@@ -36,6 +36,13 @@ export const LEADERBOARD = {
   SCOPES: ['global', 'daily', 'weekly'] as const,
 } as const;
 
+export const TERMINAL = {
+  DEFAULT_TTL_SECONDS: 30 * 60,
+  MAX_ACTIVE_PER_USER: 2,
+  MAX_OUTPUT_LENGTH: 64 * 1024,
+  SESSION_NAMESPACE: '/terminal',
+} as const;
+
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'ctf.accessToken',
   REFRESH_TOKEN: 'ctf.refreshToken',

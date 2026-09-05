@@ -26,6 +26,14 @@ enum Difficulty {
   EXPERT
 }
 
+enum TerminalSessionStatus {
+  CREATING
+  RUNNING
+  CLOSED
+  EXPIRED
+  FAILED
+}
+
 model User {
   id                 Int      @id @default(autoincrement())
   email              String   @unique
@@ -45,6 +53,7 @@ model User {
   submissions        Submission[]
   submissionAttempts SubmissionAttempt[]
   hintUnlocks        HintUnlock[]
+  terminalSessions   TerminalSession[]
 
   @@index([role])
   @@index([createdAt])
@@ -240,4 +249,22 @@ model SubmissionAttempt {
   @@index([userId])
   @@index([challengeId])
   @@index([createdAt])
+}
+
+model TerminalSession {
+  id          String               @id
+  userId      Int
+  status      TerminalSessionStatus @default(CREATING)
+  containerId String?
+  ttlSeconds  Int
+  expiresAt   DateTime
+  closedAt    DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status, expiresAt])
+  @@index([status])
 }

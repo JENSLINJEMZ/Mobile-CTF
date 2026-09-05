@@ -8,7 +8,7 @@
 ## 1. Project TL;DR
 
 Mobile-first Capture The Flag (CTF) learning/competition product for iOS/Android (Expo/RN) + Express API + web Admin Dashboard.
-Turborepo + npm workspaces monorepo. Staged build — **Stage 4 (Leaderboard & Realtime) is DONE. Next: Stage 5 (Offline Toolkit).**
+Turborepo + npm workspaces monorepo. Staged build — **Stage 6 (Terminal & Sandbox) is DONE. Next: Stage 7 (Events, Teams & Competition).**
 
 Product goals (priority): security > working end-to-end > mobile UX > clean architecture > performance > polish > extensibility > testing > docs.
 
@@ -36,16 +36,25 @@ ctf/                        # monorepo root (working dir, git repo initialized, 
 ├── docker-compose.yml      # postgres + redis + api (full stack verified)
 ├── apps/
 │   ├── api/                # @ctf/api — Express + Socket.IO + TS (tsx dev, tsup build)
-│   │   └── src/{server.ts (http + socket),app.ts,config/env.ts,routes,middleware,services,utils,websocket}
+│   │   └── src/{server.ts (http + socket + scheduler),app.ts,config/env.ts,routes,middleware,services,utils,websocket}
+│   │       ├── services/sandbox/  # SandboxRuntime iface + DockerSandboxRuntime (dockerode, hardened) + FakeSandboxRuntime (tests)
+│   │       ├── services/terminalSessions.ts  # session lifecycle, quota, TTL, output/exit event bus
+│   │       ├── services/scheduler.ts         # interval tasks w/ no-overlap + runNow for tests
+│   │       ├── utils/workerPool.ts           # bounded-concurrency pool (sandbox creates)
+│   │       ├── utils/ansi.ts                 # stripAnsi for relay
+│   │       ├── routes/terminal.ts            # POST/GET/DELETE /api/terminal/sessions
+│   │       └── websocket/{leaderboard.ts,terminal.ts,auth.ts}  # /leaderboard + /terminal namespaces
 │   ├── mobile/             # @ctf/mobile — Expo SDK 57 + Expo Router, 5-tab shell
-│   │   └── src/app/{index,terminal,leaderboard,toolkit,profile}.tsx
+│   │   └── src/app/{index,terminal,leaderboard,toolkit,profile}.tsx (+ services/terminal.ts, services/terminalSocket.ts)
 │   └── admin/              # @ctf/admin — Vite + React 18 + TS admin shell
 ├── packages/
 │   ├── shared/             # @ctf/shared — types, enums, constants, Zod validation
+│   ├── toolkit/            # @ctf/toolkit — pure offline tool primitives (encode/crypto/hash/JWT/file) + vitest
 │   ├── database/           # @ctf/database — Prisma schema (User/Session), client, seed
 │   └── ui/                 # @ctf/ui — design tokens + web components (Button/Text/Heading/Card/Badge)
 └── infrastructure/
     ├── docker/api.Dockerfile
+    ├── sandbox/                # ctf-sandbox image Dockerfile (alpine, non-root) + SECURITY.md sign-off
     ├── nginx/ ../monitoring/ ../deployment/   # placeholders (.gitkeep)
 ```
 
@@ -97,6 +106,18 @@ ctf/                        # monorepo root (working dir, git repo initialized, 
 | Decoupled WS emit | Route calls `emitLeaderboardSolved()` (in-memory `services/events.ts` bus); `websocket/leaderboard.ts` registers the handler — no circular import service↔socket | Services stay testable w/o sockets |
 | Submit rank field | `SubmitFlagResponse.rank` computed server-side (`applySolve` → rebuild global → `ZREVRANK`) | Client never computes rank |
 | Mobile live updates | `services/socket.ts` (socket.io-client, connect on leaderboard screen focus, disconnect on blur, token read fresh from SecureStore) + `services/leaderboard.ts`; on WS event → refetch from API (client math never authoritative) | Scope chips global/daily/weekly + "you" row highlight |
+| Toolkit package | `@ctf/toolkit` (private, deps: none runtime, vitest+typescript dev) exporting **TS source** like sibling packages; pure functions only — no `node:*`, `fetch`, sockets, or global btoa/atob (own UTF-8/base64/base64url/hex to work on Hermes) | Offline-first: works identically on device, web, and Node tests |
+| Toolkit file viewer | File section takes **hex text** (from `xxd`/`od`) → `hexToBytes` → size/magic (`sniffFileType`)/EXIF (`parseExif` JPEG APP1 + TIFF IFD0/GPS)/`hexDump` | Zero new native deps; no expo-document-picker/file-system needed to meet exit criteria |
+| Toolkit verification | Test runner lives in `@ctf/toolkit` (`vitest`, 63 tests); mobile devDeps deliberately left without vitest; verified via turbo `test` + `expo export` | Pure functions tested at the package; app shell verified by bundling/route export |
+| Sandbox image | `infrastructure/sandbox/Dockerfile` — alpine:3.20 + bash/coreutils/procps/util-linux, non-root `ctf(10001):ctf(10001)`, motd banner, `/bin/bash` CMD | Minimal attack surface; no network tooling baked in (container runs `--network none` anyway) |
+| Sandbox runtime | `DockerSandboxRuntime` (dockerode) — single pinned `ctf-sandbox:latest` image, per-session container named `ctf-tm-<sessionId>`, create burst capped by `WorkerPool`; `HostConfig`: `--memory/--memory-swap 64m`, `--cpu-quota 50k/period 100k`, `--pids-limit 64` `--ulimit nofile 64`, `--cap-drop ALL`, `--security-opt no-new-privileges`, `--network none`, `--read-only` + `noexec` tmpfs on `/tmp` + `/home/ctf`, `AutoRemove: true`; NO docker socket / volumes mounted | Full hardening table in `infrastructure/sandbox/SECURITY.md`; kernel isolation (gVisor/Firecracker) documented as follow-up |
+| Sandbox exit wait | `container.wait({condition:'not-running'})` registered **AFTER** `container.start()` | Registering before start resolves immediately (container is `Created`, not `Running`) → fake exit code 0 → instance deleted from map before return |
+| Stale container names | On `createContainer` 409-conflict, force-remove the name and retry once | A crashed create/sweep must not permanently block that session-id's name |
+| Runtime injection | `configureSandboxRuntime()` swaps the singleton `SandboxRuntime` (`services/terminalSessions.ts`); prod → docker, tests → `FakeSandboxRuntime` (PassThrough echo + inputs log + killCalls) | WS/route tests exercise the full lifecycle/relay without a daemon; docker-gated isolation tests use the real one |
+| Terminal sessions | `TerminalSession` table (PK `id` = `tm_`+32 hex, status enum CREATING/RUNNING/CLOSED/EXPIRED/FAILED, containerId internal-only — never in DTO); TTL default 1800s; quota `TERMINAL_MAX_ACTIVE_PER_USER` default 2 → 429 `SESSION_LIMIT`; expiry sweep marks **EXPIRED before kill** so the exit handler can't overwrite with CLOSED (race fix) | Owner-scoped rows (userId FK cascade); `/terminal/sessions/:id` ownership checks on GET/DELETE/join |
+| WS terminal relay | Namespace `/terminal` (handshake JWT like `/leaderboard`); `terminal:join {sessionId}` (ownership + RUNNING + room `tm:<id>`) → `terminal:input {data}` → `runtime.write`; container stdout→`stripAnsi`→`terminal:output {sessionId,data}` broadcast to room; `terminal:exit {sessionId,code}` on container stop/TTL. Shared `authByHandshake` extracted to `websocket/auth.ts`; `websocket/leaderboard.ts` owns `attachSocket` + wires both namespaces (compat for leaderboard tests) | Exit criteria: relay through isolated container, closed on exit |
+| Ready check | `/api/ready` now includes `sandbox` dependency (`DockerSandboxRuntime.isAvailable()` → `docker ping`) | Compose/gates use ready status incl. sandbox daemon |
+| API Dockerfile | Added `COPY packages/toolkit/package.json` to the workspace-manifest block before `npm ci`; compose mounts `/var/run/docker.sock:ro` into `ctf-api` + `SANDBOX_*`/`TERMINAL_*` env | New toolkit workspace (Stage 5) breaks `npm ci` if manifest missing; socket RO is sufficient for dockerode (connect needs no fs write) |
 
 ---
 
@@ -154,7 +175,47 @@ ctf/                        # monorepo root (working dir, git repo initialized, 
 - Live smoke (container): register throwaway → anonymous board empty after `lb:*` flush → solve Caesar's Secret → `{pointsAwarded:110, firstBlood:true, totalScore:110, rank:1}` → global board shows solver #1 + `me {rank:1,score:110,solves:1}` → daily scope records 110 → WS: anonymous socket `connect_error: unauthorized`, authenticated socket connects, solve broadcasts `leaderboard:update {type:'solved', userId, username, pointsAwarded:100, scope:'global', at}`. Smoke users/submissions/`lb:*` cleaned afterward (demo board starts empty).
 - Notable fixes: `prisma.challenge.create` needs `category:{connect}`/`createdBy:{connect}` and String `flagHash`; stale `lb:*` from pre-Stage-4 runs flushed (rebuilt from DB on next access); DB accumulates published challenges across test runs → list assertions switched to `?limit=100`; top-N assertions became page-agnostic (me via `zscore`/`zrevrank`, not page membership); test lint: `const` for never-reassigned, unused-loop-var renamed `_flag`.
 
-**Currently running:** `docker compose up -d` stack (ctf-postgres :5432, ctf-redis :6379, ctf-api :4000) with **Stage 4** — Socket.IO `/leaderboard` live, 8 seeded challenges, demo users re-seeded, leaderboard/submission state empty for a fresh demo.
+**🔵 Stage 5 — Offline Toolkit — DONE ✅**
+
+| Task | Status |
+|---|---|
+| `packages/toolkit` — pure TS, no runtime deps (deps install via `npm install`; turbo picks up new workspace automatically), exports `./src/index.ts` like siblings | ✅ |
+| Encoding: `utf8ToBytes`/`bytesToUtf8` (TextEncoder/Decoder), base64 (own charset impl, tolerant of whitespace/padding), hex (separator-tolerant), URL percent-encoding manual, ROT13/rot-with-shift | ✅ |
+| Ciphers: `caesar`, `vigenere` (letter case-aware, non-letter pass-through), `xorBytes`/`xorWithKey` (repeating-key), `analyzeFrequency` (letter counts+%, top-5 trigrams) | ✅ |
+| Hash ID: pattern table MD5/MD4/NTLM (32), SHA-1 (40), SHA-224 (56), SHA-256/SHA3-256 (64), SHA-384 (96), SHA-512/SHA3-512 (128), bcrypt `$2a/b/y$`, Unix `$5$`/`$6$`; returns candidates + charset guess | ✅ |
+| JWT: base64url helpers + `decodeJwt` (header/payload JSON, exp/iat, expiry status, structural errors — NO signature verification by design) | ✅ |
+| File: `hexDump` (offset+hex+ascii), `sniffFileType` (16 signatures: JPEG/PNG/GIF/WebP/BMP/PDF/ZIP/GZIP/7z/ELF/PE/WAV/MP4/Ogg/FLAC/SQLite/JSON), `parseExif` (JPEG APP1 + TIFF IFD0 incl. GPS IFD → make/model/date/orientation/dims/exposure/ISO/f-ratio + GPS) | ✅ |
+| Tests: 63 vitest in `packages/toolkit` (round-trips, edge cases, malformed input, synthetic TIFF/JPEG+EXIF/GPS fixtures) | ✅ |
+| Mobile: Toolkit tab rebuilt — section chips (Encoding/Ciphers/Hash ID/JWT/Files), per-tool UI, zero-network (grep shows no fetch/socket/http refs in toolkit path); `@ctf/toolkit` added as dep | ✅ |
+| Verification: typecheck/lint/build/test 18/18 turbo (68 API + 63 toolkit), expo export incl. `/toolkit` | ✅ |
+
+**Verification log (Stage 5):**
+- 63/63 toolkit tests (incl. real-world vectors: `encodeBase64('Hello, World!')='SGVsbG8sIFdvcmxkIQ=='`, Vigenère `ATTACKATDAWN`+`LEMON`=`LXFOPVEFRNHR`, JWT `{"alg":"HS256"}`→`eyJhbGciOiJIUzI1NiJ9`).
+- Live bundle check: `expo export --platform web` shows `/toolkit` (33KB) among 10 static routes; `rg "fetch|axios|WebSocket|socket.io|XMLHttpRequest|http://"` over `packages/toolkit/src` + `toolkit.tsx` = **no network references** (exit criteria met).
+- Notable fixes: `xorBytes` must cycle the key (`b[i % b.length]`, not `b[i]`) for inputs longer than the key; `TextDecoder.decode` needs an `ArrayBuffer` view, not `number[]`; JPEG segment walk must skip length bytes; TIFF ASCII values only written when `valueCount*byteSize <= 4` (inline) — test builder had value bytes at the wrong slot.
+
+**🔵 Stage 6 — Terminal & Sandbox — DONE ✅**
+
+| Task | Status |
+|---|---|
+| Shared: `types/terminal.ts` DTOs/events + `TERMINAL` constants (TTL 1800s, max active 2, max output 64KB) + `terminalSessionIdSchema` (`tm_[a-zA-Z0-9]{16,64}`) — `ReadyResponse` gains `sandbox` dependency | ✅ |
+| Database: `TerminalSession` model + `TerminalSessionStatus` enum (CREATING/RUNNING/CLOSED/EXPIRED/FAILED) + `ctf-tm` prefix unused (container name = `ctf-tm-<sessionId>`); migration `20260905082045_add_terminal_sessions` on dev+test | ✅ |
+| Sandbox infra: `infrastructure/sandbox/Dockerfile` (alpine:3.20, non-root ctf user, bash) + **SECURITY.md** sign-off (hardening table, threat model, residual risks → gVisor/Firecracker follow-up) | ✅ |
+| API sandbox: `utils/workerPool.ts` (bounded concurrency), `services/scheduler.ts` (interval tasks, no-overlap, `runNow`), `services/sandbox/{types,dockerRuntime,fakeRuntime}.ts` — hardened HostConfig (memory/swap 64m, cpu 0.5, pids 64, nofile 64, cap-drop ALL, no-new-privileges, network none, read-only rootfs + noexec tmpfs, AutoRemove, no socket/volumes) | ✅ |
+| API terminal: `services/terminalSessions.ts` (create w/ quota 429 + TTL, list, close w/ kill, sendInput, expiry sweep kills + marks EXPIRED-first (race fix), output→`stripAnsi`→`terminalEvents` bus, injectable runtime) + `routes/terminal.ts` (POST/GET/GET:id/DELETE, owner-scoped) + `config/env.ts` `SANDBOX_*`/`TERMINAL_*` + `dockerode` dep | ✅ |
+| API ready: `/api/ready` now pings the sandbox daemon (`sandbox` dependency up/down) | ✅ |
+| API WS: namespace `/terminal` — handshake JWT auth (shared `websocket/auth.ts`), `terminal:join` (ownership + RUNNING → room `tm:<id>`), `terminal:input`, broadcasts `terminal:output` / `terminal:exit`; `websocket/leaderboard.ts` retains `attachSocket` + wires both namespaces; `server.ts` runs a `Scheduler` `terminal-expiry` sweep (60s) | ✅ |
+| Tests: `terminal.test.ts` (lifecycle, quota 429, ownership 404, malformed 400, WS reject anon / join-gate / input→output relay / exit broadcast, TTL expiry sweep), `scheduler.test.ts` + `workerPool.test.ts` (8), docker-gated `sandbox.isolation.test.ts` (hardened config via inspect; in-container non-root + CapEff=0 + zero routes + read-only rootfs + tmpfs + nofile 64; attach round-trip; full service lifecycle w/ real runtime + container-gone) — **93/93 API tests** | ✅ |
+| Mobile: `services/terminal.ts` (create/list/get/close via api client; added `api.del`) + `services/terminalSocket.ts` (WS connect/join-ack/input-ack, output/exit/error subscriber registry, fresh token) + Terminal tab rebuilt: session list w/ status, Open session, single bounded monospace output pane (`Fonts.mono`, auto-scroll, 64KB cap) + input row + Close/exit banner | ✅ |
+| Docker wiring: `infrastructure/docker/api.Dockerfile` copies `packages/toolkit/package.json` before `npm ci`; `docker-compose.yml` mounts `/var/run/docker.sock:ro` into ctf-api + `SANDBOX_*`/`TERMINAL_*` env | ✅ |
+| Verification: turbo typecheck 7/7, lint 7/7, build 2/2, test 93 API + 63 toolkit, expo export incl. `/terminal` (29KB), compose rebuild, live smoke (register → POST session RUNNING → host `ctf-tm-*` container Up → DELETE → CLOSED → container gone) | ✅ |
+
+**Verification log (Stage 6):**
+- Live smoke (containerized): POST `/api/terminal/sessions` → `tm_<32hex>` RUNNING → `docker ps` shows `ctf-tm-tm_<id>` Up → DELETE → `status: CLOSED` → `docker ps -a` shows 0 `ctf-tm-*` (AutoRemove). `/api/ready` → `{postgres: up, redis: up, sandbox: up}`.
+- Isolation suite: `docker inspect` confirms `User: ctf:ctf`, `CapDrop: ALL`, `no-new-privileges`, `NetworkMode: none`, `ReadonlyRootfs: true`, `Memory 64MiB`, `PidsLimit 64`, `AutoRemove`; in-container exec outputs `UID=10001`, `CAP=0000000000000000`, `ROUTES=0`, `FS=READONLY`, `TMP=TMPOK`, `NOFILE=64`.
+- Notable fixes: dockerode `wait()` pre-start resolves instantly on a `Created` container (register wait after `start()`); ANSCII test probe fragile → labeled `key=value` output + `toContain`; TTL sweep vs exit-handler race → expire marks DB **EXPIRED before** killing; `/proc/net/route` has a header line → count `awk 'NR>1'`.
+
+**Currently running:** `docker compose up -d` stack (ctf-postgres :5432, ctf-redis :6379, ctf-api :4000) with **Stage 6** — Socket.IO `/leaderboard` + `/terminal` live, ctf-sandbox image built, demo terminal session smoke cleaned up.
 
 **🟢 Stage 3 — Challenges, Hints & Submissions — DONE ✅**
 
@@ -193,12 +254,14 @@ ctf/                        # monorepo root (working dir, git repo initialized, 
 npm install                                   # install all workspaces
 npm run build / typecheck / lint              # turbo-driven (build skips workspaces w/o build script)
 npm test --workspace=@ctf/api                  # vitest suite (needs postgres+redis up: docker compose up -d)
+npm test --workspace=@ctf/toolkit               # vitest suite for offline toolkit pure functions (no services needed)
 npm run dev                                   # turbo parallel dev (api watch + vite + expo)
 npm run db:generate                           # prisma generate (DATABASE_URL needed)
 npm run db:deploy                             # apply migrations (prod-safe)
 npm run db:seed                               # tsx seed (demo admin + demo user, ctfpass123)
 docker compose up -d                          # postgres + redis + api
 docker compose build api                      # rebuild API image
+docker build -t ctf-sandbox:latest infrastructure/sandbox   # sandbox image (auto-built by isolation tests if missing)
 cd apps/api && npm run dev                    # API in watch mode on :4000
 cd apps/mobile && npm run web                 # Expo web dev
 cd apps/admin && npm run dev                  # Vite dev on :5173 (proxies /api → :4000)
@@ -209,7 +272,6 @@ npm install-scripts approve <pkg>             # allow blocked postinstall (npm 1
 
 ## 7. Next Steps
 
-- **Stage 5 — Offline Toolkit** (independent, no API/network dep): Toolkit tab with local encoders/ciphers/decoders (Base64/Hex/URL/ROT13/Caesar/Vigenère/XOR/frequency analysis, hash identifier, JWT decoder, file/hex/EXIF viewer) + unit tests for pure functions. Exit: toolkit runs with zero network calls.
-- Stage 7 + team/event leaderboards (see BUILD_STAGES.md 105–144): daily/weekly are done in Stage 4; **event/team** scopes intentionally deferred until Stage 7 (Events, Teams & Competition).
+- **Stage 7 — Events, Teams & Competition** (see BUILD_STAGES.md 145–…): event/team leaderboard scopes deferred from Stage 4, team membership, live event competition mode. Per-session transcript recording and kernel-isolated sandbox runtime (gVisor/Firecracker) are documented follow-ups in `infrastructure/sandbox/SECURITY.md`.
 - Future-auth hardening backlog (nice-to-have): refresh-token reuse detection (revoke family on reuse); per-user session list in Profile; email worker for production password-reset links (currently dev-link only, gated by `NODE_ENV`).
 - Security-sign-off-required changes: auth, flag verification/scoring, RBAC, sandbox/terminal gateway (§14). `SubmissionAttempt.flagAttemptHash` stores only sha256 of guesses by design.

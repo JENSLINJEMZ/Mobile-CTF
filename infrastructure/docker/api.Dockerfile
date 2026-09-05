@@ -9,6 +9,7 @@ FROM base AS build
 COPY package.json package-lock.json turbo.json tsconfig.base.json eslint.config.js ./
 COPY packages/shared/package.json ./packages/shared/package.json
 COPY packages/database/package.json ./packages/database/package.json
+COPY packages/toolkit/package.json ./packages/toolkit/package.json
 COPY packages/ui/package.json ./packages/ui/package.json
 COPY apps/api/package.json ./apps/api/package.json
 COPY apps/admin/package.json ./apps/admin/package.json

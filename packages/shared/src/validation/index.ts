@@ -3,6 +3,7 @@ import { z } from 'zod';
 export * from './auth';
 export * from './challenge';
 export * from './leaderboard';
+export * from './terminal';
 
 export const idSchema = z.coerce.number().int().positive();
 

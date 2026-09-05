@@ -9,6 +9,7 @@ import { healthRouter } from './health';
 import { leaderboardRouter } from './leaderboard';
 import { metricsRouter } from './metrics';
 import { readyRouter } from './ready';
+import { terminalRouter } from './terminal';
 
 export const apiRouter = Router();
 
@@ -26,4 +27,5 @@ apiRouter.use(generalLimiter);
 apiRouter.use('/auth', authRouter);
 apiRouter.use('/challenges', challengesRouter);
 apiRouter.use('/leaderboard', leaderboardRouter);
+apiRouter.use('/terminal', terminalRouter);
 apiRouter.use('/admin', adminRouter);
