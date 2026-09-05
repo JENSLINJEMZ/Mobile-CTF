@@ -1,0 +1,19 @@
+{
+  "name": "@ctf/toolkit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure, offline security toolkit — encoding, ciphers, hash identification, JWT decoding, hex/file analysis. Zero network, zero dependencies.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vitest": "^5.0.0"
+  }
+}

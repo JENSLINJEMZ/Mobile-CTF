@@ -5,6 +5,7 @@
   "private": true,
   "dependencies": {
     "@ctf/shared": "*",
+    "@ctf/toolkit": "*",
     "@ctf/ui": "*",
     "@expo/ui": "~57.0.16",
     "@expo/vector-icons": "^15.0.1",
