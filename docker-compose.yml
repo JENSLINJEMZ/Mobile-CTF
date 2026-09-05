@@ -1,0 +1,64 @@
+name: ctf-platform
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ctf-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ctf
+      POSTGRES_PASSWORD: ctf
+      POSTGRES_DB: ctf_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ctf -d ctf_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: ctf-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    container_name: ctf-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://ctf:ctf@postgres:5432/ctf_dev
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGINS: http://localhost:5173
+      JWT_SECRET: dev-only-change-me-access-secret
+      JWT_REFRESH_SECRET: dev-only-change-me-refresh-secret
+      RATE_LIMIT_LOGIN: "5"
+      RATE_LIMIT_GENERAL: "100"
+      RATE_LIMIT_SUBMISSION: "5"
+      BCRYPT_ROUNDS: "12"
+
+volumes:
+  postgres_data:
+  redis_data:

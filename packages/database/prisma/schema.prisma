@@ -1,0 +1,243 @@
+// Stage 1 — Prisma schema v1: User + Session (base models).
+// Schema contract owner: Database/DevOps team. Stages 2+ extend with
+// Challenge/Hint/Submission/Event/etc. per mobile_CTF.md §3 and §5.5.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  AUTHOR
+  MODERATOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+  EXPERT
+}
+
+model User {
+  id                 Int      @id @default(autoincrement())
+  email              String   @unique
+  username           String   @unique
+  passwordHash       String
+  role               Role     @default(USER)
+  isActive           Boolean  @default(true)
+  lastLoginAt        DateTime?
+  passwordChangedAt  DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  sessions           Session[]
+  passwordResetTokens PasswordResetToken[]
+  challengesCreated  Challenge[] @relation("ChallengeAuthor")
+  versionsAuthored   ChallengeVersion[] @relation("VersionAuthor")
+  submissions        Submission[]
+  submissionAttempts SubmissionAttempt[]
+  hintUnlocks        HintUnlock[]
+
+  @@index([role])
+  @@index([createdAt])
+}
+
+model Session {
+  id               Int      @id @default(autoincrement())
+  userId           Int
+  refreshTokenHash String   @unique
+  expiresAt        DateTime
+  revoked          Boolean  @default(false)
+  userAgent        String?
+  ipAddress        String?
+  createdAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revoked])
+}
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model ChallengeCategory {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  slug      String   @unique
+  icon      String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  challenges Challenge[]
+
+  @@index([sortOrder])
+}
+
+model Tag {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  challenges ChallengeTag[]
+}
+
+model ChallengeTag {
+  challengeId Int
+  tagId       Int
+
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  tag       Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([challengeId, tagId])
+  @@index([tagId])
+}
+
+model Challenge {
+  id          Int        @id @default(autoincrement())
+  slug        String     @unique
+  title       String
+  description String
+  categoryId  Int
+  difficulty  Difficulty @default(EASY)
+  basePoints  Int
+  published   Boolean    @default(false)
+  flagHash    String
+  flagSalt    String
+  createdById Int
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  category   ChallengeCategory @relation(fields: [categoryId], references: [id])
+  createdBy User              @relation("ChallengeAuthor", fields: [createdById], references: [id])
+  tags       ChallengeTag[]
+  versions   ChallengeVersion[]
+  hints      Hint[]
+  attachments Attachment[]
+  submissions Submission[]
+  attempts   SubmissionAttempt[]
+
+  @@index([categoryId])
+  @@index([difficulty])
+  @@index([published])
+  @@index([createdAt])
+}
+
+model ChallengeVersion {
+  id          Int        @id @default(autoincrement())
+  challengeId Int
+  version     Int
+  title       String
+  description String
+  difficulty  Difficulty @default(EASY)
+  basePoints  Int
+  changeSummary String?
+  createdAt   DateTime   @default(now())
+  createdById Int
+
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  createdBy User      @relation("VersionAuthor", fields: [createdById], references: [id])
+
+  @@unique([challengeId, version])
+  @@index([createdAt])
+}
+
+model Hint {
+  id            Int     @id @default(autoincrement())
+  challengeId   Int
+  title         String
+  body          String
+  penaltyPoints Int     @default(0)
+  sortOrder     Int     @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  challenge Challenge  @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  unlocks   HintUnlock[]
+
+  @@index([challengeId])
+}
+
+model HintUnlock {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  hintId    Int
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hint Hint @relation(fields: [hintId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, hintId])
+  @@index([hintId])
+}
+
+model Attachment {
+  id          Int      @id @default(autoincrement())
+  challengeId Int
+  title       String
+  url         String
+  mimeType    String?
+  sizeBytes   Int?
+  createdAt   DateTime @default(now())
+
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@index([challengeId])
+}
+
+model Submission {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  challengeId    Int
+  attemptId      Int      @unique
+  pointsAwarded  Int
+  isFirstBlood   Boolean  @default(false)
+  solvedAt       DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  attempt   SubmissionAttempt @relation(fields: [attemptId], references: [id])
+
+  @@unique([userId, challengeId])
+  @@index([challengeId])
+  @@index([userId, solvedAt])
+}
+
+model SubmissionAttempt {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  challengeId   Int
+  flagAttemptHash String
+  correct       Boolean
+  createdAt     DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge   Challenge   @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  submission  Submission?
+
+  @@index([userId])
+  @@index([challengeId])
+  @@index([createdAt])
+}

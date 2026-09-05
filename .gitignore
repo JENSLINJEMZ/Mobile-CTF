@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+apps/mobile/.expo/
+apps/mobile/dist/
+.ui/
+.vite/
+
+# Turborepo
+.turbo/
+
+# Environment — never commit real values
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Coverage
+coverage/
+
+# Prisma
+packages/database/prisma/migrations/dev.db

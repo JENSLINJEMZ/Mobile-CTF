@@ -1,0 +1,23 @@
+# Monorepo build context — exclude heavy/irrelevant paths from docker builds.
+**/node_modules
+node_modules
+**/dist
+dist
+**/.expo
+.expo
+**/.turbo
+.turbo
+.git
+.gitignore
+.gitkeep
+*.log
+npm-debug.log*
+.env
+.env.*
+!.env.example
+coverage
+.DS_Store
+apps/mobile/ios
+apps/mobile/android
+apps/mobile/.vscode
+apps/mobile/assets/expo.icon
