@@ -34,6 +34,31 @@ enum TerminalSessionStatus {
   FAILED
 }
 
+enum EventStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  ENDED
+}
+
+enum TeamMemberRole {
+  LEADER
+  MEMBER
+}
+
+enum TeamInviteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum UnlockRuleType {
+  TIME
+  PREREQUISITE
+  SCORE
+  ALWAYS
+}
+
 model User {
   id                 Int      @id @default(autoincrement())
   email              String   @unique
@@ -54,6 +79,13 @@ model User {
   submissionAttempts SubmissionAttempt[]
   hintUnlocks        HintUnlock[]
   terminalSessions   TerminalSession[]
+  teamsCreated       Team[] @relation("TeamOwner")
+  teamMemberships    TeamMember[]
+  invitesSent        TeamInvite[] @relation("InviteSender")
+  invitesReceived    TeamInvite[] @relation("InviteTarget")
+  eventsOrganized    Event[] @relation("EventOrganizer")
+  eventParticipants  EventParticipant[]
+  announcementsAuthored Announcement[] @relation("AnnouncementAuthor")
 
   @@index([role])
   @@index([createdAt])
@@ -146,6 +178,8 @@ model Challenge {
   attachments Attachment[]
   submissions Submission[]
   attempts   SubmissionAttempt[]
+  eventChallenges EventChallenge[]
+  unlockRulePrerequisites UnlockRulePrerequisite[]
 
   @@index([categoryId])
   @@index([difficulty])
@@ -267,4 +301,160 @@ model TerminalSession {
   @@index([userId])
   @@index([status, expiresAt])
   @@index([status])
+}
+
+model Team {
+  id          Int        @id @default(autoincrement())
+  name        String     @unique
+  slug        String     @unique
+  description String?
+  joinCode    String     @unique
+  createdById Int
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  createdBy User         @relation("TeamOwner", fields: [createdById], references: [id])
+  members   TeamMember[]
+  invites   TeamInvite[]
+  eventTeams EventTeam[]
+  eventParticipations EventParticipant[]
+
+  @@index([createdById])
+}
+
+model TeamMember {
+  id       Int            @id @default(autoincrement())
+  teamId   Int
+  userId   Int
+  role     TeamMemberRole @default(MEMBER)
+  joinedAt DateTime       @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@unique([userId])
+  @@index([teamId])
+}
+
+model TeamInvite {
+  id          Int             @id @default(autoincrement())
+  teamId      Int
+  invitedByUserId Int
+  invitedUserId   Int
+  code        String          @unique
+  status      TeamInviteStatus @default(PENDING)
+  createdAt   DateTime        @default(now())
+  usedAt      DateTime?
+
+  team       Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  invitedBy  User @relation("InviteSender", fields: [invitedByUserId], references: [id])
+  invitedUser User @relation("InviteTarget", fields: [invitedUserId], references: [id])
+
+  @@unique([teamId, invitedUserId])
+  @@index([invitedUserId])
+}
+
+model Event {
+  id          Int         @id @default(autoincrement())
+  slug        String      @unique
+  title       String
+  description String
+  status      EventStatus @default(SCHEDULED)
+  startsAt    DateTime
+  endsAt      DateTime
+  createdById Int
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  createdBy      User              @relation("EventOrganizer", fields: [createdById], references: [id])
+  participants   EventParticipant[]
+  teams          EventTeam[]
+  eventChallenges EventChallenge[]
+
+  @@index([status])
+  @@index([startsAt, endsAt])
+}
+
+model EventParticipant {
+  id           Int      @id @default(autoincrement())
+  eventId      Int
+  userId       Int
+  teamId       Int?
+  registeredAt DateTime @default(now())
+
+  event Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team  Team?  @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+}
+
+model EventTeam {
+  id       Int      @id @default(autoincrement())
+  eventId  Int
+  teamId   Int
+  joinedAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  team  Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, teamId])
+  @@unique([teamId])
+}
+
+model EventChallenge {
+  id          Int     @id @default(autoincrement())
+  eventId     Int
+  challengeId Int
+  sortOrder   Int     @default(0)
+
+  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  unlockRule UnlockRule?
+
+  @@unique([eventId, challengeId])
+  @@index([eventId])
+}
+
+model UnlockRule {
+  id            Int             @id @default(autoincrement())
+  eventChallengeId Int          @unique
+  type          UnlockRuleType  @default(ALWAYS)
+  unlockAt      DateTime?
+  minScore      Int?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  eventChallenge EventChallenge @relation(fields: [eventChallengeId], references: [id], onDelete: Cascade)
+  prerequisites UnlockRulePrerequisite[]
+
+  @@index([eventChallengeId])
+}
+
+model UnlockRulePrerequisite {
+  id          Int @id @default(autoincrement())
+  ruleId      Int
+  challengeId Int
+
+  rule      UnlockRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  challenge Challenge  @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, challengeId])
+  @@index([challengeId])
+}
+
+model Announcement {
+  id          Int      @id @default(autoincrement())
+  title       String
+  body        String
+  pinned      Boolean  @default(false)
+  createdById Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User @relation("AnnouncementAuthor", fields: [createdById], references: [id])
+
+  @@index([pinned, createdAt])
 }

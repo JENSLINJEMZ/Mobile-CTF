@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 
+import { PrismaClient } from '@prisma/client';
+
 const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ?? 'postgresql://ctf:ctf@localhost:5432/ctf_test';
 
@@ -10,7 +12,7 @@ const prismaCli = resolve(
   }),
 );
 
-export default function globalSetup() {
+function migrate() {
   execFileSync(
     process.execPath,
     [
@@ -25,4 +27,28 @@ export default function globalSetup() {
       stdio: 'inherit',
     },
   );
+}
+
+async function truncateAll(prisma: PrismaClient): Promise<void> {
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    DECLARE r record;
+    BEGIN
+      FOR r IN (
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'
+      )
+      LOOP
+        EXECUTE format('TRUNCATE TABLE %I RESTART IDENTITY CASCADE', r.tablename);
+      END LOOP;
+    END $$;
+  `);
+}
+
+export default async function globalSetup() {
+  migrate();
+  const prisma = new PrismaClient({ datasources: { db: { url: TEST_DATABASE_URL } } });
+  await truncateAll(prisma);
+  await prisma.$disconnect();
 }

@@ -1,11 +1,13 @@
 import { z } from 'zod';
 
+export * from './id';
 export * from './auth';
 export * from './challenge';
 export * from './leaderboard';
 export * from './terminal';
-
-export const idSchema = z.coerce.number().int().positive();
+export * from './events';
+export * from './teams';
+export * from './announcements';
 
 export const paginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),

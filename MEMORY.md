@@ -8,7 +8,7 @@
 ## 1. Project TL;DR
 
 Mobile-first Capture The Flag (CTF) learning/competition product for iOS/Android (Expo/RN) + Express API + web Admin Dashboard.
-Turborepo + npm workspaces monorepo. Staged build — **Stage 6 (Terminal & Sandbox) is DONE. Next: Stage 7 (Events, Teams & Competition).**
+Turborepo + npm workspaces monorepo. Staged build — **Stage 7 (Events, Teams & Competition) is DONE. Next: Stage 8 (Offline & Sync).**
 
 Product goals (priority): security > working end-to-end > mobile UX > clean architecture > performance > polish > extensibility > testing > docs.
 
@@ -193,6 +193,34 @@ ctf/                        # monorepo root (working dir, git repo initialized, 
 - 63/63 toolkit tests (incl. real-world vectors: `encodeBase64('Hello, World!')='SGVsbG8sIFdvcmxkIQ=='`, Vigenère `ATTACKATDAWN`+`LEMON`=`LXFOPVEFRNHR`, JWT `{"alg":"HS256"}`→`eyJhbGciOiJIUzI1NiJ9`).
 - Live bundle check: `expo export --platform web` shows `/toolkit` (33KB) among 10 static routes; `rg "fetch|axios|WebSocket|socket.io|XMLHttpRequest|http://"` over `packages/toolkit/src` + `toolkit.tsx` = **no network references** (exit criteria met).
 - Notable fixes: `xorBytes` must cycle the key (`b[i % b.length]`, not `b[i]`) for inputs longer than the key; `TextDecoder.decode` needs an `ArrayBuffer` view, not `number[]`; JPEG segment walk must skip length bytes; TIFF ASCII values only written when `valueCount*byteSize <= 4` (inline) — test builder had value bytes at the wrong slot.
+
+**🔵 Stage 7 — Events, Teams & Competition — DONE ✅**
+
+| Task | Status |
+|---|---|
+| Database: `Event/EventChallenge/UnlockRule/UnlockRulePrerequisite/EventParticipant/EventTeam/Team/TeamMember/Announcement` + `EventStatus`/`UnlockRuleType`/`TeamMemberRole` enums (migration `20260905085228_add_events_teams_announcements` on dev+test, client regenerated) | ✅ |
+| Shared: event/team/announcement DTOs + Zod schemas (per-type unlockRule superRefine), `TEAM` (`MAX_MEMBERS 5`, `JOIN_CODE_LENGTH 6`, `INVITE_CODE_LENGTH 8`) + `EVENT` leaderboard constants, `ErrorCode.LOCKED` | ✅ |
+| API unlock gating: `services/unlockRules.ts` (pure evaluator, TIME/PREREQUISITE/SCORE/ALWAYS), `services/events.ts` `getEventChallengeStates`+`assertEventChallengeAccess`+`lockedMessage`, wired into `listChallenges`/`getChallengeDetail` (+`locked`/`lockedReason` on `ChallengeSummaryDto`) and `submitChallenge` (403 LOCKED) | ✅ |
+| API events: lifecycle (create/update/delete admin), join/leave (SCHEDULED/RUNNING only, one team per event, team opt-in), event challenges list, event leaderboards (`lb:event:<id>` ZINCRBY via `recordEventSolve` on successful solve — participants + teams scopes) | ✅ |
+| API teams: create (unique slug+joinCode 6-char), join-by-code, invites (leader-generated 8-char), role promotion/demotion, removeMember (≥1 leader guard, auto-promote oldest member, single-member team disbands), delete, one-team-per-user (`TeamMember.userId` unique) | ✅ |
+| API announcements: public list + admin create/update/delete (`services/announcements.ts`) | ✅ |
+| API routes: `/events`, `/teams`, `/announcements` + admin events/event-challenges/announcements CRUD in `routes/admin.ts`; `?event=` passthrough on challenge list/detail/submission (`parseEventId`) | ✅ |
+| WS decoupling: the former Stage-6 leaderboard WS bus (`emitLeaderboardSolved`/`setLeaderboardSolvedHandler`) moved to `services/leaderboardEvents.ts` after the new events service replaced `services/events.ts`; imports updated in `websocket/leaderboard.ts` + `routes/challenges.ts` | ✅ |
+| Tests: `unlockRules.test.ts` (9), `teams.test.ts` (12), `events.test.ts` (21) — gating reasons, score/team leaderboards, join/leave + status gating, RBAC, one-team/one-event constraints, circular prereq & self-dep guards, SCORE minScore 110 unlock, TIME lockout → **135/135 API tests** | ✅ |
+| Test DB hermeticity: `apps/api/test/global-setup.ts` now resets all public tables (`RESTART IDENTITY CASCADE`) before runs after `migrate deploy` (fixed browse-list pollution from accumulated test data pushing `limit=100` past fresh fixtures) | ✅ |
+| Seed: demo RUNNING event "CTF Summer Sprint" with unlock rules over seeded challenges (caesars-secret always-open, xor-marks-the-spot PREREQUISITE on caesars, stolen-sql SCORE 110, cookie-jar TIME +2h), demo team "Demo Squad" (`DEMO01`) led by `player1` registered in the event, plus a pinned + non-pinned announcement — idempotent (`deleteMany(challenge)` cascades `UnlockRule`) | ✅ |
+| Mobile: Events tab (announcement strip, event cards with status/countdown + join/leave), event detail (`event/[id]` — description, join/leave, My Team, locked-challenge badges + unlock reasons, event leaderboard Participants/Teams toggle), Teams screen (create/join by code, leader promote/demote/remove, dissolve), challenge detail passes `?event=` so event solves feed the event leaderboard (`api.patch` added to the http client) | ✅ |
+| Admin (stage-forward): Events view (create event, schedule, add challenges, per-challenge unlock-rule editor TIME/PREREQUISITE/SCORE/ALWAYS, remove/delete) + Announcements view (create/edit/pin/delete) in `apps/admin/src/`; nav now selects views | ✅ |
+| Shared fix: circular-import TDZ in `validation/events.ts` (`import { idSchema } from '.'`) → `validation/id.ts` re-exported first from `validation/index.ts` | ✅ |
+| Verification: turbo typecheck/lint/build 18/18, 135 API tests, expo export incl. `/events` + `/event/[id]` + `/teams`, compose rebuild + live smoke (join → gated list → submit caesars `?event=7` → score 110 leaderboard rank 1, stolen-sql unlocks, cookie-jar stays TIME-locked; admin add/unlock PREREQUISITE; announcements live) | ✅ |
+| `getMyTeam` exposes the join code to members; `EventListScope` lives in services (not shared), `EventLeaderboardScope` in shared | ✅ |
+
+**Verification log (Stage 7):**
+- Live smoke (containerized): login `user@ctf.test` → `GET /api/events/7/challenges` shows caesars open, xor `prerequisite`, stolen-sql `score`, cookie-jar `time_lock` → POST `/api/challenges/1/submissions?event=7` with `ctf{caesar_would_be_proud}` → `110 pts`, gates refresh (xor+stolen-sql open, cookie-jar still locked), `/api/events/7/leaderboard` → `[{rank 1, player1, 110}]`, `/api/teams/mine` → Demo Squad `DEMO01`.
+- Admin smoke: `GET /api/admin/events` lists sprint; POST event-challenge with `PREREQUISITE [challengeId 3]` applied; `GET /api/announcements` returns both seeded items. Debug events created during dbo script sessions (Dbg/Dbg2-5) deleted via admin API.
+- Full suite: 13 files / 135 tests passing; typecheck 18/18, lint 18/18 (only pre-existing warnings in `sandbox.isolation.test.ts` + `terminal.test.ts`).
+
+**Currently running:** `docker compose up -d` stack (ctf-postgres :5432, ctf-redis :6379, ctf-api :4000) with **Stage 7** — events/teams/announcements live, demo event "CTF Summer Sprint" (RUNNING) with `DEMO01` team and demo solve on the board.
 
 **🔵 Stage 6 — Terminal & Sandbox — DONE ✅**
 

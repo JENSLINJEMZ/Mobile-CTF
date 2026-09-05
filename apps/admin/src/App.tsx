@@ -1,23 +1,24 @@
 import { APP_NAME, APP_VERSION } from '@ctf/shared';
 import type { AuthResponse, HealthResponse, UserDto } from '@ctf/shared';
-import { Badge, Button, Card, Heading, Text } from '@ctf/ui';
+import { Badge, Button, Card, Text } from '@ctf/ui';
 import { useEffect, useState } from 'react';
+
+import type { Session } from './adminApi';
+import { AnnouncementsView } from './views/AnnouncementsView';
+import { EventsView } from './views/EventsView';
 
 const NAV_ITEMS = [
   'Dashboard',
   'Challenges',
   'Events',
+  'Announcements',
   'Users',
   'Teams',
   'Analytics',
   'Audit Log',
 ] as const;
 
-interface Session {
-  user: UserDto;
-  accessToken: string;
-  refreshToken: string;
-}
+type NavItem = (typeof NAV_ITEMS)[number];
 
 const SESSION_KEY = 'ctf.adminSession.v1';
 
@@ -128,6 +129,7 @@ const inputStyle: React.CSSProperties = {
 
 function Dashboard({ session, onLogout }: { session: Session; onLogout: () => void }) {
   const [apiStatus, setApiStatus] = useState<'checking' | 'up' | 'down'>('checking');
+  const [activeView, setActiveView] = useState<NavItem>('Dashboard');
 
   useEffect(() => {
     fetch('/api/health', {
@@ -137,6 +139,8 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
       .then((body: HealthResponse) => setApiStatus(body.status === 'ok' ? 'up' : 'down'))
       .catch(() => setApiStatus('down'));
   }, [session.accessToken]);
+
+  const untouched = new Set<NavItem>(['Dashboard', 'Challenges', 'Users', 'Teams', 'Analytics', 'Audit Log']);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
@@ -149,22 +153,31 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           flexShrink: 0,
         }}
       >
-        <Heading level={3} style={{ color: '#ffffff' }}>
-          {APP_NAME}
-        </Heading>
-        <Text tone="muted" size="sm">
-          Admin console v{APP_VERSION}
-        </Text>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ color: '#ffffff', fontSize: 18, fontWeight: 700 }}>{APP_NAME}</div>
+            <Text tone="muted" size="sm">
+              Admin console v{APP_VERSION}
+            </Text>
+          </div>
+        </div>
         <nav style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {NAV_ITEMS.map((item) => (
             <a
               key={item}
               href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveView(item);
+              }}
               style={{
                 color: '#cbd5e1',
                 textDecoration: 'none',
                 padding: '8px 12px',
                 borderRadius: 8,
+                cursor: 'pointer',
+                fontWeight: activeView === item ? 700 : 400,
+                backgroundColor: activeView === item ? 'rgba(37, 99, 235, 0.25)' : 'transparent',
               }}
             >
               {item}
@@ -181,24 +194,30 @@ function Dashboard({ session, onLogout }: { session: Session; onLogout: () => vo
           <Button onClick={onLogout}>Sign out</Button>
         </div>
 
-        <Card
-          title="Stage 2 — Admin shell"
-          bodyStyle={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-        >
-          <Text>
-            API status:{' '}
-            {apiStatus === 'checking' ? (
-              <Badge tone="neutral">checking…</Badge>
-            ) : apiStatus === 'up' ? (
-              <Badge tone="success">up</Badge>
-            ) : (
-              <Badge tone="danger">down</Badge>
-            )}
-          </Text>
-          <Text tone="secondary">
-            Signed in as <code>{session.user.username}</code>. Screens land in later stages.
-          </Text>
-        </Card>
+        {activeView === 'Events' ? <EventsView session={session} /> : null}
+        {activeView === 'Announcements' ? <AnnouncementsView session={session} /> : null}
+
+        {untouched.has(activeView) ? (
+          <Card
+            title={`Stage 7 — ${activeView}`}
+            bodyStyle={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+          >
+            <Text>
+              API status:{' '}
+              {apiStatus === 'checking' ? (
+                <Badge tone="neutral">checking…</Badge>
+              ) : apiStatus === 'up' ? (
+                <Badge tone="success">up</Badge>
+              ) : (
+                <Badge tone="danger">down</Badge>
+              )}
+            </Text>
+            <Text tone="secondary">
+              Signed in as <code>{session.user.username}</code>. This section is a placeholder in
+              this stage.
+            </Text>
+          </Card>
+        ) : null}
       </main>
     </div>
   );

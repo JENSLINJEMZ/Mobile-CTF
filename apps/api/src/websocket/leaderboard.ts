@@ -1,7 +1,7 @@
 import type { Server as HttpServer } from 'node:http';
 import { Server as SocketIOServer, type Server } from 'socket.io';
 
-import { setLeaderboardSolvedHandler } from '../services/events';
+import { setLeaderboardSolvedHandler } from '../services/leaderboardEvents';
 import { logger } from '../utils/logger';
 import { authByHandshake } from './auth';
 import { attachTerminalNamespace } from './terminal';

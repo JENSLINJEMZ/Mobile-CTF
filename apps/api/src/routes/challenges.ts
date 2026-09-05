@@ -16,11 +16,16 @@ import {
   unlockHint,
 } from '../services/challenges';
 import { submitFlag } from '../services/submissions';
-import { emitLeaderboardSolved } from '../services/events';
+import { emitLeaderboardSolved } from '../services/leaderboardEvents';
 
 export const challengesRouter = Router();
 
 challengesRouter.use(optionalAuth);
+
+function parseEventId(value: unknown): number | undefined {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : undefined;
+}
 
 challengesRouter.get(
   '/categories',
@@ -52,6 +57,7 @@ challengesRouter.get(
         tag: typeof req.query.tag === 'string' ? req.query.tag : undefined,
         search: typeof req.query.search === 'string' ? req.query.search : undefined,
         solved: req.query.solved === 'solved' || req.query.solved === 'unsolved' ? req.query.solved : undefined,
+        eventId: parseEventId(req.query.event),
       },
       req.user,
     );
@@ -62,7 +68,7 @@ challengesRouter.get(
 challengesRouter.get(
   '/:id(\\d+)',
   asyncHandler(async (req, res) => {
-    const data = await getChallengeDetail(Number(req.params.id), req.user);
+    const data = await getChallengeDetail(Number(req.params.id), req.user, parseEventId(req.query.event));
     res.json({ success: true, data });
   }),
 );
@@ -80,7 +86,12 @@ challengesRouter.post(
   submissionLimiter,
   validateBody(submitFlagSchema),
   asyncHandler(async (req, res) => {
-    const data = await submitFlag(req.user!.id, Number(req.params.id), req.body.flag);
+    const data = await submitFlag(
+      req.user!.id,
+      Number(req.params.id),
+      req.body.flag,
+      parseEventId(req.query.event),
+    );
     if (data.correct && data.pointsAwarded > 0 && req.user) {
       emitLeaderboardSolved({
         type: 'solved',

@@ -25,6 +25,8 @@ export interface ChallengeSummaryDto {
   published: boolean;
   solvedByMe: boolean;
   tags: ChallengeTagDto[];
+  locked?: boolean;
+  lockedReason?: string | null;
 }
 
 export interface HintDto {

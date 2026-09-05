@@ -3,6 +3,7 @@ import { prisma } from '@ctf/database';
 import { sha256Hex, verifyFlag } from '@ctf/database';
 
 import { ApiError } from '../middleware/errors';
+import { assertEventChallengeAccess, recordEventSolve } from './events';
 import { computeSolveResult } from './scoring';
 import { applySolve, getGlobalRank, getUserTotalScore } from './leaderboard';
 
@@ -10,6 +11,7 @@ export async function submitFlag(
   userId: number,
   challengeId: number,
   flag: string,
+  eventId?: number,
 ): Promise<SubmitFlagResponse> {
   const challenge = await prisma.challenge.findUnique({
     where: { id: challengeId },
@@ -25,6 +27,10 @@ export async function submitFlag(
   });
   if (!challenge || !challenge.published) {
     throw new ApiError(404, 'NOT_FOUND', 'Challenge not found');
+  }
+
+  if (eventId !== undefined) {
+    await assertEventChallengeAccess(eventId, challengeId, userId);
   }
 
   const existing = await prisma.submission.findUnique({
@@ -106,6 +112,7 @@ export async function submitFlag(
   }
 
   const { totalScore, rank } = await applySolve(userId, pointsAwarded);
+  await recordEventSolve(userId, pointsAwarded);
   return {
     correct: true,
     message: isFirstBlood

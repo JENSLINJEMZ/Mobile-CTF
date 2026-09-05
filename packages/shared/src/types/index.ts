@@ -4,3 +4,6 @@ export * from './auth';
 export * from './challenge';
 export * from './leaderboard';
 export * from './terminal';
+export * from './events';
+export * from './teams';
+export * from './announcements';

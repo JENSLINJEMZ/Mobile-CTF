@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { Difficulty, Role } from '@prisma/client';
+import { Difficulty, Role, type Prisma } from '@prisma/client';
 
 import { hashFlag, randomSalt } from '../src/flag';
 import { prisma } from '../src/client';
@@ -63,10 +63,15 @@ async function main() {
   const tags = await seedTags();
   const challenges = await seedChallenges(admin.id, categories, tags);
 
+  const eventId = await seedEvent(admin.id);
+  const demoTeam = await seedDemoTeam(user.id, eventId);
+  await seedAnnouncements(admin.id);
+
   console.log(`[seed] demo admin: ${admin.username} <${admin.email}> (role=${admin.role})`);
   console.log(`[seed] demo user:  ${user.username} <${user.email}> (role=${user.role})`);
   console.log(`[seed] shared dev password for both: "${password}" (bcrypt rounds=${Number(process.env.BCRYPT_ROUNDS ?? 12)})`);
   console.log(`[seed] categories: ${Object.keys(categories).length}, tags: ${Object.keys(tags).length}, challenges: ${challenges}`);
+  console.log(`[seed] demo event: ${eventId}, demo team: ${demoTeam.name} (code ${demoTeam.joinCode})`);
   console.log('[seed] done.');
 }
 
@@ -509,3 +514,163 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+// ---------------------------------------------------------------------------
+// Stage 7: events, teams, announcements
+// ---------------------------------------------------------------------------
+
+const EVENT_SEED = {
+  slug: 'ctf-summer-sprint',
+  title: 'CTF Summer Sprint',
+  description: [
+    '# CTF Summer Sprint',
+    '',
+    'The first-ever live event on this platform. Solve challenges, watch the',
+    'leaderboard shuffle, and climb the team rankings before the clock runs out.',
+    '',
+    'Some challenges unlock early, others appear as you earn score — keep solving!',
+  ].join('\n'),
+};
+
+async function seedEvent(organizerId: number): Promise<number> {
+  const startsAt = new Date(Date.now() - 60 * 60 * 1000);
+  const endsAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  const event = await prisma.event.upsert({
+    where: { slug: EVENT_SEED.slug },
+    update: {
+      title: EVENT_SEED.title,
+      description: EVENT_SEED.description,
+      status: 'RUNNING',
+      startsAt,
+      endsAt,
+      createdById: organizerId,
+    },
+    create: {
+      slug: EVENT_SEED.slug,
+      title: EVENT_SEED.title,
+      description: EVENT_SEED.description,
+      status: 'RUNNING',
+      startsAt,
+      endsAt,
+      createdById: organizerId,
+    },
+  });
+
+  await prisma.eventChallenge.deleteMany({ where: { eventId: event.id } });
+
+  async function challengeId(slug: string): Promise<number> {
+    const row = await prisma.challenge.findUnique({ where: { slug } });
+    if (!row) throw new Error(`Seed event references unknown challenge "${slug}"`);
+    return row.id;
+  }
+
+  const caesar = await challengeId('caesars-secret');
+  const xor = await challengeId('xor-marks-the-spot');
+  const sql = await challengeId('stolen-sql');
+  const cookie = await challengeId('cookie-jar');
+
+  const entries: {
+    challengeId: number;
+    sortOrder: number;
+    unlock: Prisma.UnlockRuleCreateWithoutEventChallengeInput | undefined;
+  }[] = [
+    { challengeId: caesar, sortOrder: 0, unlock: undefined },
+    {
+      challengeId: xor,
+      sortOrder: 1,
+      unlock: {
+        type: 'PREREQUISITE',
+        prerequisites: { create: [{ challengeId: caesar }] },
+      },
+    },
+    { challengeId: sql, sortOrder: 2, unlock: { type: 'SCORE', minScore: 110 } },
+    {
+      challengeId: cookie,
+      sortOrder: 3,
+      unlock: { type: 'TIME', unlockAt: new Date(Date.now() + 2 * 60 * 60 * 1000) },
+    },
+  ];
+
+  for (const entry of entries) {
+    await prisma.eventChallenge.create({
+      data: {
+        eventId: event.id,
+        challengeId: entry.challengeId,
+        sortOrder: entry.sortOrder,
+        unlockRule: entry.unlock ? { create: entry.unlock } : undefined,
+      },
+    });
+  }
+
+  return event.id;
+}
+
+async function seedDemoTeam(
+  leaderId: number,
+  eventId: number,
+): Promise<{ name: string; joinCode: string }> {
+  const team = await prisma.team.upsert({
+    where: { joinCode: 'DEMO01' },
+    update: {
+      name: 'Demo Squad',
+      slug: 'demo-squad',
+      description: 'The default team created during seeding. Grab a friend with the join code!',
+      createdById: leaderId,
+    },
+    create: {
+      name: 'Demo Squad',
+      slug: 'demo-squad',
+      description: 'The default team created during seeding. Grab a friend with the join code!',
+      joinCode: 'DEMO01',
+      createdById: leaderId,
+    },
+  });
+
+  await prisma.teamMember.upsert({
+    where: { userId: leaderId },
+    update: { teamId: team.id, role: 'LEADER' },
+    create: { teamId: team.id, userId: leaderId, role: 'LEADER' },
+  });
+
+  await prisma.eventParticipant.upsert({
+    where: { eventId_userId: { eventId, userId: leaderId } },
+    update: {},
+    create: { eventId, userId: leaderId, teamId: team.id },
+  });
+
+  await prisma.eventTeam.upsert({
+    where: { teamId: team.id },
+    update: { eventId },
+    create: { eventId, teamId: team.id },
+  });
+
+  return { name: team.name, joinCode: team.joinCode };
+}
+
+const ANNOUNCEMENT_SEEDS = [
+  {
+    title: 'Welcome to the Summer Sprint',
+    body: [
+      'The Summer Sprint event is live! Register before the clock runs out.',
+      '',
+      'Remember: some challenges are locked until you earn score or solve',
+      'their prerequisites. The team leaderboard updates with every solve.',
+    ].join('\n'),
+    pinned: true,
+  },
+  {
+    title: 'Flag format reminder',
+    body: 'All flags follow the `ctf{...}` format. Keep the braces and use underscores between words.',
+    pinned: false,
+  },
+];
+
+async function seedAnnouncements(authorId: number): Promise<void> {
+  for (const seed of ANNOUNCEMENT_SEEDS) {
+    await prisma.announcement.deleteMany({ where: { title: seed.title } });
+    await prisma.announcement.create({
+      data: { title: seed.title, body: seed.body, pinned: seed.pinned, createdById: authorId },
+    });
+  }
+}

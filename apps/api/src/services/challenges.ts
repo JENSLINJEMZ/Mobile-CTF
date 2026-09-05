@@ -7,11 +7,13 @@ import {
   type HintDto,
   type PaginatedResult,
 } from '@ctf/shared';
+import { ErrorCode } from '@ctf/shared';
 import { prisma } from '@ctf/database';
 import { hashFlag, randomSalt } from '@ctf/database';
 import type { Prisma } from '@prisma/client';
 
 import { ApiError } from '../middleware/errors';
+import { getEventChallengeStates, lockedMessage, type EventChallengeGate } from './events';
 
 export type Viewer = { id: number; role: string } | undefined;
 
@@ -84,6 +86,7 @@ export interface ChallengeListInput {
   tag?: string;
   search?: string;
   solved?: 'solved' | 'unsolved';
+  eventId?: number;
 }
 
 function applyFilters(
@@ -125,6 +128,13 @@ export async function listChallenges(
   };
   applyFilters(where, input);
 
+  let eventGate = new Map<number, EventChallengeGate>();
+  if (input.eventId !== undefined) {
+    const { states } = await getEventChallengeStates(input.eventId, viewer?.id);
+    eventGate = states;
+    where.id = { in: [...states.keys()] };
+  }
+
   const [total, rows, userSolved] = await Promise.all([
     prisma.challenge.count({ where }),
     prisma.challenge.findMany({
@@ -142,18 +152,23 @@ export async function listChallenges(
   const solvedSet = new Set(userSolved.map((s) => s.challengeId));
   const totalPages = Math.ceil(total / limit);
   return {
-    items: rows.map((c) => ({
-      id: c.id,
-      slug: c.slug,
-      title: c.title,
-      category: toCategoryDto(c.category),
-      difficulty: c.difficulty as SharedDifficulty,
-      basePoints: c.basePoints,
-      solvedCount: c._count.submissions,
-      published: c.published,
-      solvedByMe: solvedSet.has(c.id),
-      tags: c.tags.map((t) => toTagDto(t.tag)),
-    })),
+    items: rows.map((c) => {
+      const gate = eventGate.get(c.id);
+      return {
+        id: c.id,
+        slug: c.slug,
+        title: c.title,
+        category: toCategoryDto(c.category),
+        difficulty: c.difficulty as SharedDifficulty,
+        basePoints: c.basePoints,
+        solvedCount: c._count.submissions,
+        published: c.published,
+        solvedByMe: solvedSet.has(c.id),
+        tags: c.tags.map((t) => toTagDto(t.tag)),
+        locked: gate?.locked ?? false,
+        lockedReason: gate?.reason ?? null,
+      };
+    }),
     meta: {
       page,
       limit,
@@ -179,6 +194,7 @@ export async function resolveChallengeById(id: number): Promise<
 export async function getChallengeDetail(
   id: number,
   viewer: Viewer,
+  eventId?: number,
 ): Promise<ChallengeDetailDto> {
   const manage = canManage(viewer);
   const challenge = await prisma.challenge.findUnique({
@@ -194,6 +210,14 @@ export async function getChallengeDetail(
 
   if (!challenge || (!challenge.published && !manage)) {
     throw new ApiError(404, 'NOT_FOUND', 'Challenge not found');
+  }
+
+  if (eventId !== undefined) {
+    const { states } = await getEventChallengeStates(eventId, viewer?.id);
+    const gate = states.get(challenge.id);
+    if (gate?.locked) {
+      throw new ApiError(403, ErrorCode.LOCKED, lockedMessage(gate.reason));
+    }
   }
 
   const { solved, unlockedHintIds } = await loadSolutionState(viewer?.id, challenge.id);

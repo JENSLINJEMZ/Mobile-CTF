@@ -31,8 +31,9 @@ function difficultyLabel(value: string): string {
 }
 
 export default function ChallengeDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, event } = useLocalSearchParams<{ id: string; event?: string }>();
   const challengeId = Number(id);
+  const eventId = event ? Number(event) : undefined;
   const colorScheme = useColorScheme();
   const authStatus = useAuthStore((s) => s.status);
 
@@ -86,7 +87,7 @@ export default function ChallengeDetailScreen() {
   const load = useCallback(async () => {
     try {
       setLoadError(null);
-      const data = await getChallenge(challengeId);
+      const data = await getChallenge(challengeId, eventId);
       setChallenge(data);
       setResult(null);
     } catch (err) {
@@ -94,7 +95,7 @@ export default function ChallengeDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [challengeId]);
+  }, [challengeId, eventId]);
 
   useEffect(() => {
     void load();
@@ -106,7 +107,7 @@ export default function ChallengeDetailScreen() {
     setSubmitError(null);
     setResult(null);
     try {
-      const response = await submitFlag(challengeId, flag.trim());
+      const response = await submitFlag(challengeId, flag.trim(), eventId);
       setResult(response);
       if (response.correct) {
         setFlag('');
@@ -117,7 +118,7 @@ export default function ChallengeDetailScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [challengeId, flag, submitting, load]);
+  }, [challengeId, flag, submitting, load, eventId]);
 
   const onUnlockHint = useCallback(
     async (hintId: number) => {

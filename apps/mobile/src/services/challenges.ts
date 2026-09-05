@@ -34,17 +34,23 @@ export async function listChallenges(params: ChallengeListParams = {}): Promise<
   );
 }
 
-export async function getChallenge(id: number): Promise<ChallengeDetailDto> {
-  return api.get<ChallengeDetailDto>(`/challenges/${id}`, { auth: true });
+export async function getChallenge(id: number, eventId?: number): Promise<ChallengeDetailDto> {
+  const qs = eventId ? `?event=${eventId}` : '';
+  return api.get<ChallengeDetailDto>(`/challenges/${id}${qs}`, { auth: true });
 }
 
 export async function listChallengeCategories(): Promise<ChallengeCategoryDto[]> {
   return api.get<ChallengeCategoryDto[]>('/challenges/categories');
 }
 
-export async function submitFlag(id: number, flag: string): Promise<SubmitFlagResponse> {
+export async function submitFlag(
+  id: number,
+  flag: string,
+  eventId?: number,
+): Promise<SubmitFlagResponse> {
   const body: SubmitFlagRequest = { flag };
-  return api.post<SubmitFlagResponse>(`/challenges/${id}/submissions`, body, { auth: true });
+  const qs = eventId ? `?event=${eventId}` : '';
+  return api.post<SubmitFlagResponse>(`/challenges/${id}/submissions${qs}`, body, { auth: true });
 }
 
 export async function unlockHint(challengeId: number, hintId: number): Promise<UnlockHintResponse> {

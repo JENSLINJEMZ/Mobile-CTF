@@ -43,6 +43,17 @@ export const TERMINAL = {
   SESSION_NAMESPACE: '/terminal',
 } as const;
 
+export const TEAM = {
+  MAX_MEMBERS: 5,
+  JOIN_CODE_LENGTH: 6,
+  INVITE_CODE_LENGTH: 8,
+} as const;
+
+export const EVENT = {
+  LEADERBOARD_DEFAULT_LIMIT: 50,
+  LEADERBOARD_MAX_LIMIT: 100,
+} as const;
+
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'ctf.accessToken',
   REFRESH_TOKEN: 'ctf.refreshToken',

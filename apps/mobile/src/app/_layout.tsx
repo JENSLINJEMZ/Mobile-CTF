@@ -35,6 +35,15 @@ export default function RootLayout() {
           }}
         />
         <Tabs.Screen
+          name="events"
+          options={{
+            title: 'Events',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="calendar" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="leaderboard"
           options={{
             title: 'Leaderboard',
@@ -58,6 +67,14 @@ export default function RootLayout() {
         <Tabs.Screen
           name="challenge/[id]"
           options={{ href: null, title: 'Challenge' }}
+        />
+        <Tabs.Screen
+          name="event/[id]"
+          options={{ href: null, title: 'Event' }}
+        />
+        <Tabs.Screen
+          name="teams"
+          options={{ href: null, title: 'My Team' }}
         />
         <Tabs.Screen
           name="auth/login"
