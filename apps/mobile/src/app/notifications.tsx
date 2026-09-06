@@ -196,6 +196,7 @@ export default function NotificationsScreen() {
             disabled={pushBusy}
             trackColor={{ true: "#2563eb" }}
             thumbColor="#ffffff"
+            accessibilityLabel="Push notifications"
           />
         </ThemedView>
       ) : null}
@@ -203,6 +204,8 @@ export default function NotificationsScreen() {
       <ThemedView style={styles.toolbar}>
         <Pressable
           onPress={toggleUnreadOnly}
+          accessibilityRole="button"
+          accessibilityState={{ selected: unreadOnly }}
           style={({ pressed }) => [
             styles.chip,
             unreadOnly && styles.chipActive,
@@ -220,6 +223,8 @@ export default function NotificationsScreen() {
           <Pressable
             disabled={busyAll}
             onPress={() => void onMarkAllRead()}
+            accessibilityRole="button"
+            accessibilityHint="Marks every notification as read"
             style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
           >
             {busyAll ? (
@@ -256,6 +261,10 @@ export default function NotificationsScreen() {
             return (
               <Pressable
                 onPress={() => void onPressItem(item.id)}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  unread ? `${item.title}, unread` : item.title
+                }
                 style={({ pressed }) => [
                   styles.row,
                   pressed && styles.pressed,
