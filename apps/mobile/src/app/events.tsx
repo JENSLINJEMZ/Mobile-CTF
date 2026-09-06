@@ -1,45 +1,50 @@
-import type { AnnouncementDto, EventSummaryDto } from '@ctf/shared';
-import { Link, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet } from 'react-native';
+import type { AnnouncementDto, EventSummaryDto } from "@ctf/shared";
+import { Link, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+} from "react-native";
 
-import { ScreenShell } from '@/components/screen-shell';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { listAnnouncements } from '@/services/announcements';
-import { joinEvent, leaveEvent, listEvents } from '@/services/events';
-import { useAuthStore } from '@/store/auth-store';
+import { ScreenShell } from "@/components/screen-shell";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { Spacing } from "@/constants/theme";
+import { listAnnouncements } from "@/services/announcements";
+import { joinEvent, leaveEvent, listEvents } from "@/services/events";
+import { useAuthStore } from "@/store/auth-store";
 
-function statusColor(status: EventSummaryDto['status']): string {
+function statusColor(status: EventSummaryDto["status"]): string {
   switch (status) {
-    case 'DRAFT':
-      return '#6b7280';
-    case 'SCHEDULED':
-      return '#2563eb';
-    case 'RUNNING':
-      return '#16a34a';
-    case 'ENDED':
-      return '#dc2626';
+    case "DRAFT":
+      return "#6b7280";
+    case "SCHEDULED":
+      return "#2563eb";
+    case "RUNNING":
+      return "#16a34a";
+    case "ENDED":
+      return "#dc2626";
   }
 }
 
 function remainingLabel(event: EventSummaryDto): string {
-  if (event.status === 'SCHEDULED') {
+  if (event.status === "SCHEDULED") {
     const s = event.startsInSeconds ?? 0;
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
-    return `Starts in ${h > 0 ? `${h}h ` : ''}${m}m`;
+    return `Starts in ${h > 0 ? `${h}h ` : ""}${m}m`;
   }
-  if (event.status === 'RUNNING') {
+  if (event.status === "RUNNING") {
     const end = new Date(event.endsAt).getTime();
     const diff = Math.max(0, end - Date.now());
     const h = Math.floor(diff / 3600000);
     const m = Math.floor((diff % 3600000) / 60000);
     return h > 0 ? `${h}h ${m}m left` : `${m}m left`;
   }
-  if (event.status === 'ENDED') return 'Ended';
-  return 'Draft';
+  if (event.status === "ENDED") return "Ended";
+  return "Draft";
 }
 
 export default function EventsScreen() {
@@ -59,7 +64,7 @@ export default function EventsScreen() {
       setEvents(items);
       setAnnouncements(announcements);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load events');
+      setError(err instanceof Error ? err.message : "Failed to load events");
     }
   }, []);
 
@@ -81,7 +86,7 @@ export default function EventsScreen() {
         }
         void load();
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Action failed');
+        setError(err instanceof Error ? err.message : "Action failed");
       } finally {
         setBusyId(null);
       }
@@ -89,7 +94,7 @@ export default function EventsScreen() {
     [busyId, load],
   );
 
-  const isAuthenticated = authStatus === 'authenticated';
+  const isAuthenticated = authStatus === "authenticated";
 
   return (
     <ScreenShell title="Events">
@@ -99,17 +104,27 @@ export default function EventsScreen() {
           data={announcements}
           keyExtractor={(item) => String(item.id)}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: Spacing.two, paddingBottom: Spacing.two }}
+          contentContainerStyle={{
+            gap: Spacing.two,
+            paddingBottom: Spacing.two,
+          }}
           renderItem={({ item }) => (
             <ThemedView
               type="backgroundElement"
-              style={[styles.announcement, item.pinned && styles.announcementPinned]}
+              style={[
+                styles.announcement,
+                item.pinned && styles.announcementPinned,
+              ]}
             >
               <ThemedText type="smallBold" numberOfLines={1}>
-                {item.pinned ? '📌 ' : ''}
+                {item.pinned ? "📌 " : ""}
                 {item.title}
               </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
+              <ThemedText
+                type="small"
+                themeColor="textSecondary"
+                numberOfLines={2}
+              >
                 {item.body}
               </ThemedText>
             </ThemedView>
@@ -119,7 +134,7 @@ export default function EventsScreen() {
 
       {error ? (
         <Pressable onPress={() => void load()}>
-          <ThemedText type="small" style={{ color: '#dc2626' }}>
+          <ThemedText type="small" style={{ color: "#dc2626" }}>
             {error} — tap to retry
           </ThemedText>
         </Pressable>
@@ -135,43 +150,63 @@ export default function EventsScreen() {
           renderItem={({ item }) => (
             <ThemedView type="backgroundElement" style={styles.card}>
               <Link href={`/event/${item.id}`} asChild>
-                <Pressable style={({ pressed }) => [styles.cardHeader, pressed && styles.pressed]}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.cardHeader,
+                    pressed && styles.pressed,
+                  ]}
+                >
                   <ThemedView style={styles.cardBody}>
                     <ThemedView style={styles.titleRow}>
                       <ThemedText type="smallBold" numberOfLines={1}>
                         {item.title}
                       </ThemedText>
                       <ThemedView
-                        style={[styles.statusDot, { backgroundColor: statusColor(item.status) }]}
+                        style={[
+                          styles.statusDot,
+                          { backgroundColor: statusColor(item.status) },
+                        ]}
                       />
                     </ThemedView>
-                    <ThemedText type="small" style={{ color: statusColor(item.status) }}>
+                    <ThemedText
+                      type="small"
+                      style={{ color: statusColor(item.status) }}
+                    >
                       {remainingLabel(item)}
                     </ThemedText>
                     <ThemedText type="small" themeColor="textSecondary">
-                      {item.participantCount} participant{item.participantCount === 1 ? '' : 's'} ·{' '}
-                      {item.teamCount} team{item.teamCount === 1 ? '' : 's'}
+                      {item.participantCount} participant
+                      {item.participantCount === 1 ? "" : "s"} ·{" "}
+                      {item.teamCount} team{item.teamCount === 1 ? "" : "s"}
                     </ThemedText>
                   </ThemedView>
                 </Pressable>
               </Link>
 
-              {isAuthenticated && item.status !== 'ENDED' ? (
+              {isAuthenticated && item.status !== "ENDED" ? (
                 <Pressable
-                  disabled={busyId !== null || item.status === 'DRAFT'}
+                  disabled={busyId !== null || item.status === "DRAFT"}
                   onPress={() => void onAction(item)}
                   style={({ pressed }) => [
                     styles.actionButton,
                     item.joinedByMe ? styles.actionJoined : styles.actionJoin,
-                    (busyId !== null || item.status === 'DRAFT') && styles.pressed,
+                    (busyId !== null || item.status === "DRAFT") &&
+                      styles.pressed,
                     pressed && styles.pressed,
                   ]}
                 >
                   {busyId === item.id ? (
                     <ActivityIndicator color="#ffffff" size="small" />
                   ) : (
-                    <ThemedText type="small" style={{ color: '#ffffff', fontWeight: '600' }}>
-                      {item.joinedByMe ? 'Leave' : item.status === 'DRAFT' ? 'Draft' : 'Join'}
+                    <ThemedText
+                      type="small"
+                      style={{ color: "#ffffff", fontWeight: "600" }}
+                    >
+                      {item.joinedByMe
+                        ? "Leave"
+                        : item.status === "DRAFT"
+                          ? "Draft"
+                          : "Join"}
                     </ThemedText>
                   )}
                 </Pressable>
@@ -179,7 +214,11 @@ export default function EventsScreen() {
             </ThemedView>
           )}
           ListEmptyComponent={
-            <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
+            <ThemedText
+              type="small"
+              themeColor="textSecondary"
+              style={styles.empty}
+            >
               No events right now. Check back soon!
             </ThemedText>
           }
@@ -198,7 +237,7 @@ const styles = StyleSheet.create({
   },
   announcementPinned: {
     borderWidth: 1,
-    borderColor: '#f59e0b',
+    borderColor: "#f59e0b",
   },
   listContent: {
     gap: Spacing.two,
@@ -210,16 +249,16 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   cardBody: {
     flex: 1,
     gap: Spacing.half,
   },
   titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.two,
   },
   statusDot: {
@@ -229,18 +268,18 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Spacing.two + Spacing.half,
   },
   actionJoin: {
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
   },
   actionJoined: {
-    backgroundColor: '#dc2626',
+    backgroundColor: "#dc2626",
   },
   empty: {
     marginTop: Spacing.five,
-    textAlign: 'center',
+    textAlign: "center",
   },
   pressed: {
     opacity: 0.6,

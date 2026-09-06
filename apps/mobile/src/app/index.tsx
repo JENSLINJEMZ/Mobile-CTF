@@ -1,6 +1,10 @@
-import type { ChallengeCategoryDto, ChallengeSummaryDto, PaginatedResult } from '@ctf/shared';
-import { Link } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import type {
+  ChallengeCategoryDto,
+  ChallengeSummaryDto,
+  PaginatedResult,
+} from "@ctf/shared";
+import { Link } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -8,20 +12,20 @@ import {
   StyleSheet,
   TextInput,
   useColorScheme,
-} from 'react-native';
+} from "react-native";
 
-import { ScreenShell } from '@/components/screen-shell';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { listChallengeCategories, listChallenges } from '@/services/challenges';
-import { useAuthStore } from '@/store/auth-store';
+import { ScreenShell } from "@/components/screen-shell";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { Spacing } from "@/constants/theme";
+import { listChallengeCategories, listChallenges } from "@/services/challenges";
+import { useAuthStore } from "@/store/auth-store";
 
 const DIFFICULTY_COLORS: Record<string, string> = {
-  EASY: '#16a34a',
-  MEDIUM: '#d97706',
-  HARD: '#dc2626',
-  EXPERT: '#7c3aed',
+  EASY: "#16a34a",
+  MEDIUM: "#d97706",
+  HARD: "#dc2626",
+  EXPERT: "#7c3aed",
 };
 
 function difficultyLabel(value: string): string {
@@ -32,21 +36,28 @@ export default function ChallengesScreen() {
   const colorScheme = useColorScheme();
   const authStatus = useAuthStore((s) => s.status);
   const [categories, setCategories] = useState<ChallengeCategoryDto[]>([]);
-  const [data, setData] = useState<PaginatedResult<ChallengeSummaryDto> | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
-  const [search, setSearch] = useState('');
+  const [data, setData] = useState<PaginatedResult<ChallengeSummaryDto> | null>(
+    null,
+  );
+  const [selectedCategory, setSelectedCategory] = useState<
+    string | undefined
+  >();
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   const dataRef = useRef<PaginatedResult<ChallengeSummaryDto> | null>(null);
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
 
   const load = useCallback(
     async (category?: string, query?: string, append = false) => {
       try {
         setError(null);
         if (!append) setLoading(true);
-        const page = append && dataRef.current ? dataRef.current.meta.page + 1 : 1;
+        const page =
+          append && dataRef.current ? dataRef.current.meta.page + 1 : 1;
         const result = await listChallenges({
           page,
           category,
@@ -59,7 +70,9 @@ export default function ChallengesScreen() {
         dataRef.current = merged;
         setData(merged);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load challenges');
+        setError(
+          err instanceof Error ? err.message : "Failed to load challenges",
+        );
       } finally {
         setLoading(false);
       }
@@ -91,10 +104,13 @@ export default function ChallengesScreen() {
   }, [selectedCategory, search, load]);
 
   useEffect(() => {
-    if (authStatus === 'authenticated') void load(selectedCategory, search);
+    if (authStatus === "authenticated") void load(selectedCategory, search);
   }, [authStatus, selectedCategory, search, load]);
 
-  const sub = useCallback((text: string) => text.slice(0, 92) + (text.length > 92 ? '…' : ''), []);
+  const sub = useCallback(
+    (text: string) => text.slice(0, 92) + (text.length > 92 ? "…" : ""),
+    [],
+  );
 
   return (
     <ScreenShell title="Challenges">
@@ -102,28 +118,50 @@ export default function ChallengesScreen() {
         value={search}
         onChangeText={setSearch}
         placeholder="Search challenges…"
-        placeholderTextColor={isDark ? '#9ca3af' : '#6b7280'}
-        style={[styles.search, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}
+        placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
+        style={[
+          styles.search,
+          { backgroundColor: isDark ? "#1f2937" : "#f3f4f6" },
+        ]}
       />
 
       <FlatList
         horizontal
-        data={[{ slug: undefined, name: 'All', icon: null, id: 0, sortOrder: -1 }, ...categories]}
-        keyExtractor={(item) => item.slug ?? 'all'}
+        data={[
+          { slug: undefined, name: "All", icon: null, id: 0, sortOrder: -1 },
+          ...categories,
+        ]}
+        keyExtractor={(item) => item.slug ?? "all"}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: Spacing.two, paddingVertical: Spacing.one }}
+        contentContainerStyle={{
+          gap: Spacing.two,
+          paddingVertical: Spacing.one,
+        }}
         renderItem={({ item }) => {
           const active = selectedCategory === item.slug;
           return (
             <Pressable
-              onPress={() => setSelectedCategory(active ? undefined : item.slug)}
+              onPress={() =>
+                setSelectedCategory(active ? undefined : item.slug)
+              }
               style={[
                 styles.categoryChip,
-                { backgroundColor: active ? '#2563eb' : isDark ? '#1f2937' : '#eef2ff' },
+                {
+                  backgroundColor: active
+                    ? "#2563eb"
+                    : isDark
+                      ? "#1f2937"
+                      : "#eef2ff",
+                },
               ]}
             >
               <ThemedText
-                style={[styles.categoryChipLabel, { color: active ? '#ffffff' : isDark ? '#c7d2fe' : '#1e3a8a' }]}
+                style={[
+                  styles.categoryChipLabel,
+                  {
+                    color: active ? "#ffffff" : isDark ? "#c7d2fe" : "#1e3a8a",
+                  },
+                ]}
               >
                 {item.name}
               </ThemedText>
@@ -134,7 +172,7 @@ export default function ChallengesScreen() {
 
       {error ? (
         <Pressable onPress={() => void load(selectedCategory, search)}>
-          <ThemedText type="small" style={{ color: '#dc2626' }}>
+          <ThemedText type="small" style={{ color: "#dc2626" }}>
             {error} — tap to retry
           </ThemedText>
         </Pressable>
@@ -147,38 +185,58 @@ export default function ChallengesScreen() {
           data={data.items}
           keyExtractor={(item) => String(item.id)}
           onEndReached={() => {
-            if (dataRef.current?.meta.hasNext) void load(selectedCategory, search, true);
+            if (dataRef.current?.meta.hasNext)
+              void load(selectedCategory, search, true);
           }}
           onEndReachedThreshold={0.4}
           renderItem={({ item }) => (
             <Link href={`/challenge/${item.id}`} asChild>
-              <Pressable style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.card,
+                  pressed && styles.cardPressed,
+                ]}
+              >
                 <ThemedView type="backgroundElement" style={styles.cardInner}>
                   <ThemedView
-                    style={[styles.difficultyDot, { backgroundColor: DIFFICULTY_COLORS[item.difficulty] }]}
+                    style={[
+                      styles.difficultyDot,
+                      { backgroundColor: DIFFICULTY_COLORS[item.difficulty] },
+                    ]}
                   />
                   <ThemedView style={styles.cardBody}>
                     <ThemedText type="smallBold" numberOfLines={1}>
                       {item.title}
                     </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
-                      {sub(item.category.name)} · {difficultyLabel(item.difficulty)}
+                    <ThemedText
+                      type="small"
+                      themeColor="textSecondary"
+                      numberOfLines={2}
+                    >
+                      {sub(item.category.name)} ·{" "}
+                      {difficultyLabel(item.difficulty)}
                     </ThemedText>
                     {item.solvedByMe ? (
-                      <ThemedText type="small" style={{ color: '#16a34a' }}>
+                      <ThemedText type="small" style={{ color: "#16a34a" }}>
                         Solved ✓
                       </ThemedText>
                     ) : null}
                   </ThemedView>
                   <ThemedView style={styles.pointsBox}>
-                    <ThemedText type="smallBold">{item.basePoints} pts</ThemedText>
+                    <ThemedText type="smallBold">
+                      {item.basePoints} pts
+                    </ThemedText>
                   </ThemedView>
                 </ThemedView>
               </Pressable>
             </Link>
           )}
           ListEmptyComponent={
-            <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
+            <ThemedText
+              type="small"
+              themeColor="textSecondary"
+              style={styles.empty}
+            >
               No challenges match your filters.
             </ThemedText>
           }
@@ -190,12 +248,12 @@ export default function ChallengesScreen() {
 
 const styles = StyleSheet.create({
   search: {
-    width: '100%',
+    width: "100%",
     borderRadius: 12,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two + Spacing.half,
     fontSize: 15,
-    color: '#111827',
+    color: "#111827",
   },
   categoryChip: {
     borderRadius: 999,
@@ -203,10 +261,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
   },
   categoryChipLabel: {
-    fontWeight: '600',
+    fontWeight: "600",
   },
   card: {
-    width: '100%',
+    width: "100%",
     borderRadius: 16,
     marginBottom: Spacing.two,
   },
@@ -214,8 +272,8 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   cardInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: 16,
     padding: Spacing.three,
     gap: Spacing.three,
@@ -230,10 +288,10 @@ const styles = StyleSheet.create({
     gap: Spacing.half,
   },
   pointsBox: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
   empty: {
     marginTop: Spacing.five,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });

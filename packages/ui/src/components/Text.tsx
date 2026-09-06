@@ -1,14 +1,14 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from "react";
 
-import { colors, typography } from '../tokens';
+import { colors, typography } from "../tokens";
 
-type Tone = 'default' | 'secondary' | 'muted' | 'danger' | 'success';
+type Tone = "default" | "secondary" | "muted" | "danger" | "success";
 
 export interface TextProps {
   children: ReactNode;
   tone?: Tone;
-  size?: 'xs' | 'sm' | 'md' | 'lg';
-  weight?: 'regular' | 'medium' | 'semibold' | 'bold';
+  size?: "xs" | "sm" | "md" | "lg";
+  weight?: "regular" | "medium" | "semibold" | "bold";
   style?: CSSProperties;
 }
 
@@ -22,9 +22,9 @@ const toneStyles: Record<Tone, CSSProperties> = {
 
 export function Text({
   children,
-  tone = 'default',
-  size = 'md',
-  weight = 'regular',
+  tone = "default",
+  size = "md",
+  weight = "regular",
   style,
 }: TextProps) {
   return (

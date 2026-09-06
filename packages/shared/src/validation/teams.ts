@@ -1,7 +1,11 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const createTeamSchema = z.object({
-  name: z.string().trim().min(3, 'Team name is too short').max(60, 'Team name is too long'),
+  name: z
+    .string()
+    .trim()
+    .min(3, "Team name is too short")
+    .max(60, "Team name is too long"),
   description: z.string().trim().max(400).optional(),
 });
 
@@ -10,7 +14,7 @@ export const joinTeamSchema = z.object({
     .string()
     .trim()
     .toUpperCase()
-    .regex(/^[A-Z0-9]{4,10}$/, 'Join codes look like ABC123'),
+    .regex(/^[A-Z0-9]{4,10}$/, "Join codes look like ABC123"),
 });
 
 export const createTeamInviteSchema = z.object({
@@ -22,9 +26,9 @@ export const acceptTeamInviteSchema = z.object({
     .string()
     .trim()
     .toUpperCase()
-    .regex(/^[A-Z0-9]{4,12}$/, 'Invite codes look like ABCD1234'),
+    .regex(/^[A-Z0-9]{4,12}$/, "Invite codes look like ABCD1234"),
 });
 
 export const updateTeamMemberRoleSchema = z.object({
-  role: z.enum(['LEADER', 'MEMBER']),
+  role: z.enum(["LEADER", "MEMBER"]),
 });

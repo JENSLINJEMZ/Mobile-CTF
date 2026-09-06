@@ -1,18 +1,19 @@
-import type { TeamDetailDto, TeamDto, TeamMemberRole } from '@ctf/shared';
-import { ErrorCode, TEAM } from '@ctf/shared';
-import { prisma } from '@ctf/database';
+import type { TeamDetailDto, TeamDto, TeamMemberRole } from "@ctf/shared";
+import { ErrorCode, TEAM } from "@ctf/shared";
+import { prisma } from "@ctf/database";
 
-import { ApiError } from '../middleware/errors';
+import { ApiError } from "../middleware/errors";
+import { evaluateAndGrantAchievements } from "./achievements";
 
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 function randomCode(length: number): string {
   const bytes = new Uint8Array(length);
   globalThis.crypto.getRandomValues(bytes);
-  let code = '';
+  let code = "";
   for (let i = 0; i < length; i += 1) {
     const byte = bytes[i] ?? 0;
-    code += CODE_ALPHABET[byte % CODE_ALPHABET.length] ?? '';
+    code += CODE_ALPHABET[byte % CODE_ALPHABET.length] ?? "";
   }
   return code;
 }
@@ -20,18 +21,24 @@ function randomCode(length: number): string {
 function slugify(name: string): string {
   return name
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
     .slice(0, 60);
 }
 
 async function uniqueJoinCode(): Promise<string> {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = randomCode(TEAM.JOIN_CODE_LENGTH);
-    const existing = await prisma.team.findUnique({ where: { joinCode: code } });
+    const existing = await prisma.team.findUnique({
+      where: { joinCode: code },
+    });
     if (!existing) return code;
   }
-  throw new ApiError(500, ErrorCode.INTERNAL_ERROR, 'Could not allocate a team join code');
+  throw new ApiError(
+    500,
+    ErrorCode.INTERNAL_ERROR,
+    "Could not allocate a team join code",
+  );
 }
 
 async function uniqueSlug(name: string): Promise<string> {
@@ -49,24 +56,31 @@ async function uniqueSlug(name: string): Promise<string> {
 async function assertNotInTeam(userId: number): Promise<void> {
   const existing = await prisma.teamMember.findUnique({ where: { userId } });
   if (existing) {
-    throw new ApiError(409, ErrorCode.CONFLICT, 'You are already in a team');
+    throw new ApiError(409, ErrorCode.CONFLICT, "You are already in a team");
   }
 }
 
 async function assertTeamHasRoom(teamId: number): Promise<void> {
   const count = await prisma.teamMember.count({ where: { teamId } });
   if (count >= TEAM.MAX_MEMBERS) {
-    throw new ApiError(409, ErrorCode.CONFLICT, 'This team is full');
+    throw new ApiError(409, ErrorCode.CONFLICT, "This team is full");
   }
 }
 
-async function requireLeaderMembership(userId: number, teamId: number): Promise<void> {
+async function requireLeaderMembership(
+  userId: number,
+  teamId: number,
+): Promise<void> {
   const member = await prisma.teamMember.findUnique({
     where: { teamId_userId: { teamId, userId } },
     select: { role: true },
   });
-  if (!member || member.role !== 'LEADER') {
-    throw new ApiError(403, ErrorCode.FORBIDDEN, 'Only the team leader can do that');
+  if (!member || member.role !== "LEADER") {
+    throw new ApiError(
+      403,
+      ErrorCode.FORBIDDEN,
+      "Only the team leader can do that",
+    );
   }
 }
 
@@ -75,7 +89,10 @@ export interface CreateTeamInput {
   description?: string | null;
 }
 
-export async function createTeam(userId: number, input: CreateTeamInput): Promise<TeamDetailDto> {
+export async function createTeam(
+  userId: number,
+  input: CreateTeamInput,
+): Promise<TeamDetailDto> {
   await assertNotInTeam(userId);
   const slug = await uniqueSlug(input.name);
   const joinCode = await uniqueJoinCode();
@@ -91,31 +108,43 @@ export async function createTeam(userId: number, input: CreateTeamInput): Promis
       },
     });
     await tx.teamMember.create({
-      data: { teamId: created.id, userId, role: 'LEADER' },
+      data: { teamId: created.id, userId, role: "LEADER" },
     });
     return created;
   });
 
+  await evaluateAndGrantAchievements(userId);
   return getTeam(team.id, userId);
 }
 
-export async function getMyTeam(
-  userId: number,
-): Promise<TeamDetailDto | null> {
+export async function getMyTeam(userId: number): Promise<TeamDetailDto | null> {
   const membership = await prisma.teamMember.findUnique({
     where: { userId },
-    include: { team: { include: { members: { include: { user: { select: { id: true, username: true } } } } } } },
+    include: {
+      team: {
+        include: {
+          members: {
+            include: { user: { select: { id: true, username: true } } },
+          },
+        },
+      },
+    },
   });
   if (!membership) return null;
   return toDetailDto(membership.team as never, membership.role, true);
 }
 
-export async function getTeam(id: number, viewerId?: number): Promise<TeamDetailDto> {
+export async function getTeam(
+  id: number,
+  viewerId?: number,
+): Promise<TeamDetailDto> {
   const team = await prisma.team.findUnique({
     where: { id },
-    include: { members: { include: { user: { select: { id: true, username: true } } } } },
+    include: {
+      members: { include: { user: { select: { id: true, username: true } } } },
+    },
   });
-  if (!team) throw new ApiError(404, ErrorCode.NOT_FOUND, 'Team not found');
+  if (!team) throw new ApiError(404, ErrorCode.NOT_FOUND, "Team not found");
 
   const membership = viewerId
     ? await prisma.teamMember.findUnique({
@@ -165,8 +194,10 @@ function toDetailDto(
 
 export async function listTeams(search?: string): Promise<TeamDto[]> {
   const rows = await prisma.team.findMany({
-    where: search ? { name: { contains: search, mode: 'insensitive' } } : undefined,
-    orderBy: { createdAt: 'desc' },
+    where: search
+      ? { name: { contains: search, mode: "insensitive" } }
+      : undefined,
+    orderBy: { createdAt: "desc" },
     take: 50,
     include: { _count: { select: { members: true } } },
   });
@@ -180,21 +211,33 @@ export async function listTeams(search?: string): Promise<TeamDto[]> {
   }));
 }
 
-export async function joinTeamByCode(userId: number, joinCode: string): Promise<TeamDetailDto> {
+export async function joinTeamByCode(
+  userId: number,
+  joinCode: string,
+): Promise<TeamDetailDto> {
   await assertNotInTeam(userId);
   const team = await prisma.team.findUnique({
     where: { joinCode },
-    include: { members: { include: { user: { select: { id: true, username: true } } } } },
+    include: {
+      members: { include: { user: { select: { id: true, username: true } } } },
+    },
   });
   if (!team) {
-    throw new ApiError(404, ErrorCode.NOT_FOUND, 'No team found for that join code');
+    throw new ApiError(
+      404,
+      ErrorCode.NOT_FOUND,
+      "No team found for that join code",
+    );
   }
   if (team.members.length >= TEAM.MAX_MEMBERS) {
-    throw new ApiError(409, ErrorCode.CONFLICT, 'This team is full');
+    throw new ApiError(409, ErrorCode.CONFLICT, "This team is full");
   }
 
-  await prisma.teamMember.create({ data: { teamId: team.id, userId, role: 'MEMBER' } });
+  await prisma.teamMember.create({
+    data: { teamId: team.id, userId, role: "MEMBER" },
+  });
 
+  await evaluateAndGrantAchievements(userId);
   return getTeam(team.id, userId);
 }
 
@@ -207,13 +250,19 @@ export async function inviteTeamMember(
   await assertTeamHasRoom(teamId);
 
   const target = await prisma.user.findUnique({ where: { username } });
-  if (!target) throw new ApiError(404, ErrorCode.NOT_FOUND, 'No user with that username');
+  if (!target)
+    throw new ApiError(404, ErrorCode.NOT_FOUND, "No user with that username");
   await assertNotInTeam(target.id);
 
   const code = randomCode(TEAM.INVITE_CODE_LENGTH);
   await prisma.teamInvite.upsert({
     where: { teamId_invitedUserId: { teamId, invitedUserId: target.id } },
-    update: { code, status: 'PENDING', usedAt: null, invitedByUserId: leaderUserId },
+    update: {
+      code,
+      status: "PENDING",
+      usedAt: null,
+      invitedByUserId: leaderUserId,
+    },
     create: {
       teamId,
       invitedByUserId: leaderUserId,
@@ -225,25 +274,33 @@ export async function inviteTeamMember(
   return { inviteCode: code, teamId };
 }
 
-export async function acceptTeamInvite(userId: number, inviteCode: string): Promise<TeamDetailDto> {
+export async function acceptTeamInvite(
+  userId: number,
+  inviteCode: string,
+): Promise<TeamDetailDto> {
   await assertNotInTeam(userId);
-  const invite = await prisma.teamInvite.findUnique({ where: { code: inviteCode } });
-  if (!invite || invite.status !== 'PENDING') {
-    throw new ApiError(404, ErrorCode.NOT_FOUND, 'Invalid or expired invite');
+  const invite = await prisma.teamInvite.findUnique({
+    where: { code: inviteCode },
+  });
+  if (!invite || invite.status !== "PENDING") {
+    throw new ApiError(404, ErrorCode.NOT_FOUND, "Invalid or expired invite");
   }
   if (invite.invitedUserId !== userId) {
-    throw new ApiError(403, ErrorCode.FORBIDDEN, 'This invite is not for you');
+    throw new ApiError(403, ErrorCode.FORBIDDEN, "This invite is not for you");
   }
   await assertTeamHasRoom(invite.teamId);
 
   await prisma.$transaction(async (tx) => {
-    await tx.teamMember.create({ data: { teamId: invite.teamId, userId, role: 'MEMBER' } });
+    await tx.teamMember.create({
+      data: { teamId: invite.teamId, userId, role: "MEMBER" },
+    });
     await tx.teamInvite.update({
       where: { id: invite.id },
-      data: { status: 'ACCEPTED', usedAt: new Date() },
+      data: { status: "ACCEPTED", usedAt: new Date() },
     });
   });
 
+  await evaluateAndGrantAchievements(userId);
   return getTeam(invite.teamId, userId);
 }
 
@@ -257,14 +314,23 @@ export async function setTeamMemberRole(
   const target = await prisma.teamMember.findUnique({
     where: { teamId_userId: { teamId, userId: targetUserId } },
   });
-  if (!target) throw new ApiError(404, ErrorCode.NOT_FOUND, 'That user is not in this team');
+  if (!target)
+    throw new ApiError(
+      404,
+      ErrorCode.NOT_FOUND,
+      "That user is not in this team",
+    );
 
-  if (role === 'MEMBER' && target.role === 'LEADER') {
+  if (role === "MEMBER" && target.role === "LEADER") {
     const leaderCount = await prisma.teamMember.count({
-      where: { teamId, role: 'LEADER' },
+      where: { teamId, role: "LEADER" },
     });
     if (leaderCount <= 1) {
-      throw new ApiError(409, ErrorCode.CONFLICT, 'A team needs at least one leader');
+      throw new ApiError(
+        409,
+        ErrorCode.CONFLICT,
+        "A team needs at least one leader",
+      );
     }
   }
 
@@ -285,37 +351,47 @@ export async function removeTeamMember(
   const target = await prisma.teamMember.findUnique({
     where: { teamId_userId: { teamId, userId: targetUserId } },
   });
-  if (!target) throw new ApiError(404, ErrorCode.NOT_FOUND, 'That user is not in this team');
+  if (!target)
+    throw new ApiError(
+      404,
+      ErrorCode.NOT_FOUND,
+      "That user is not in this team",
+    );
 
   const others = await prisma.teamMember.findMany({
     where: { teamId, userId: { not: targetUserId } },
-    orderBy: { joinedAt: 'asc' },
+    orderBy: { joinedAt: "asc" },
     select: { userId: true, role: true },
   });
 
-  if (target.role === 'LEADER') {
+  if (target.role === "LEADER") {
     if (others.length === 0) {
       await prisma.team.delete({ where: { id: teamId } });
       return { disbanded: true, team: null };
     }
-    const leaderCount = others.filter((m) => m.role === 'LEADER').length;
+    const leaderCount = others.filter((m) => m.role === "LEADER").length;
     if (leaderCount === 0) {
       const successor = others[0];
       if (successor !== undefined) {
         await prisma.teamMember.update({
           where: { teamId_userId: { teamId, userId: successor.userId } },
-          data: { role: 'LEADER' },
+          data: { role: "LEADER" },
         });
       }
     }
   }
 
-  await prisma.teamMember.delete({ where: { teamId_userId: { teamId, userId: targetUserId } } });
+  await prisma.teamMember.delete({
+    where: { teamId_userId: { teamId, userId: targetUserId } },
+  });
 
   return { disbanded: false, team: await getTeam(teamId, leaderUserId) };
 }
 
-export async function deleteTeam(userId: number, teamId: number): Promise<void> {
+export async function deleteTeam(
+  userId: number,
+  teamId: number,
+): Promise<void> {
   await requireLeaderMembership(userId, teamId);
   await prisma.team.delete({ where: { id: teamId } });
 }

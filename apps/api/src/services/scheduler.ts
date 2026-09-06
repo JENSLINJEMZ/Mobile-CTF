@@ -1,4 +1,4 @@
-import { logger } from '../utils/logger';
+import { logger } from "../utils/logger";
 
 export interface ScheduledTask {
   name: string;
@@ -17,7 +17,7 @@ export class Scheduler {
 
   constructor(private readonly tasks: ScheduledTask[] = []) {
     if (this.tasks.length === 0) {
-      throw new Error('Scheduler requires at least one task');
+      throw new Error("Scheduler requires at least one task");
     }
   }
 
@@ -33,14 +33,14 @@ export class Scheduler {
       this.timers.get(task.name)!.unref();
       setTimeout(() => void this.tick(task), 50).unref();
     }
-    logger.info({ tasks: this.tasks.map((t) => t.name) }, 'scheduler started');
+    logger.info({ tasks: this.tasks.map((t) => t.name) }, "scheduler started");
   }
 
   stop(): void {
     for (const timer of this.timers.values()) clearInterval(timer);
     this.timers.clear();
     this.started = false;
-    logger.info('scheduler stopped');
+    logger.info("scheduler stopped");
   }
 
   async runNow(name: string): Promise<unknown> {
@@ -55,7 +55,7 @@ export class Scheduler {
     try {
       await task.run();
     } catch (err) {
-      logger.error({ err, task: task.name }, 'scheduled task failed');
+      logger.error({ err, task: task.name }, "scheduled task failed");
     } finally {
       this.running.delete(task.name);
     }

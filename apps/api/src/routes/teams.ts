@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from "express";
 
 import {
   acceptTeamInviteSchema,
@@ -6,12 +6,12 @@ import {
   createTeamSchema,
   joinTeamSchema,
   updateTeamMemberRoleSchema,
-} from '@ctf/shared';
+} from "@ctf/shared";
 
-import { authenticate } from '../middleware/auth';
-import { asyncHandler } from '../middleware/errors';
-import { optionalAuth } from '../middleware/optionalAuth';
-import { validateBody } from '../middleware/validate';
+import { authenticate } from "../middleware/auth";
+import { asyncHandler } from "../middleware/errors";
+import { optionalAuth } from "../middleware/optionalAuth";
+import { validateBody } from "../middleware/validate";
 import {
   acceptTeamInvite,
   createTeam,
@@ -23,17 +23,17 @@ import {
   listTeams,
   removeTeamMember,
   setTeamMemberRole,
-} from '../services/teams';
+} from "../services/teams";
 
 export const teamsRouter = Router();
 
 teamsRouter.use(optionalAuth);
 
 teamsRouter.get(
-  '/',
+  "/",
   asyncHandler(async (req, res) => {
     const data = await listTeams(
-      typeof req.query.search === 'string' && req.query.search.trim().length > 0
+      typeof req.query.search === "string" && req.query.search.trim().length > 0
         ? req.query.search.trim()
         : undefined,
     );
@@ -42,7 +42,7 @@ teamsRouter.get(
 );
 
 teamsRouter.get(
-  '/mine',
+  "/mine",
   authenticate,
   asyncHandler(async (req, res) => {
     const data = await getMyTeam(req.user!.id);
@@ -51,7 +51,7 @@ teamsRouter.get(
 );
 
 teamsRouter.get(
-  '/:id(\\d+)',
+  "/:id(\\d+)",
   asyncHandler(async (req, res) => {
     const data = await getTeam(Number(req.params.id), req.user?.id);
     res.json({ success: true, data });
@@ -59,7 +59,7 @@ teamsRouter.get(
 );
 
 teamsRouter.post(
-  '/',
+  "/",
   authenticate,
   validateBody(createTeamSchema),
   asyncHandler(async (req, res) => {
@@ -69,7 +69,7 @@ teamsRouter.post(
 );
 
 teamsRouter.post(
-  '/join',
+  "/join",
   authenticate,
   validateBody(joinTeamSchema),
   asyncHandler(async (req, res) => {
@@ -79,7 +79,7 @@ teamsRouter.post(
 );
 
 teamsRouter.post(
-  '/invites/accept',
+  "/invites/accept",
   authenticate,
   validateBody(acceptTeamInviteSchema),
   asyncHandler(async (req, res) => {
@@ -89,17 +89,21 @@ teamsRouter.post(
 );
 
 teamsRouter.post(
-  '/:id(\\d+)/invites',
+  "/:id(\\d+)/invites",
   authenticate,
   validateBody(createTeamInviteSchema),
   asyncHandler(async (req, res) => {
-    const data = await inviteTeamMember(req.user!.id, Number(req.params.id), req.body.username);
+    const data = await inviteTeamMember(
+      req.user!.id,
+      Number(req.params.id),
+      req.body.username,
+    );
     res.status(201).json({ success: true, data });
   }),
 );
 
 teamsRouter.patch(
-  '/:id(\\d+)/members/:userId(\\d+)',
+  "/:id(\\d+)/members/:userId(\\d+)",
   authenticate,
   validateBody(updateTeamMemberRoleSchema),
   asyncHandler(async (req, res) => {
@@ -114,7 +118,7 @@ teamsRouter.patch(
 );
 
 teamsRouter.delete(
-  '/:id(\\d+)/members/:userId(\\d+)',
+  "/:id(\\d+)/members/:userId(\\d+)",
   authenticate,
   asyncHandler(async (req, res) => {
     const data = await removeTeamMember(
@@ -127,7 +131,7 @@ teamsRouter.delete(
 );
 
 teamsRouter.delete(
-  '/:id(\\d+)',
+  "/:id(\\d+)",
   authenticate,
   asyncHandler(async (req, res) => {
     await deleteTeam(req.user!.id, Number(req.params.id));

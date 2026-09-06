@@ -9,6 +9,8 @@
     "@ctf/ui": "*",
     "@expo/ui": "~57.0.16",
     "@expo/vector-icons": "^15.0.1",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/netinfo": "12.0.1",
     "expo": "~57.0.20",
     "expo-constants": "~57.0.17",
     "expo-device": "~57.0.1",
@@ -38,14 +40,17 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.0"
   },
   "scripts": {
+    "dev": "expo start --web",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "vitest run"
   }
 }

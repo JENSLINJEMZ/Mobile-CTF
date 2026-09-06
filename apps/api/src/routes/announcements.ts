@@ -1,15 +1,15 @@
-import { Router } from 'express';
+import { Router } from "express";
 
-import { asyncHandler } from '../middleware/errors';
-import { optionalAuth } from '../middleware/optionalAuth';
-import { listAnnouncements } from '../services/announcements';
+import { asyncHandler } from "../middleware/errors";
+import { optionalAuth } from "../middleware/optionalAuth";
+import { listAnnouncements } from "../services/announcements";
 
 export const announcementsRouter = Router();
 
 announcementsRouter.use(optionalAuth);
 
 announcementsRouter.get(
-  '/',
+  "/",
   asyncHandler(async (req, res) => {
     const limit = Number(req.query.limit);
     const data = await listAnnouncements(

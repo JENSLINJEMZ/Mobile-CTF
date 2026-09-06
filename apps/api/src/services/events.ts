@@ -7,14 +7,15 @@ import {
   type UnlockLockedReason,
   type UnlockRuleDto,
   type UnlockRuleType,
-} from '@ctf/shared';
-import { Difficulty, EVENT, ErrorCode } from '@ctf/shared';
-import { prisma } from '@ctf/database';
-import type { Prisma } from '@prisma/client';
+} from "@ctf/shared";
+import { Difficulty, EVENT, ErrorCode } from "@ctf/shared";
+import { prisma } from "@ctf/database";
+import type { Prisma } from "@prisma/client";
 
-import { ApiError } from '../middleware/errors';
-import { getRedis } from './dependencies';
-import { evaluateUnlockRule, type UnlockRuleInput } from './unlockRules';
+import { ApiError } from "../middleware/errors";
+import { evaluateAndGrantAchievements } from "./achievements";
+import { getRedis } from "./dependencies";
+import { evaluateUnlockRule, type UnlockRuleInput } from "./unlockRules";
 
 export type EffectiveEventStatus = EventStatus;
 
@@ -40,18 +41,21 @@ export function effectiveEventStatus(
   event: { status: EventStatus; startsAt: Date; endsAt: Date },
   now: Date = new Date(),
 ): EffectiveEventStatus {
-  if (event.status === 'DRAFT' || event.status === 'ENDED') {
+  if (event.status === "DRAFT" || event.status === "ENDED") {
     return event.status;
   }
-  if (now < event.startsAt) return 'SCHEDULED';
-  if (now <= event.endsAt) return 'RUNNING';
-  return 'ENDED';
+  if (now < event.startsAt) return "SCHEDULED";
+  if (now <= event.endsAt) return "RUNNING";
+  return "ENDED";
 }
 
 function startsInSeconds(event: EventRow, now: Date): number | null {
   const status = effectiveEventStatus(event, now);
-  if (status === 'DRAFT' || status === 'ENDED') return null;
-  return Math.max(0, Math.round((event.startsAt.getTime() - now.getTime()) / 1000));
+  if (status === "DRAFT" || status === "ENDED") return null;
+  return Math.max(
+    0,
+    Math.round((event.startsAt.getTime() - now.getTime()) / 1000),
+  );
 }
 
 export interface EventRegistrationState {
@@ -94,10 +98,12 @@ function toSummaryDto(
   };
 }
 
-async function loadEventRows(where: Prisma.EventWhereInput): Promise<EventRow[]> {
+async function loadEventRows(
+  where: Prisma.EventWhereInput,
+): Promise<EventRow[]> {
   const rows = await prisma.event.findMany({
     where,
-    orderBy: { startsAt: 'desc' },
+    orderBy: { startsAt: "desc" },
     include: {
       _count: { select: { participants: true, teams: true } },
     },
@@ -105,7 +111,7 @@ async function loadEventRows(where: Prisma.EventWhereInput): Promise<EventRow[]>
   return rows as unknown as EventRow[];
 }
 
-export type EventListScope = 'upcoming' | 'running' | 'ended' | 'all';
+export type EventListScope = "upcoming" | "running" | "ended" | "all";
 
 export async function listEvents(
   scope: EventListScope,
@@ -119,21 +125,29 @@ export async function listEvents(
       : await loadRegistrationMap(viewerId);
 
   const items = rows
-    .map((event) => toSummaryDto(event, now, registrations.get(event.id) ?? { joinedByMe: false, myTeamId: null }))
-    .filter((event) => scope === 'all' || event.status === scopeToStatus(scope));
+    .map((event) =>
+      toSummaryDto(
+        event,
+        now,
+        registrations.get(event.id) ?? { joinedByMe: false, myTeamId: null },
+      ),
+    )
+    .filter(
+      (event) => scope === "all" || event.status === scopeToStatus(scope),
+    );
 
   return { items };
 }
 
 function scopeToStatus(scope: EventListScope): EventStatus | null {
   switch (scope) {
-    case 'upcoming':
-      return 'SCHEDULED';
-    case 'running':
-      return 'RUNNING';
-    case 'ended':
-      return 'ENDED';
-    case 'all':
+    case "upcoming":
+      return "SCHEDULED";
+    case "running":
+      return "RUNNING";
+    case "ended":
+      return "ENDED";
+    case "all":
       return null;
   }
 }
@@ -160,29 +174,41 @@ export async function getEventDetail(
     where: { id },
     include: { _count: { select: { participants: true, teams: true } } },
   });
-  if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, 'Event not found');
+  if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, "Event not found");
   const registration = await getRegistrationState(id, viewerId);
   return toSummaryDto(event as unknown as EventRow, new Date(), registration);
 }
 
-const OPEN_STATUSES: EventStatus[] = ['SCHEDULED', 'RUNNING'];
+const OPEN_STATUSES: EventStatus[] = ["SCHEDULED", "RUNNING"];
 
-export async function joinEvent(userId: number, eventId: number): Promise<EventSummaryDto> {
+export async function joinEvent(
+  userId: number,
+  eventId: number,
+): Promise<EventSummaryDto> {
   const event = await prisma.event.findUnique({
     where: { id: eventId },
     include: { _count: { select: { participants: true, teams: true } } },
   });
-  if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, 'Event not found');
+  if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, "Event not found");
 
   const status = effectiveEventStatus(event);
   if (!OPEN_STATUSES.includes(status)) {
-    throw new ApiError(400, ErrorCode.VALIDATION_ERROR, 'This event is not open for registration');
+    throw new ApiError(
+      400,
+      ErrorCode.VALIDATION_ERROR,
+      "This event is not open for registration",
+    );
   }
 
   const existing = await prisma.eventParticipant.findUnique({
     where: { eventId_userId: { eventId, userId } },
   });
-  if (existing) throw new ApiError(409, ErrorCode.CONFLICT, 'You already joined this event');
+  if (existing)
+    throw new ApiError(
+      409,
+      ErrorCode.CONFLICT,
+      "You already joined this event",
+    );
 
   const myTeam = await prisma.teamMember.findUnique({
     where: { userId },
@@ -190,12 +216,14 @@ export async function joinEvent(userId: number, eventId: number): Promise<EventS
   });
   let teamAlreadyInEvent = false;
   if (myTeam) {
-    const teamInEvent = await prisma.eventTeam.findUnique({ where: { teamId: myTeam.teamId } });
+    const teamInEvent = await prisma.eventTeam.findUnique({
+      where: { teamId: myTeam.teamId },
+    });
     if (teamInEvent && teamInEvent.eventId !== eventId) {
       throw new ApiError(
         409,
         ErrorCode.CONFLICT,
-        'Your team is already registered in another event',
+        "Your team is already registered in another event",
       );
     }
     teamAlreadyInEvent = !!teamInEvent;
@@ -214,21 +242,34 @@ export async function joinEvent(userId: number, eventId: number): Promise<EventS
     where: { id: eventId },
     include: { _count: { select: { participants: true, teams: true } } },
   });
-  return toSummaryDto(updated as unknown as EventRow, new Date(), { joinedByMe: true, myTeamId: myTeam?.teamId ?? null });
+  const summary = toSummaryDto(updated as unknown as EventRow, new Date(), {
+    joinedByMe: true,
+    myTeamId: myTeam?.teamId ?? null,
+  });
+
+  await evaluateAndGrantAchievements(userId);
+  return summary;
 }
 
-export async function leaveEvent(userId: number, eventId: number): Promise<EventSummaryDto> {
+export async function leaveEvent(
+  userId: number,
+  eventId: number,
+): Promise<EventSummaryDto> {
   const event = await prisma.event.findUnique({
     where: { id: eventId },
     include: { _count: { select: { participants: true, teams: true } } },
   });
-  if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, 'Event not found');
+  if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, "Event not found");
 
   const participant = await prisma.eventParticipant.findUnique({
     where: { eventId_userId: { eventId, userId } },
   });
   if (!participant) {
-    throw new ApiError(404, ErrorCode.NOT_FOUND, 'You are not registered for this event');
+    throw new ApiError(
+      404,
+      ErrorCode.NOT_FOUND,
+      "You are not registered for this event",
+    );
   }
 
   await prisma.$transaction(async (tx) => {
@@ -238,7 +279,9 @@ export async function leaveEvent(userId: number, eventId: number): Promise<Event
         where: { eventId, teamId: participant.teamId },
       });
       if (remaining === 0) {
-        await tx.eventTeam.deleteMany({ where: { eventId, teamId: participant.teamId } });
+        await tx.eventTeam.deleteMany({
+          where: { eventId, teamId: participant.teamId },
+        });
       }
     }
   });
@@ -247,7 +290,10 @@ export async function leaveEvent(userId: number, eventId: number): Promise<Event
     where: { id: eventId },
     include: { _count: { select: { participants: true, teams: true } } },
   });
-  return toSummaryDto(updated as unknown as EventRow, new Date(), { joinedByMe: false, myTeamId: null });
+  return toSummaryDto(updated as unknown as EventRow, new Date(), {
+    joinedByMe: false,
+    myTeamId: null,
+  });
 }
 
 /**
@@ -261,14 +307,24 @@ export async function recordEventSolve(
 ): Promise<number[]> {
   const participants = await prisma.eventParticipant.findMany({
     where: { userId },
-    select: { event: { select: { id: true, status: true, startsAt: true, endsAt: true } } },
+    select: {
+      event: {
+        select: { id: true, status: true, startsAt: true, endsAt: true },
+      },
+    },
   });
-  const active = participants.filter((p) => effectiveEventStatus(p.event, at) === 'RUNNING' && pointsAwarded > 0);
+  const active = participants.filter(
+    (p) => effectiveEventStatus(p.event, at) === "RUNNING" && pointsAwarded > 0,
+  );
   if (active.length === 0) return [];
   const redis = getRedis();
   const pipeline = redis.pipeline();
   for (const p of active) {
-    pipeline.zincrby(eventLeaderboardKey(p.event.id), pointsAwarded, String(userId));
+    pipeline.zincrby(
+      eventLeaderboardKey(p.event.id),
+      pointsAwarded,
+      String(userId),
+    );
   }
   await pipeline.exec();
   return active.map((p) => p.event.id);
@@ -276,25 +332,28 @@ export async function recordEventSolve(
 
 export async function getEventLeaderboard(
   eventId: number,
-  scope: 'participants' | 'teams',
+  scope: "participants" | "teams",
   viewerId: number,
   limit: number = EVENT.LEADERBOARD_DEFAULT_LIMIT,
 ): Promise<EventLeaderboardResponse> {
-  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true } });
-  if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, 'Event not found');
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true },
+  });
+  if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, "Event not found");
 
   const refDate = new Date().toISOString();
   const redis = getRedis();
   const key = eventLeaderboardKey(eventId);
   const safeLimit = Math.min(Math.max(1, limit), EVENT.LEADERBOARD_MAX_LIMIT);
 
-  if (scope === 'teams') {
+  if (scope === "teams") {
     return getTeamLeaderboard(eventId, viewerId, safeLimit, refDate);
   }
 
   const max = Math.max(safeLimit, 1);
   const [raw, myRank, myScore] = await Promise.all([
-    redis.zrevrange(key, 0, max - 1, 'WITHSCORES'),
+    redis.zrevrange(key, 0, max - 1, "WITHSCORES"),
     redis.zrevrank(key, String(viewerId)),
     redis.zscore(key, String(viewerId)),
   ]);
@@ -311,7 +370,7 @@ export async function getEventLeaderboard(
 
   return {
     eventId,
-    scope: 'participants',
+    scope: "participants",
     refDate,
     entries: [...scores.entries()].map(([id, score], index) => ({
       rank: index + 1,
@@ -322,7 +381,10 @@ export async function getEventLeaderboard(
     me:
       viewerId === undefined
         ? null
-        : { rank: myRank === null ? null : myRank + 1, score: Math.round(Number(myScore ?? 0)) },
+        : {
+            rank: myRank === null ? null : myRank + 1,
+            score: Math.round(Number(myScore ?? 0)),
+          },
   };
 }
 
@@ -342,7 +404,12 @@ async function getTeamLeaderboard(
     },
   });
 
-  const scores: { teamId: number; name: string; score: number; memberCount: number }[] = [];
+  const scores: {
+    teamId: number;
+    name: string;
+    score: number;
+    memberCount: number;
+  }[] = [];
   const redis = getRedis();
   for (const et of eventTeams) {
     const memberPipes = redis.pipeline();
@@ -351,7 +418,8 @@ async function getTeamLeaderboard(
     }
     const results = (await memberPipes.exec()) ?? [];
     const total = results.reduce(
-      (sum, [err, value]) => sum + (err || value === null ? 0 : Math.round(Number(value))),
+      (sum, [err, value]) =>
+        sum + (err || value === null ? 0 : Math.round(Number(value))),
       0,
     );
     scores.push({
@@ -368,13 +436,15 @@ async function getTeamLeaderboard(
     select: { teamId: true },
   });
   const myTeamId = myMembership?.teamId ?? null;
-  const myTeamRank = myTeamId ? scores.findIndex((s) => s.teamId === myTeamId) : -1;
+  const myTeamRank = myTeamId
+    ? scores.findIndex((s) => s.teamId === myTeamId)
+    : -1;
 
   const myScore = await redis.zscore(key, String(viewerId));
 
   return {
     eventId,
-    scope: 'teams',
+    scope: "teams",
     refDate,
     entries: scores.slice(0, limit).map((s, index) => ({
       rank: index + 1,
@@ -407,7 +477,8 @@ interface EventChallengeRow {
     basePoints: number;
     _count: { submissions: number };
   };
-  unlockRule: (UnlockRuleRow & { prerequisites: { challengeId: number }[] }) | null;
+  unlockRule:
+    (UnlockRuleRow & { prerequisites: { challengeId: number }[] }) | null;
 }
 
 interface UnlockRuleRow {
@@ -422,7 +493,7 @@ function toUnlockRuleDto(
   if (!rule) return null;
   const dto: UnlockRuleDto = { type: rule.type };
   if (rule.unlockAt) dto.unlockAt = rule.unlockAt.toISOString();
-  if (rule.type === 'PREREQUISITE') {
+  if (rule.type === "PREREQUISITE") {
     dto.requireChallengeIds = rule.prerequisites.map((p) => p.challengeId);
   }
   if (rule.minScore !== null) dto.minScore = rule.minScore;
@@ -450,17 +521,23 @@ export interface EventChallengeGate {
 export async function getEventChallengeStates(
   eventId: number,
   userId: number | undefined,
-): Promise<{ status: EventStatus; registered: boolean; states: Map<number, EventChallengeGate> }> {
+): Promise<{
+  status: EventStatus;
+  registered: boolean;
+  states: Map<number, EventChallengeGate>;
+}> {
   const event = await prisma.event.findUnique({
     where: { id: eventId },
     select: { id: true, status: true, startsAt: true, endsAt: true },
   });
-  if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, 'Event not found');
+  if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, "Event not found");
 
   const rows = (await prisma.eventChallenge.findMany({
     where: { eventId },
     include: {
-      unlockRule: { include: { prerequisites: { select: { challengeId: true } } } },
+      unlockRule: {
+        include: { prerequisites: { select: { challengeId: true } } },
+      },
     },
   })) as unknown as (EventChallengeRow & { challengeId: number })[];
 
@@ -486,27 +563,34 @@ export async function getEventChallengeStates(
       )
     : new Set<number>();
   const eventScore = userId
-    ? Math.round(Number((await getRedis().zscore(eventLeaderboardKey(eventId), String(userId))) ?? 0))
+    ? Math.round(
+        Number(
+          (await getRedis().zscore(
+            eventLeaderboardKey(eventId),
+            String(userId),
+          )) ?? 0,
+        ),
+      )
     : 0;
 
   const states = new Map<number, EventChallengeGate>();
   for (const row of rows) {
     let locked: boolean;
     let reason: UnlockLockedReason | null = null;
-    if (status === 'DRAFT') {
+    if (status === "DRAFT") {
       locked = true;
-      reason = 'not_started';
-    } else if (status === 'ENDED') {
+      reason = "not_started";
+    } else if (status === "ENDED") {
       locked = true;
-      reason = 'ended';
-    } else if (status === 'SCHEDULED') {
+      reason = "ended";
+    } else if (status === "SCHEDULED") {
       locked = true;
-      reason = 'not_started';
+      reason = "not_started";
     } else {
       // RUNNING
       if (joinRequired) {
         locked = true;
-        reason = 'join_required';
+        reason = "join_required";
       } else {
         const outcome = evaluateUnlockRule(toUnlockRuleInput(row.unlockRule), {
           now: new Date(),
@@ -534,11 +618,11 @@ export async function listEventChallenges(
     where: { id: eventId },
     select: { id: true },
   });
-  if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, 'Event not found');
+  if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, "Event not found");
 
   const rows = (await prisma.eventChallenge.findMany({
     where: { eventId },
-    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     include: {
       challenge: {
         select: {
@@ -550,21 +634,29 @@ export async function listEventChallenges(
           _count: { select: { submissions: true } },
         },
       },
-      unlockRule: { include: { prerequisites: { select: { challengeId: true } } } },
+      unlockRule: {
+        include: { prerequisites: { select: { challengeId: true } } },
+      },
     },
   })) as unknown as EventChallengeRow[];
 
   const { states } = await getEventChallengeStates(eventId, userId);
   const solvedByMe = userId
     ? new Set(
-        (await prisma.submission.findMany({ where: { userId }, select: { challengeId: true } })).map(
-          (s) => s.challengeId,
-        ),
+        (
+          await prisma.submission.findMany({
+            where: { userId },
+            select: { challengeId: true },
+          })
+        ).map((s) => s.challengeId),
       )
     : new Set<number>();
 
   return rows.map((row) => {
-    const gate = states.get(row.challenge.id) ?? { locked: false, reason: null };
+    const gate = states.get(row.challenge.id) ?? {
+      locked: false,
+      reason: null,
+    };
     return {
       id: row.id,
       challengeId: row.challenge.id,
@@ -596,20 +688,20 @@ export async function assertEventChallengeAccess(
 
 export function lockedMessage(reason: UnlockLockedReason | null): string {
   switch (reason) {
-    case 'not_started':
-      return 'This event has not started yet';
-    case 'ended':
-      return 'This event has ended';
-    case 'join_required':
-      return 'Join the event to access its challenges';
-    case 'time_lock':
-      return 'This challenge unlocks later in the event';
-    case 'prerequisite':
-      return 'Solve the required challenge(s) to unlock this one';
-    case 'score':
-      return 'Reach the required score to unlock this challenge';
+    case "not_started":
+      return "This event has not started yet";
+    case "ended":
+      return "This event has ended";
+    case "join_required":
+      return "Join the event to access its challenges";
+    case "time_lock":
+      return "This challenge unlocks later in the event";
+    case "prerequisite":
+      return "Solve the required challenge(s) to unlock this one";
+    case "score":
+      return "Reach the required score to unlock this challenge";
     default:
-      return 'This challenge is locked';
+      return "This challenge is locked";
   }
 }
 
@@ -626,9 +718,19 @@ export interface AdminCreateEvent {
   status?: EventStatus;
 }
 
-export async function createEvent(input: AdminCreateEvent, organizerId: number): Promise<EventSummaryDto> {
-  const existing = await prisma.event.findUnique({ where: { slug: input.slug } });
-  if (existing) throw new ApiError(409, ErrorCode.CONFLICT, 'An event with this slug already exists');
+export async function createEvent(
+  input: AdminCreateEvent,
+  organizerId: number,
+): Promise<EventSummaryDto> {
+  const existing = await prisma.event.findUnique({
+    where: { slug: input.slug },
+  });
+  if (existing)
+    throw new ApiError(
+      409,
+      ErrorCode.CONFLICT,
+      "An event with this slug already exists",
+    );
 
   const event = await prisma.event.create({
     data: {
@@ -637,12 +739,15 @@ export async function createEvent(input: AdminCreateEvent, organizerId: number):
       description: input.description,
       startsAt: new Date(input.startsAt),
       endsAt: new Date(input.endsAt),
-      status: input.status ?? 'SCHEDULED',
+      status: input.status ?? "SCHEDULED",
       createdById: organizerId,
     },
     include: { _count: { select: { participants: true, teams: true } } },
   });
-  return toSummaryDto(event as unknown as EventRow, new Date(), { joinedByMe: false, myTeamId: null });
+  return toSummaryDto(event as unknown as EventRow, new Date(), {
+    joinedByMe: false,
+    myTeamId: null,
+  });
 }
 
 export type AdminUpdateEvent = Partial<AdminCreateEvent>;
@@ -652,7 +757,8 @@ export async function updateEvent(
   input: AdminUpdateEvent,
 ): Promise<EventSummaryDto> {
   const existing = await prisma.event.findUnique({ where: { id } });
-  if (!existing) throw new ApiError(404, ErrorCode.NOT_FOUND, 'Event not found');
+  if (!existing)
+    throw new ApiError(404, ErrorCode.NOT_FOUND, "Event not found");
 
   const event = await prisma.event.update({
     where: { id },
@@ -666,12 +772,19 @@ export async function updateEvent(
     },
     include: { _count: { select: { participants: true, teams: true } } },
   });
-  return toSummaryDto(event as unknown as EventRow, new Date(), { joinedByMe: false, myTeamId: null });
+  return toSummaryDto(event as unknown as EventRow, new Date(), {
+    joinedByMe: false,
+    myTeamId: null,
+  });
 }
 
 export async function deleteEvent(id: number): Promise<void> {
-  const existing = await prisma.event.findUnique({ where: { id }, select: { id: true } });
-  if (!existing) throw new ApiError(404, ErrorCode.NOT_FOUND, 'Event not found');
+  const existing = await prisma.event.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!existing)
+    throw new ApiError(404, ErrorCode.NOT_FOUND, "Event not found");
   await prisma.event.delete({ where: { id } });
 }
 
@@ -685,22 +798,36 @@ export async function addEventChallenge(
   eventId: number,
   input: AdminCreateEventChallenge,
 ): Promise<EventChallengeDto> {
-  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true } });
-  if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, 'Event not found');
-  const challenge = await prisma.challenge.findUnique({ where: { id: input.challengeId }, select: { id: true } });
-  if (!challenge) throw new ApiError(404, ErrorCode.NOT_FOUND, 'Challenge not found');
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true },
+  });
+  if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, "Event not found");
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: input.challengeId },
+    select: { id: true },
+  });
+  if (!challenge)
+    throw new ApiError(404, ErrorCode.NOT_FOUND, "Challenge not found");
 
   const existing = await prisma.eventChallenge.findUnique({
     where: { eventId_challengeId: { eventId, challengeId: input.challengeId } },
   });
-  if (existing) throw new ApiError(409, ErrorCode.CONFLICT, 'Challenge already in this event');
+  if (existing)
+    throw new ApiError(
+      409,
+      ErrorCode.CONFLICT,
+      "Challenge already in this event",
+    );
 
   const row = await prisma.eventChallenge.create({
     data: {
       eventId,
       challengeId: input.challengeId,
       sortOrder: input.sortOrder ?? 0,
-      unlockRule: input.unlock ? { create: buildUnlockRuleData(input.unlock) } : undefined,
+      unlockRule: input.unlock
+        ? { create: buildUnlockRuleData(input.unlock) }
+        : undefined,
     },
     include: {
       challenge: {
@@ -713,7 +840,9 @@ export async function addEventChallenge(
           _count: { select: { submissions: true } },
         },
       },
-      unlockRule: { include: { prerequisites: { select: { challengeId: true } } } },
+      unlockRule: {
+        include: { prerequisites: { select: { challengeId: true } } },
+      },
     },
   });
   const { states } = await getEventChallengeStates(eventId, undefined);
@@ -747,7 +876,8 @@ export async function updateEventChallenge(
     where: { id },
     select: { id: true, eventId: true },
   });
-  if (!row) throw new ApiError(404, ErrorCode.NOT_FOUND, 'Event challenge not found');
+  if (!row)
+    throw new ApiError(404, ErrorCode.NOT_FOUND, "Event challenge not found");
 
   const unlock = input.unlock;
   if (unlock !== undefined) {
@@ -756,7 +886,8 @@ export async function updateEventChallenge(
         where: { eventChallengeId: id },
         select: { id: true },
       });
-      if (existingRule) await tx.unlockRule.delete({ where: { id: existingRule.id } });
+      if (existingRule)
+        await tx.unlockRule.delete({ where: { id: existingRule.id } });
       if (unlock !== null) {
         await tx.unlockRule.create({
           data: { eventChallengeId: id, ...buildUnlockRuleData(unlock) },
@@ -779,16 +910,20 @@ export async function updateEventChallenge(
           _count: { select: { submissions: true } },
         },
       },
-      unlockRule: { include: { prerequisites: { select: { challengeId: true } } } },
+      unlockRule: {
+        include: { prerequisites: { select: { challengeId: true } } },
+      },
     },
   });
   return listEventChallengeDto(updated as unknown as EventChallengeRow);
 }
 
-function buildUnlockRuleData(unlock: UnlockRuleDto): Prisma.UnlockRuleCreateWithoutEventChallengeInput {
+function buildUnlockRuleData(
+  unlock: UnlockRuleDto,
+): Prisma.UnlockRuleCreateWithoutEventChallengeInput {
   const prerequisites = unlock.requireChallengeIds ?? [];
   return {
-    type: unlock.type as Prisma.UnlockRuleCreateWithoutEventChallengeInput['type'],
+    type: unlock.type as Prisma.UnlockRuleCreateWithoutEventChallengeInput["type"],
     unlockAt: unlock.unlockAt ? new Date(unlock.unlockAt) : null,
     minScore: unlock.minScore ?? null,
     ...(prerequisites.length > 0
@@ -819,7 +954,11 @@ function listEventChallengeDto(row: EventChallengeRow): EventChallengeDto {
 }
 
 export async function removeEventChallenge(id: number): Promise<void> {
-  const row = await prisma.eventChallenge.findUnique({ where: { id }, select: { id: true } });
-  if (!row) throw new ApiError(404, ErrorCode.NOT_FOUND, 'Event challenge not found');
+  const row = await prisma.eventChallenge.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!row)
+    throw new ApiError(404, ErrorCode.NOT_FOUND, "Event challenge not found");
   await prisma.eventChallenge.delete({ where: { id } });
 }

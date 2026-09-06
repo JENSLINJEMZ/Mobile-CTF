@@ -6,14 +6,18 @@ import {
   type Difficulty as SharedDifficulty,
   type HintDto,
   type PaginatedResult,
-} from '@ctf/shared';
-import { ErrorCode } from '@ctf/shared';
-import { prisma } from '@ctf/database';
-import { hashFlag, randomSalt } from '@ctf/database';
-import type { Prisma } from '@prisma/client';
+} from "@ctf/shared";
+import { ErrorCode } from "@ctf/shared";
+import { prisma } from "@ctf/database";
+import { hashFlag, randomSalt } from "@ctf/database";
+import type { Prisma } from "@prisma/client";
 
-import { ApiError } from '../middleware/errors';
-import { getEventChallengeStates, lockedMessage, type EventChallengeGate } from './events';
+import { ApiError } from "../middleware/errors";
+import {
+  getEventChallengeStates,
+  lockedMessage,
+  type EventChallengeGate,
+} from "./events";
 
 export type Viewer = { id: number; role: string } | undefined;
 
@@ -32,20 +36,31 @@ interface TagRow {
 }
 
 function toCategoryDto(c: CategoryRow): ChallengeCategoryDto {
-  return { id: c.id, name: c.name, slug: c.slug, icon: c.icon, sortOrder: c.sortOrder };
+  return {
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    icon: c.icon,
+    sortOrder: c.sortOrder,
+  };
 }
 
 function toTagDto(t: TagRow): ChallengeTagDto {
   return { id: t.id, name: t.name, slug: t.slug };
 }
 
-const adminRoles = ['ADMIN', 'SUPER_ADMIN', 'MODERATOR', 'AUTHOR'] as const;
+const adminRoles = ["ADMIN", "SUPER_ADMIN", "MODERATOR", "AUTHOR"] as const;
 
 function canManage(viewer: Viewer): boolean {
-  return !!viewer && adminRoles.includes(viewer.role as (typeof adminRoles)[number]);
+  return (
+    !!viewer && adminRoles.includes(viewer.role as (typeof adminRoles)[number])
+  );
 }
 
-async function loadSolutionState(userId: number | undefined, challengeId: number): Promise<{
+async function loadSolutionState(
+  userId: number | undefined,
+  challengeId: number,
+): Promise<{
   solved: boolean;
   unlockedHintIds: Set<number>;
 }> {
@@ -68,13 +83,13 @@ async function loadSolutionState(userId: number | undefined, challengeId: number
 
 export async function listCategories(): Promise<ChallengeCategoryDto[]> {
   const rows = await prisma.challengeCategory.findMany({
-    orderBy: { sortOrder: 'asc' },
+    orderBy: { sortOrder: "asc" },
   });
   return rows.map(toCategoryDto);
 }
 
 export async function listTags(): Promise<ChallengeTagDto[]> {
-  const rows = await prisma.tag.findMany({ orderBy: { name: 'asc' } });
+  const rows = await prisma.tag.findMany({ orderBy: { name: "asc" } });
   return rows.map(toTagDto);
 }
 
@@ -85,7 +100,7 @@ export interface ChallengeListInput {
   difficulty?: SharedDifficulty;
   tag?: string;
   search?: string;
-  solved?: 'solved' | 'unsolved';
+  solved?: "solved" | "unsolved";
   eventId?: number;
 }
 
@@ -93,19 +108,19 @@ function applyFilters(
   where: Prisma.ChallengeWhereInput,
   filters: ChallengeListInput,
 ): Prisma.ChallengeWhereInput {
-  if (typeof filters.category === 'string' && filters.category.length > 0) {
+  if (typeof filters.category === "string" && filters.category.length > 0) {
     where.category = { slug: filters.category };
   }
   if (filters.difficulty) {
     where.difficulty = filters.difficulty;
   }
-  if (typeof filters.tag === 'string' && filters.tag.length > 0) {
+  if (typeof filters.tag === "string" && filters.tag.length > 0) {
     where.tags = { some: { tag: { slug: filters.tag } } };
   }
-  if (typeof filters.search === 'string' && filters.search.length > 0) {
+  if (typeof filters.search === "string" && filters.search.length > 0) {
     where.OR = [
-      { title: { contains: filters.search, mode: 'insensitive' } },
-      { description: { contains: filters.search, mode: 'insensitive' } },
+      { title: { contains: filters.search, mode: "insensitive" } },
+      { description: { contains: filters.search, mode: "insensitive" } },
     ];
   }
   return where;
@@ -121,8 +136,10 @@ export async function listChallenges(
   const manage = canManage(viewer);
   const where: Prisma.ChallengeWhereInput = {
     published: manage ? undefined : true,
-    ...(input.solved === 'solved' && viewer ? { submissions: { some: { userId: viewer.id } } } : {}),
-    ...(input.solved === 'unsolved' && viewer
+    ...(input.solved === "solved" && viewer
+      ? { submissions: { some: { userId: viewer.id } } }
+      : {}),
+    ...(input.solved === "unsolved" && viewer
       ? { submissions: { none: { userId: viewer.id } } }
       : {}),
   };
@@ -139,13 +156,24 @@ export async function listChallenges(
     prisma.challenge.count({ where }),
     prisma.challenge.findMany({
       where,
-      orderBy: [{ difficulty: 'asc' }, { basePoints: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [
+        { difficulty: "asc" },
+        { basePoints: "asc" },
+        { createdAt: "asc" },
+      ],
       skip: (page - 1) * limit,
       take: limit,
-      include: { category: true, tags: { include: { tag: true } }, _count: { select: { submissions: true } } },
+      include: {
+        category: true,
+        tags: { include: { tag: true } },
+        _count: { select: { submissions: true } },
+      },
     }),
     viewer
-      ? prisma.submission.findMany({ where: { userId: viewer.id }, select: { challengeId: true } })
+      ? prisma.submission.findMany({
+          where: { userId: viewer.id },
+          select: { challengeId: true },
+        })
       : Promise.resolve([]),
   ]);
 
@@ -187,7 +215,10 @@ export async function resolveChallengeById(id: number): Promise<
     }
   | undefined
 > {
-  const challenge = await prisma.challenge.findUnique({ where: { id }, select: { id: true, slug: true, published: true } });
+  const challenge = await prisma.challenge.findUnique({
+    where: { id },
+    select: { id: true, slug: true, published: true },
+  });
   return challenge ?? undefined;
 }
 
@@ -201,15 +232,15 @@ export async function getChallengeDetail(
     where: { id },
     include: {
       category: true,
-      tags: { include: { tag: true }, orderBy: { tagId: 'asc' } },
-      hints: { orderBy: { sortOrder: 'asc' } },
-      attachments: { orderBy: { createdAt: 'asc' } },
+      tags: { include: { tag: true }, orderBy: { tagId: "asc" } },
+      hints: { orderBy: { sortOrder: "asc" } },
+      attachments: { orderBy: { createdAt: "asc" } },
       _count: { select: { submissions: true } },
     },
   });
 
   if (!challenge || (!challenge.published && !manage)) {
-    throw new ApiError(404, 'NOT_FOUND', 'Challenge not found');
+    throw new ApiError(404, "NOT_FOUND", "Challenge not found");
   }
 
   if (eventId !== undefined) {
@@ -220,7 +251,18 @@ export async function getChallengeDetail(
     }
   }
 
-  const { solved, unlockedHintIds } = await loadSolutionState(viewer?.id, challenge.id);
+  const { solved, unlockedHintIds } = await loadSolutionState(
+    viewer?.id,
+    challenge.id,
+  );
+  const bookmarkedByMe =
+    viewer?.id !== undefined &&
+    (await prisma.bookmark.findUnique({
+      where: {
+        userId_challengeId: { userId: viewer.id, challengeId: challenge.id },
+      },
+      select: { id: true },
+    })) !== null;
 
   const hints: HintDto[] = challenge.hints.map((h) => {
     const unlocked = manage || unlockedHintIds.has(h.id);
@@ -245,6 +287,7 @@ export async function getChallengeDetail(
     published: challenge.published,
     solvedByMe: solved,
     tags: challenge.tags.map((t) => toTagDto(t.tag)),
+    bookmarkedByMe,
     hints,
     attachments: challenge.attachments.map((a) => ({
       id: a.id,
@@ -258,9 +301,12 @@ export async function getChallengeDetail(
   };
 }
 
-function assertPublishedForSolve(challenge: { published: boolean; id: number }): void {
+function assertPublishedForSolve(challenge: {
+  published: boolean;
+  id: number;
+}): void {
   if (!challenge.published) {
-    throw new ApiError(404, 'NOT_FOUND', 'Challenge not found');
+    throw new ApiError(404, "NOT_FOUND", "Challenge not found");
   }
 }
 
@@ -283,7 +329,7 @@ export async function assertSolveTarget(id: number): Promise<{
       flagSalt: true,
     },
   });
-  if (!challenge) throw new ApiError(404, 'NOT_FOUND', 'Challenge not found');
+  if (!challenge) throw new ApiError(404, "NOT_FOUND", "Challenge not found");
   assertPublishedForSolve(challenge);
   return challenge;
 }
@@ -304,11 +350,21 @@ export async function createChallenge(
   input: AdminCreateChallenge,
   authorId: number,
 ): Promise<ChallengeDetailDto> {
-  const category = await prisma.challengeCategory.findUnique({ where: { id: input.categoryId } });
-  if (!category) throw new ApiError(400, 'VALIDATION_ERROR', 'Unknown category');
+  const category = await prisma.challengeCategory.findUnique({
+    where: { id: input.categoryId },
+  });
+  if (!category)
+    throw new ApiError(400, "VALIDATION_ERROR", "Unknown category");
 
-  const existing = await prisma.challenge.findUnique({ where: { slug: input.slug } });
-  if (existing) throw new ApiError(409, 'CONFLICT', 'A challenge with this slug already exists');
+  const existing = await prisma.challenge.findUnique({
+    where: { slug: input.slug },
+  });
+  if (existing)
+    throw new ApiError(
+      409,
+      "CONFLICT",
+      "A challenge with this slug already exists",
+    );
 
   const salt = randomSalt();
   const challenge = await prisma.challenge.create({
@@ -327,7 +383,12 @@ export async function createChallenge(
         ? { create: input.tagIds.map((tagId) => ({ tagId })) }
         : undefined,
     },
-    include: { category: true, tags: { include: { tag: true } }, hints: true, attachments: true },
+    include: {
+      category: true,
+      tags: { include: { tag: true } },
+      hints: true,
+      attachments: true,
+    },
   });
 
   await prisma.challengeVersion.create({
@@ -339,14 +400,21 @@ export async function createChallenge(
       difficulty: challenge.difficulty as SharedDifficulty,
       basePoints: challenge.basePoints,
       createdById: authorId,
-      changeSummary: 'Initial release',
+      changeSummary: "Initial release",
     },
   });
 
-  return hydrateDetail(challenge as never, { solved: false, unlockedHintIds: new Set() }, { manage: true }, 0);
+  return hydrateDetail(
+    challenge as never,
+    { solved: false, unlockedHintIds: new Set() },
+    { manage: true },
+    0,
+  );
 }
 
-export type AdminUpdateChallenge = Partial<Omit<AdminCreateChallenge, 'published'>> & {
+export type AdminUpdateChallenge = Partial<
+  Omit<AdminCreateChallenge, "published">
+> & {
   published?: boolean;
   tagIds?: number[];
 };
@@ -360,9 +428,12 @@ export async function updateChallenge(
     where: { id },
     include: { tags: { select: { tagId: true } } },
   });
-  if (!existing) throw new ApiError(404, 'NOT_FOUND', 'Challenge not found');
+  if (!existing) throw new ApiError(404, "NOT_FOUND", "Challenge not found");
 
-  const newFlag = typeof input.flag === 'string' && input.flag.length > 0 ? input.flag : undefined;
+  const newFlag =
+    typeof input.flag === "string" && input.flag.length > 0
+      ? input.flag
+      : undefined;
 
   const data: Prisma.ChallengeUpdateInput = {
     title: input.title,
@@ -371,19 +442,25 @@ export async function updateChallenge(
     basePoints: input.basePoints,
     published: input.published,
     ...(newFlag !== undefined
-      ? { flagHash: hashFlag(newFlag, existing.flagSalt), flagSalt: existing.flagSalt }
+      ? {
+          flagHash: hashFlag(newFlag, existing.flagSalt),
+          flagSalt: existing.flagSalt,
+        }
       : {}),
   };
 
   const categoryId = input.categoryId;
   if (categoryId) {
-    const category = await prisma.challengeCategory.findUnique({ where: { id: categoryId } });
-    if (!category) throw new ApiError(400, 'VALIDATION_ERROR', 'Unknown category');
+    const category = await prisma.challengeCategory.findUnique({
+      where: { id: categoryId },
+    });
+    if (!category)
+      throw new ApiError(400, "VALIDATION_ERROR", "Unknown category");
   }
 
   const lastVersion = await prisma.challengeVersion.findFirst({
     where: { challengeId: id },
-    orderBy: { version: 'desc' },
+    orderBy: { version: "desc" },
   });
   const nextVersion = (lastVersion?.version ?? 0) + 1;
 
@@ -413,7 +490,12 @@ export async function updateChallenge(
     const t = (await tx.challenge.update({
       where: { id },
       data,
-      include: { category: true, tags: { include: { tag: true } }, hints: true, attachments: true },
+      include: {
+        category: true,
+        tags: { include: { tag: true } },
+        hints: true,
+        attachments: true,
+      },
     })) as Prisma.ChallengeGetPayload<{
       include: {
         category: true;
@@ -426,13 +508,23 @@ export async function updateChallenge(
   });
 
   const { solved, unlockedHintIds } = await loadSolutionState(undefined, id);
-  const solvedCount = await prisma.submission.count({ where: { challengeId: id } });
-  return hydrateDetail(updated as never, { solved, unlockedHintIds }, { manage: true }, solvedCount);
+  const solvedCount = await prisma.submission.count({
+    where: { challengeId: id },
+  });
+  return hydrateDetail(
+    updated as never,
+    { solved, unlockedHintIds },
+    { manage: true },
+    solvedCount,
+  );
 }
 
 export async function deleteChallenge(id: number): Promise<void> {
-  const existing = await prisma.challenge.findUnique({ where: { id }, select: { id: true } });
-  if (!existing) throw new ApiError(404, 'NOT_FOUND', 'Challenge not found');
+  const existing = await prisma.challenge.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!existing) throw new ApiError(404, "NOT_FOUND", "Challenge not found");
   await prisma.challenge.delete({ where: { id } });
 }
 
@@ -442,7 +534,13 @@ function hydrateDetail(
     slug: string;
     title: string;
     description: string;
-    category: { id: number; name: string; slug: string; icon: string | null; sortOrder: number };
+    category: {
+      id: number;
+      name: string;
+      slug: string;
+      icon: string | null;
+      sortOrder: number;
+    };
     difficulty: SharedDifficulty;
     basePoints: number;
     published: boolean;
@@ -454,13 +552,20 @@ function hydrateDetail(
       penaltyPoints: number;
       sortOrder: number;
     }[];
-    attachments?: { id: number; title: string; url: string; mimeType: string | null; sizeBytes: number | null }[];
+    attachments?: {
+      id: number;
+      title: string;
+      url: string;
+      mimeType: string | null;
+      sizeBytes: number | null;
+    }[];
     createdAt: Date | string;
     updatedAt: Date | string;
   },
   state: { solved: boolean; unlockedHintIds: Set<number> },
   opts: { manage: boolean },
   solvedCount: number,
+  bookmarkedByMe = false,
 ): ChallengeDetailDto {
   const { solved, unlockedHintIds } = state;
   return {
@@ -474,6 +579,7 @@ function hydrateDetail(
     solvedCount,
     published: challenge.published,
     solvedByMe: solved,
+    bookmarkedByMe,
     tags: (challenge.tags ?? []).map((t) => toTagDto(t.tag!)),
     hints: (challenge.hints ?? []).map((h) => {
       const unlocked = opts.manage || unlockedHintIds.has(h.id);
@@ -502,13 +608,16 @@ export async function unlockHint(
   challengeId: number,
   hintId: number,
 ): Promise<HintDto> {
-  const challenge = await prisma.challenge.findUnique({ where: { id: challengeId }, select: { id: true, published: true } });
-  if (!challenge) throw new ApiError(404, 'NOT_FOUND', 'Challenge not found');
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: challengeId },
+    select: { id: true, published: true },
+  });
+  if (!challenge) throw new ApiError(404, "NOT_FOUND", "Challenge not found");
   assertPublishedForSolve(challenge);
 
   const hint = await prisma.hint.findUnique({ where: { id: hintId } });
   if (!hint || hint.challengeId !== challengeId) {
-    throw new ApiError(404, 'NOT_FOUND', 'Hint not found');
+    throw new ApiError(404, "NOT_FOUND", "Hint not found");
   }
 
   await prisma.hintUnlock.upsert({
@@ -527,16 +636,27 @@ export async function unlockHint(
 }
 
 export async function listAdminHintIds(challengeId: number): Promise<number[]> {
-  const rows = await prisma.hint.findMany({ where: { challengeId }, select: { id: true } });
+  const rows = await prisma.hint.findMany({
+    where: { challengeId },
+    select: { id: true },
+  });
   return rows.map((r) => r.id);
 }
 
 export async function createHint(
   challengeId: number,
-  input: { title: string; body: string; penaltyPoints: number; sortOrder: number },
+  input: {
+    title: string;
+    body: string;
+    penaltyPoints: number;
+    sortOrder: number;
+  },
 ): Promise<HintDto> {
-  const challenge = await prisma.challenge.findUnique({ where: { id: challengeId }, select: { id: true } });
-  if (!challenge) throw new ApiError(404, 'NOT_FOUND', 'Challenge not found');
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: challengeId },
+    select: { id: true },
+  });
+  if (!challenge) throw new ApiError(404, "NOT_FOUND", "Challenge not found");
   const hint = await prisma.hint.create({
     data: { ...input, challengeId },
   });
@@ -551,11 +671,19 @@ export async function createHint(
 
 export async function updateHint(
   hintId: number,
-  input: Partial<{ title: string; body: string; penaltyPoints: number; sortOrder: number }>,
+  input: Partial<{
+    title: string;
+    body: string;
+    penaltyPoints: number;
+    sortOrder: number;
+  }>,
 ): Promise<HintDto> {
   const hint = await prisma.hint.findUnique({ where: { id: hintId } });
-  if (!hint) throw new ApiError(404, 'NOT_FOUND', 'Hint not found');
-  const updated = await prisma.hint.update({ where: { id: hintId }, data: input });
+  if (!hint) throw new ApiError(404, "NOT_FOUND", "Hint not found");
+  const updated = await prisma.hint.update({
+    where: { id: hintId },
+    data: input,
+  });
   return {
     id: updated.id,
     title: updated.title,
@@ -567,6 +695,6 @@ export async function updateHint(
 
 export async function deleteHint(hintId: number): Promise<void> {
   const hint = await prisma.hint.findUnique({ where: { id: hintId } });
-  if (!hint) throw new ApiError(404, 'NOT_FOUND', 'Hint not found');
+  if (!hint) throw new ApiError(404, "NOT_FOUND", "Hint not found");
   await prisma.hint.delete({ where: { id: hintId } });
 }

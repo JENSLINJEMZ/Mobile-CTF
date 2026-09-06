@@ -1,12 +1,13 @@
-import { API_PREFIX } from '@ctf/shared';
+import { API_PREFIX } from "@ctf/shared";
 
 import {
   clearStoredTokens,
   getStoredTokens,
   storeTokens,
-} from './token-storage';
+} from "./token-storage";
 
-export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
+export const API_URL =
+  process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
 
 export class ApiClientError extends Error {
   constructor(
@@ -15,12 +16,12 @@ export class ApiClientError extends Error {
     message: string,
   ) {
     super(message);
-    this.name = 'ApiClientError';
+    this.name = "ApiClientError";
   }
 }
 
 export interface ApiRequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   auth?: boolean;
 }
@@ -30,8 +31,8 @@ async function tryRefreshTokens(): Promise<boolean> {
   if (!refreshToken) return false;
 
   const res = await fetch(`${API_URL}${API_PREFIX}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ refreshToken }),
   });
 
@@ -56,12 +57,16 @@ async function tryRefreshTokens(): Promise<boolean> {
   }
 }
 
-async function apiRequest<T>(path: string, options: ApiRequestOptions = {}, allowAuthRetry = true): Promise<T> {
-  const { method = 'GET', body, auth = false } = options;
+async function apiRequest<T>(
+  path: string,
+  options: ApiRequestOptions = {},
+  allowAuthRetry = true,
+): Promise<T> {
+  const { method = "GET", body, auth = false } = options;
 
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
+    headers["Content-Type"] = "application/json";
   }
   if (auth) {
     const { accessToken } = await getStoredTokens();
@@ -90,7 +95,7 @@ async function apiRequest<T>(path: string, options: ApiRequestOptions = {}, allo
     const error = json?.error;
     throw new ApiClientError(
       res.status,
-      error?.code ?? 'INTERNAL_ERROR',
+      error?.code ?? "INTERNAL_ERROR",
       error?.message ?? `Request failed (${res.status})`,
     );
   }
@@ -99,12 +104,18 @@ async function apiRequest<T>(path: string, options: ApiRequestOptions = {}, allo
 }
 
 export const api = {
-  get: <T>(path: string, options?: Omit<ApiRequestOptions, 'method'>) =>
-    apiRequest<T>(path, { ...options, method: 'GET' }),
-  post: <T>(path: string, body?: unknown, options?: Omit<ApiRequestOptions, 'method' | 'body'>) =>
-    apiRequest<T>(path, { ...options, method: 'POST', body }),
-  patch: <T>(path: string, body?: unknown, options?: Omit<ApiRequestOptions, 'method' | 'body'>) =>
-    apiRequest<T>(path, { ...options, method: 'PATCH', body }),
-  del: <T>(path: string, options?: Omit<ApiRequestOptions, 'method'>) =>
-    apiRequest<T>(path, { ...options, method: 'DELETE' }),
+  get: <T>(path: string, options?: Omit<ApiRequestOptions, "method">) =>
+    apiRequest<T>(path, { ...options, method: "GET" }),
+  post: <T>(
+    path: string,
+    body?: unknown,
+    options?: Omit<ApiRequestOptions, "method" | "body">,
+  ) => apiRequest<T>(path, { ...options, method: "POST", body }),
+  patch: <T>(
+    path: string,
+    body?: unknown,
+    options?: Omit<ApiRequestOptions, "method" | "body">,
+  ) => apiRequest<T>(path, { ...options, method: "PATCH", body }),
+  del: <T>(path: string, options?: Omit<ApiRequestOptions, "method">) =>
+    apiRequest<T>(path, { ...options, method: "DELETE" }),
 };

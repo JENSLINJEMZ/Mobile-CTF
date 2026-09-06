@@ -1,5 +1,5 @@
-import { Link, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { Link, useRouter } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -7,25 +7,28 @@ import {
   Pressable,
   StyleSheet,
   TextInput,
-} from 'react-native';
+} from "react-native";
 
-import { ScreenShell } from '@/components/screen-shell';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
-import { useAuthStore } from '@/store/auth-store';
+import { ScreenShell } from "@/components/screen-shell";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { Spacing } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useAuthStore } from "@/store/auth-store";
 
 export default function RegisterScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { register, clearError, error } = useAuthStore();
-  const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = email.trim().length > 0 && username.trim().length > 0 && password.length >= 8;
+  const canSubmit =
+    email.trim().length > 0 &&
+    username.trim().length > 0 &&
+    password.length >= 8;
 
   const onRegister = async () => {
     if (submitting || !canSubmit) return;
@@ -33,7 +36,7 @@ export default function RegisterScreen() {
     clearError();
     try {
       await register(email, username, password);
-      router.replace('/');
+      router.replace("/");
     } catch {
       // error surfaced via store
     } finally {
@@ -44,12 +47,12 @@ export default function RegisterScreen() {
   return (
     <ScreenShell title="Create account">
       <ThemedText type="small" themeColor="textSecondary">
-        Choose a username (3-32 chars: letters, digits, _ or -) and a password of at least 8
-        characters.
+        Choose a username (3-32 chars: letters, digits, _ or -) and a password
+        of at least 8 characters.
       </ThemedText>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.form}
       >
         <ThemedView type="backgroundElement" style={styles.field}>
@@ -90,7 +93,7 @@ export default function RegisterScreen() {
         </ThemedView>
 
         {error ? (
-          <ThemedText type="small" style={{ color: '#dc2626' }}>
+          <ThemedText type="small" style={{ color: "#dc2626" }}>
             {error}
           </ThemedText>
         ) : null}
@@ -113,7 +116,9 @@ export default function RegisterScreen() {
 
         <Link href="/auth/login" asChild>
           <Pressable style={styles.linkRow}>
-            <ThemedText type="linkPrimary">Already registered? Sign in</ThemedText>
+            <ThemedText type="linkPrimary">
+              Already registered? Sign in
+            </ThemedText>
           </Pressable>
         </Link>
       </KeyboardAvoidingView>
@@ -123,7 +128,7 @@ export default function RegisterScreen() {
 
 const styles = StyleSheet.create({
   form: {
-    width: '100%',
+    width: "100%",
     gap: Spacing.two,
   },
   field: {
@@ -136,10 +141,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
   },
   button: {
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: Spacing.three,
     marginTop: Spacing.two,
   },
@@ -150,11 +155,11 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   buttonLabel: {
-    color: '#ffffff',
-    fontWeight: '600',
+    color: "#ffffff",
+    fontWeight: "600",
   },
   linkRow: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Spacing.two,
   },
 });

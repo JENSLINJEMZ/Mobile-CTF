@@ -4,10 +4,10 @@ import type {
   Request,
   RequestHandler,
   Response,
-} from 'express';
-import { ZodError } from 'zod';
+} from "express";
+import { ZodError } from "zod";
 
-import { ErrorCode } from '@ctf/shared';
+import { ErrorCode } from "@ctf/shared";
 
 export class ApiError extends Error {
   constructor(
@@ -17,7 +17,7 @@ export class ApiError extends Error {
     public readonly details?: unknown,
   ) {
     super(message ?? code);
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
 }
 
@@ -32,22 +32,20 @@ export const asyncHandler =
 export const notFound: RequestHandler = (req, res) => {
   res.status(404).json({
     success: false,
-    error: { code: ErrorCode.NOT_FOUND, message: `Route not found: ${req.method} ${req.path}` },
+    error: {
+      code: ErrorCode.NOT_FOUND,
+      message: `Route not found: ${req.method} ${req.path}`,
+    },
   });
 };
 
-export const errorHandler: ErrorRequestHandler = (
-  err,
-  req,
-  res,
-  _next,
-) => {
+export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   if (err instanceof ZodError) {
     res.status(400).json({
       success: false,
       error: {
         code: ErrorCode.VALIDATION_ERROR,
-        message: 'Invalid request payload',
+        message: "Invalid request payload",
         details: err.issues,
       },
     });
@@ -62,9 +60,9 @@ export const errorHandler: ErrorRequestHandler = (
     return;
   }
 
-  req.log.error({ err }, 'Unhandled error');
+  req.log.error({ err }, "Unhandled error");
   res.status(500).json({
     success: false,
-    error: { code: ErrorCode.INTERNAL_ERROR, message: 'Internal server error' },
+    error: { code: ErrorCode.INTERNAL_ERROR, message: "Internal server error" },
   });
 };

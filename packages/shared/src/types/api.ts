@@ -1,4 +1,4 @@
-import type { ErrorCode } from './enums';
+import type { ErrorCode } from "./enums";
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -27,19 +27,19 @@ export interface PaginatedResult<T> {
 }
 
 export interface HealthDependency {
-  status: 'up' | 'down' | 'unknown';
+  status: "up" | "down" | "unknown";
   latencyMs?: number;
 }
 
 export interface HealthResponse {
-  status: 'ok' | 'degraded';
+  status: "ok" | "degraded";
   version: string;
   uptime: number;
   timestamp: string;
 }
 
 export interface ReadyResponse {
-  status: 'ready' | 'not_ready';
+  status: "ready" | "not_ready";
   dependencies: {
     postgres: HealthDependency;
     redis: HealthDependency;

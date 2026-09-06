@@ -86,6 +86,9 @@ model User {
   eventsOrganized    Event[] @relation("EventOrganizer")
   eventParticipants  EventParticipant[]
   announcementsAuthored Announcement[] @relation("AnnouncementAuthor")
+  notes              Note[]
+  achievements       UserAchievement[]
+  bookmarks          Bookmark[]
 
   @@index([role])
   @@index([createdAt])
@@ -180,6 +183,7 @@ model Challenge {
   attempts   SubmissionAttempt[]
   eventChallenges EventChallenge[]
   unlockRulePrerequisites UnlockRulePrerequisite[]
+  bookmarks  Bookmark[]
 
   @@index([categoryId])
   @@index([difficulty])
@@ -274,12 +278,14 @@ model SubmissionAttempt {
   challengeId   Int
   flagAttemptHash String
   correct       Boolean
+  idempotencyKey String?
   createdAt     DateTime @default(now())
 
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   challenge   Challenge   @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   submission  Submission?
 
+  @@unique([userId, idempotencyKey])
   @@index([userId])
   @@index([challengeId])
   @@index([createdAt])
@@ -457,4 +463,59 @@ model Announcement {
   createdBy User @relation("AnnouncementAuthor", fields: [createdById], references: [id])
 
   @@index([pinned, createdAt])
+}
+
+model Note {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  clientKey String
+  title     String
+  body      String
+  deleted   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientKey])
+  @@index([userId, updatedAt])
+}
+
+model Achievement {
+  id          Int     @id @default(autoincrement())
+  code        String  @unique
+  title       String
+  description String
+  icon        String?
+  sortOrder   Int     @default(0)
+
+  earned UserAchievement[]
+
+  @@index([sortOrder])
+}
+
+model UserAchievement {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  achievementId Int
+  earnedAt      DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([achievementId])
+}
+
+model Bookmark {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  challengeId Int
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, challengeId])
+  @@index([userId, createdAt])
 }

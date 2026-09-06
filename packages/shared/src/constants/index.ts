@@ -1,7 +1,7 @@
-export const APP_NAME = 'CTF Platform';
-export const APP_VERSION = '0.1.0';
-export const API_VERSION = 'v1';
-export const API_PREFIX = '/api';
+export const APP_NAME = "CTF Platform";
+export const APP_VERSION = "0.1.0";
+export const API_VERSION = "v1";
+export const API_PREFIX = "/api";
 
 export const PAGINATION = {
   DEFAULT_PAGE: 1,
@@ -25,7 +25,7 @@ export const RATE_LIMITS = {
 } as const;
 
 export const CHALLENGE = {
-  FLAG_PREFIX: 'ctf{',
+  FLAG_PREFIX: "ctf{",
   FIRST_BLOOD_BONUS_PERCENT: 10,
   SEARCH_MIN_CHARS: 2,
 } as const;
@@ -33,14 +33,14 @@ export const CHALLENGE = {
 export const LEADERBOARD = {
   DEFAULT_LIMIT: 20,
   MAX_LIMIT: 100,
-  SCOPES: ['global', 'daily', 'weekly'] as const,
+  SCOPES: ["global", "daily", "weekly"] as const,
 } as const;
 
 export const TERMINAL = {
   DEFAULT_TTL_SECONDS: 30 * 60,
   MAX_ACTIVE_PER_USER: 2,
   MAX_OUTPUT_LENGTH: 64 * 1024,
-  SESSION_NAMESPACE: '/terminal',
+  SESSION_NAMESPACE: "/terminal",
 } as const;
 
 export const TEAM = {
@@ -55,7 +55,7 @@ export const EVENT = {
 } as const;
 
 export const STORAGE_KEYS = {
-  ACCESS_TOKEN: 'ctf.accessToken',
-  REFRESH_TOKEN: 'ctf.refreshToken',
-  OFFLINE_QUEUE: 'ctf.offlineQueue',
+  ACCESS_TOKEN: "ctf.accessToken",
+  REFRESH_TOKEN: "ctf.refreshToken",
+  OFFLINE_QUEUE: "ctf.offlineQueue",
 } as const;

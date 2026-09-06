@@ -1,4 +1,4 @@
-import type { Difficulty } from './enums';
+import type { Difficulty } from "./enums";
 
 export interface ChallengeCategoryDto {
   id: number;
@@ -49,12 +49,14 @@ export interface ChallengeDetailDto extends ChallengeSummaryDto {
   description: string;
   hints: HintDto[];
   attachments: AttachmentDto[];
+  bookmarkedByMe: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface SubmitFlagRequest {
   flag: string;
+  idempotencyKey?: string;
 }
 
 export interface SubmitFlagResponse {
@@ -82,5 +84,5 @@ export interface ChallengeListQuery {
   difficulty?: Difficulty;
   tag?: string;
   search?: string;
-  solved?: 'solved' | 'unsolved';
+  solved?: "solved" | "unsolved";
 }

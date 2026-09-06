@@ -5,13 +5,13 @@ import type {
   EventLeaderboardScope,
   EventListResponse,
   EventSummaryDto,
-} from '@ctf/shared';
-import { EVENT } from '@ctf/shared';
+} from "@ctf/shared";
+import { EVENT } from "@ctf/shared";
 
-import { api } from './http';
+import { api } from "./http";
 
 export async function listEvents(): Promise<EventSummaryDto[]> {
-  const result = await api.get<EventListResponse>('/events');
+  const result = await api.get<EventListResponse>("/events");
   return result.items;
 }
 
@@ -20,7 +20,9 @@ export async function getEvent(id: number): Promise<EventSummaryDto> {
 }
 
 export async function joinEvent(id: number): Promise<EventJoinResponse> {
-  return api.post<EventJoinResponse>(`/events/${id}/join`, undefined, { auth: true });
+  return api.post<EventJoinResponse>(`/events/${id}/join`, undefined, {
+    auth: true,
+  });
 }
 
 export async function leaveEvent(id: number): Promise<void> {
@@ -38,6 +40,10 @@ export async function getEventLeaderboard(
   );
 }
 
-export async function getEventChallenges(id: number): Promise<EventChallengeDto[]> {
-  return api.get<EventChallengeDto[]>(`/events/${id}/challenges`, { auth: true });
+export async function getEventChallenges(
+  id: number,
+): Promise<EventChallengeDto[]> {
+  return api.get<EventChallengeDto[]>(`/events/${id}/challenges`, {
+    auth: true,
+  });
 }

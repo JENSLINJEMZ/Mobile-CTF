@@ -2,7 +2,7 @@ import type {
   ForgotPasswordResponse,
   LogoutResponse,
   ResetPasswordResponse,
-} from '@ctf/shared';
+} from "@ctf/shared";
 import {
   forgotPasswordSchema,
   loginSchema,
@@ -10,26 +10,26 @@ import {
   refreshSchema,
   registerSchema,
   resetPasswordSchema,
-} from '@ctf/shared';
-import { Router } from 'express';
+} from "@ctf/shared";
+import { Router } from "express";
 
-import { env } from '../config/env';
-import { authenticate } from '../middleware/auth';
-import { asyncHandler } from '../middleware/errors';
-import { createRateLimiter } from '../middleware/rateLimit';
-import { validateBody } from '../middleware/validate';
-import { authService } from '../services/auth';
+import { env } from "../config/env";
+import { authenticate } from "../middleware/auth";
+import { asyncHandler } from "../middleware/errors";
+import { createRateLimiter } from "../middleware/rateLimit";
+import { validateBody } from "../middleware/validate";
+import { authService } from "../services/auth";
 
 export const authRouter = Router();
 
 const loginLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   limit: env.rateLimitLogin,
-  keyPrefix: 'login',
+  keyPrefix: "login",
 });
 
 authRouter.post(
-  '/register',
+  "/register",
   validateBody(registerSchema),
   asyncHandler(async (req, res) => {
     const result = await authService.register(req.body);
@@ -38,7 +38,7 @@ authRouter.post(
 );
 
 authRouter.post(
-  '/login',
+  "/login",
   loginLimiter,
   validateBody(loginSchema),
   asyncHandler(async (req, res) => {
@@ -48,7 +48,7 @@ authRouter.post(
 );
 
 authRouter.post(
-  '/refresh',
+  "/refresh",
   validateBody(refreshSchema),
   asyncHandler(async (req, res) => {
     const result = await authService.refresh(req.body.refreshToken);
@@ -57,7 +57,7 @@ authRouter.post(
 );
 
 authRouter.post(
-  '/logout',
+  "/logout",
   validateBody(logoutSchema),
   asyncHandler(async (req, res) => {
     const result = await authService.logout(req.body.refreshToken);
@@ -66,7 +66,7 @@ authRouter.post(
 );
 
 authRouter.post(
-  '/logout-all',
+  "/logout-all",
   authenticate,
   asyncHandler(async (req, res) => {
     const result = await authService.logoutAll(req.user!.id);
@@ -75,7 +75,7 @@ authRouter.post(
 );
 
 authRouter.get(
-  '/me',
+  "/me",
   authenticate,
   asyncHandler(async (req, res) => {
     const result = await authService.me(req.user!.id);
@@ -84,7 +84,7 @@ authRouter.get(
 );
 
 authRouter.post(
-  '/forgot-password',
+  "/forgot-password",
   validateBody(forgotPasswordSchema),
   asyncHandler(async (req, res) => {
     const result = await authService.forgotPassword(req.body.email);
@@ -93,10 +93,13 @@ authRouter.post(
 );
 
 authRouter.post(
-  '/reset-password',
+  "/reset-password",
   validateBody(resetPasswordSchema),
   asyncHandler(async (req, res) => {
-    const result = await authService.resetPassword(req.body.token, req.body.newPassword);
+    const result = await authService.resetPassword(
+      req.body.token,
+      req.body.newPassword,
+    );
     res.json({ success: true, data: result satisfies ResetPasswordResponse });
   }),
 );

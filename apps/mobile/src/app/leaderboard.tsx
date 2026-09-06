@@ -1,38 +1,43 @@
-import type { LeaderboardResponse, LeaderboardScope } from '@ctf/shared';
-import { LEADERBOARD } from '@ctf/shared';
-import { Link, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet } from 'react-native';
+import type { LeaderboardResponse, LeaderboardScope } from "@ctf/shared";
+import { LEADERBOARD } from "@ctf/shared";
+import { Link, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+} from "react-native";
 
-import { ScreenShell } from '@/components/screen-shell';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { getLeaderboard } from '@/services/leaderboard';
+import { ScreenShell } from "@/components/screen-shell";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { Spacing } from "@/constants/theme";
+import { getLeaderboard } from "@/services/leaderboard";
 import {
   connectLeaderboardSocket,
   disconnectLeaderboardSocket,
   subscribeLeaderboardUpdate,
-} from '@/services/socket';
-import { useAuthStore } from '@/store/auth-store';
+} from "@/services/socket";
+import { useAuthStore } from "@/store/auth-store";
 
 const SCOPE_LABELS: Record<LeaderboardScope, string> = {
-  global: 'Global',
-  daily: 'Daily',
-  weekly: 'Weekly',
+  global: "Global",
+  daily: "Daily",
+  weekly: "Weekly",
 };
 
 const MEDAL_COLORS: Record<number, string> = {
-  1: '#d4af37',
-  2: '#b5b5bd',
-  3: '#cd7f32',
+  1: "#d4af37",
+  2: "#b5b5bd",
+  3: "#cd7f32",
 };
 
 export default function LeaderboardScreen() {
   const authStatus = useAuthStore((s) => s.status);
   const currentUser = useAuthStore((s) => s.user);
 
-  const [scope, setScope] = useState<LeaderboardScope>('global');
+  const [scope, setScope] = useState<LeaderboardScope>("global");
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +54,9 @@ export default function LeaderboardScreen() {
       }
     } catch (err) {
       if (requestId === requestRef.current) {
-        setError(err instanceof Error ? err.message : 'Failed to load leaderboard');
+        setError(
+          err instanceof Error ? err.message : "Failed to load leaderboard",
+        );
       }
     } finally {
       if (requestId === requestRef.current) {
@@ -75,7 +82,7 @@ export default function LeaderboardScreen() {
     }, [scope, load]),
   );
 
-  const isAuthenticated = authStatus === 'authenticated';
+  const isAuthenticated = authStatus === "authenticated";
   const entries = data?.entries ?? [];
   const me = data?.me ?? null;
 
@@ -83,12 +90,19 @@ export default function LeaderboardScreen() {
     <ScreenShell title="Leaderboard">
       {!isAuthenticated ? (
         <ThemedView type="backgroundElement" style={styles.promptCard}>
-          <ThemedText type="small">Live rankings update over WebSockets.</ThemedText>
+          <ThemedText type="small">
+            Live rankings update over WebSockets.
+          </ThemedText>
           <Link href="/auth/login" asChild>
             <Pressable
-              style={({ pressed }) => [styles.signInButton, pressed && styles.cardPressed]}
+              style={({ pressed }) => [
+                styles.signInButton,
+                pressed && styles.cardPressed,
+              ]}
             >
-              <ThemedText style={styles.signInLabel}>Sign in for live updates</ThemedText>
+              <ThemedText style={styles.signInLabel}>
+                Sign in for live updates
+              </ThemedText>
             </Pressable>
           </Link>
         </ThemedView>
@@ -114,7 +128,7 @@ export default function LeaderboardScreen() {
             >
               <ThemedText
                 type="smallBold"
-                style={{ color: active ? '#ffffff' : undefined }}
+                style={{ color: active ? "#ffffff" : undefined }}
               >
                 {SCOPE_LABELS[value]}
               </ThemedText>
@@ -126,7 +140,7 @@ export default function LeaderboardScreen() {
       {me != null ? (
         <ThemedView type="backgroundElement" style={styles.scoreCard}>
           <ThemedText type="smallBold">
-            {me.rank != null ? `You are #${me.rank}` : 'Unranked'}
+            {me.rank != null ? `You are #${me.rank}` : "Unranked"}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             {me.score} points · {me.solves} solves
@@ -141,11 +155,13 @@ export default function LeaderboardScreen() {
         </ThemedView>
       ) : null}
 
-      {loading && !data ? <ActivityIndicator style={{ marginTop: Spacing.four }} /> : null}
+      {loading && !data ? (
+        <ActivityIndicator style={{ marginTop: Spacing.four }} />
+      ) : null}
 
       {error ? (
         <Pressable onPress={() => void load(scope)}>
-          <ThemedText type="small" style={{ color: '#dc2626' }}>
+          <ThemedText type="small" style={{ color: "#dc2626" }}>
             {error} — tap to retry
           </ThemedText>
         </Pressable>
@@ -167,7 +183,12 @@ export default function LeaderboardScreen() {
               type="backgroundElement"
               style={[styles.row, isMe && styles.rowMe]}
             >
-              <ThemedText style={[styles.rankCell, medal ? { color: medal } : styles.rankPlain]}>
+              <ThemedText
+                style={[
+                  styles.rankCell,
+                  medal ? { color: medal } : styles.rankPlain,
+                ]}
+              >
                 {entry.rank}
               </ThemedText>
               <ThemedText numberOfLines={1} style={styles.usernameCell}>
@@ -193,36 +214,36 @@ export default function LeaderboardScreen() {
 
 const styles = StyleSheet.create({
   promptCard: {
-    width: '100%',
+    width: "100%",
     borderRadius: 12,
     padding: Spacing.three,
     gap: Spacing.two,
   },
   signInButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Spacing.two,
   },
   signInLabel: {
-    color: '#ffffff',
-    fontWeight: '600',
+    color: "#ffffff",
+    fontWeight: "600",
   },
   chips: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Spacing.two,
   },
   chip: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderRadius: 999,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   chipActive: {
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
   },
   scoreCard: {
-    width: '100%',
+    width: "100%",
     borderRadius: 12,
     padding: Spacing.three,
     gap: Spacing.half,
@@ -233,8 +254,8 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.four,
   },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.three,
     borderRadius: 12,
     paddingVertical: Spacing.two + Spacing.half,
@@ -242,11 +263,11 @@ const styles = StyleSheet.create({
   },
   rowMe: {
     borderWidth: 1,
-    borderColor: '#2563eb',
+    borderColor: "#2563eb",
   },
   rankCell: {
     minWidth: 28,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   rankPlain: {
     color: undefined,
@@ -255,7 +276,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   refresh: {
-    alignSelf: 'center',
+    alignSelf: "center",
     paddingVertical: Spacing.one,
   },
   cardPressed: {

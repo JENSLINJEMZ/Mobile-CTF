@@ -1,16 +1,42 @@
-import { Link } from 'expo-router';
-import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import { Link, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet } from "react-native";
 
-import { ScreenShell } from '@/components/screen-shell';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { useAuthStore } from '@/store/auth-store';
+import { ScreenShell } from "@/components/screen-shell";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { Spacing } from "@/constants/theme";
+import { getAchievements } from "@/services/achievements";
+import { listBookmarks } from "@/services/bookmarks";
+import { useAuthStore } from "@/store/auth-store";
 
 export default function ProfileScreen() {
   const { status, user, logout, error, clearError } = useAuthStore();
+  const [earned, setEarned] = useState<number | null>(null);
+  const [bookmarkCount, setBookmarkCount] = useState<number | null>(null);
 
-  if (status === 'loading') {
+  const loadStats = useCallback(async () => {
+    if (status !== "authenticated") return;
+    try {
+      const [achievements, bookmarks] = await Promise.all([
+        getAchievements(),
+        listBookmarks(),
+      ]);
+      setEarned(achievements.earnedCount);
+      setBookmarkCount(bookmarks.items.length);
+    } catch {
+      // Non-fatal; profile still renders.
+    }
+  }, [status]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadStats();
+    }, [loadStats]),
+  );
+
+  if (status === "loading") {
     return (
       <ScreenShell title="Profile">
         <ActivityIndicator />
@@ -18,7 +44,7 @@ export default function ProfileScreen() {
     );
   }
 
-  if (status === 'anonymous' || !user) {
+  if (status === "anonymous" || !user) {
     return (
       <ScreenShell title="Profile">
         <ThemedText>Sign in to see your stats, badges, and team.</ThemedText>
@@ -48,6 +74,55 @@ export default function ProfileScreen() {
         </ThemedText>
       </ThemedView>
 
+      <ThemedView style={styles.links}>
+        <Link href="/achievements" asChild>
+          <Pressable
+            style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
+          >
+            <Ionicons name="trophy" size={20} color="#2563eb" />
+            <ThemedText type="smallBold" style={styles.linkLabel}>
+              Achievements
+            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              {earned ?? "—"} badges
+            </ThemedText>
+          </Pressable>
+        </Link>
+        <Link href="/bookmarks" asChild>
+          <Pressable
+            style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
+          >
+            <Ionicons name="bookmark" size={20} color="#2563eb" />
+            <ThemedText type="smallBold" style={styles.linkLabel}>
+              Bookmarks
+            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              {bookmarkCount ?? "—"}
+            </ThemedText>
+          </Pressable>
+        </Link>
+        <Link href="/notes" asChild>
+          <Pressable
+            style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
+          >
+            <Ionicons name="document-text" size={20} color="#2563eb" />
+            <ThemedText type="smallBold" style={styles.linkLabel}>
+              Private notes
+            </ThemedText>
+          </Pressable>
+        </Link>
+        <Link href="/teams" asChild>
+          <Pressable
+            style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
+          >
+            <Ionicons name="people" size={20} color="#2563eb" />
+            <ThemedText type="smallBold" style={styles.linkLabel}>
+              My team
+            </ThemedText>
+          </Pressable>
+        </Link>
+      </ThemedView>
+
       <ThemedView type="backgroundElement" style={styles.card}>
         <ThemedText type="small" themeColor="textSecondary">
           Member since {new Date(user.createdAt).toLocaleDateString()}
@@ -55,7 +130,7 @@ export default function ProfileScreen() {
       </ThemedView>
 
       <Pressable
-        style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+        style={({ pressed }) => [styles.button, pressed && styles.pressed]}
         onPress={() => void logout()}
       >
         <ThemedText style={styles.buttonLabel}>Sign out all devices</ThemedText>
@@ -63,7 +138,7 @@ export default function ProfileScreen() {
 
       {error ? (
         <Pressable onPress={clearError}>
-          <ThemedText type="small" style={{ color: '#dc2626' }}>
+          <ThemedText type="small" style={{ color: "#dc2626" }}>
             {error}
           </ThemedText>
         </Pressable>
@@ -74,28 +149,41 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   card: {
-    width: '100%',
+    width: "100%",
     borderRadius: 16,
     padding: Spacing.three,
     gap: Spacing.one,
   },
+  links: {
+    width: "100%",
+    gap: Spacing.two,
+  },
+  linkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+    paddingVertical: Spacing.two,
+  },
+  linkLabel: {
+    flex: 1,
+  },
   button: {
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: Spacing.three,
     marginTop: Spacing.two,
   },
-  buttonPressed: {
+  pressed: {
     opacity: 0.85,
   },
   buttonLabel: {
-    color: '#ffffff',
-    fontWeight: '600',
+    color: "#ffffff",
+    fontWeight: "600",
   },
   ghostButton: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Spacing.three,
   },
 });

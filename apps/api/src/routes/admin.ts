@@ -1,6 +1,6 @@
-import { Router } from 'express';
+import { Router } from "express";
 
-import { Role } from '@ctf/shared';
+import { Role } from "@ctf/shared";
 
 import {
   createAnnouncementSchema,
@@ -13,16 +13,16 @@ import {
   updateEventChallengeSchema,
   updateEventSchema,
   updateHintSchema,
-} from '@ctf/shared';
+} from "@ctf/shared";
 
-import { asyncHandler } from '../middleware/errors';
-import { authenticate, requireRole } from '../middleware/auth';
-import { validateBody } from '../middleware/validate';
+import { asyncHandler } from "../middleware/errors";
+import { authenticate, requireRole } from "../middleware/auth";
+import { validateBody } from "../middleware/validate";
 import {
   createAnnouncement,
   deleteAnnouncement,
   updateAnnouncement,
-} from '../services/announcements';
+} from "../services/announcements";
 import {
   createChallenge,
   createHint,
@@ -30,7 +30,7 @@ import {
   deleteHint,
   updateChallenge,
   updateHint,
-} from '../services/challenges';
+} from "../services/challenges";
 import {
   addEventChallenge,
   createEvent,
@@ -39,7 +39,7 @@ import {
   removeEventChallenge,
   updateEvent,
   updateEventChallenge,
-} from '../services/events';
+} from "../services/events";
 
 export const adminRouter = Router();
 
@@ -47,7 +47,7 @@ adminRouter.use(authenticate);
 adminRouter.use(requireRole(Role.MODERATOR, Role.ADMIN));
 
 adminRouter.post(
-  '/challenges',
+  "/challenges",
   validateBody(createChallengeSchema),
   asyncHandler(async (req, res) => {
     const data = await createChallenge(req.body, req.user!.id);
@@ -56,16 +56,20 @@ adminRouter.post(
 );
 
 adminRouter.put(
-  '/challenges/:id(\\d+)',
+  "/challenges/:id(\\d+)",
   validateBody(updateChallengeSchema),
   asyncHandler(async (req, res) => {
-    const data = await updateChallenge(Number(req.params.id), req.body, req.user!.id);
+    const data = await updateChallenge(
+      Number(req.params.id),
+      req.body,
+      req.user!.id,
+    );
     res.json({ success: true, data });
   }),
 );
 
 adminRouter.delete(
-  '/challenges/:id(\\d+)',
+  "/challenges/:id(\\d+)",
   asyncHandler(async (req, res) => {
     await deleteChallenge(Number(req.params.id));
     res.json({ success: true, data: { deleted: true } });
@@ -73,7 +77,7 @@ adminRouter.delete(
 );
 
 adminRouter.post(
-  '/challenges/:id(\\d+)/hints',
+  "/challenges/:id(\\d+)/hints",
   validateBody(createHintSchema),
   asyncHandler(async (req, res) => {
     const data = await createHint(Number(req.params.id), req.body);
@@ -82,7 +86,7 @@ adminRouter.post(
 );
 
 adminRouter.put(
-  '/hints/:id(\\d+)',
+  "/hints/:id(\\d+)",
   validateBody(updateHintSchema),
   asyncHandler(async (req, res) => {
     const data = await updateHint(Number(req.params.id), req.body);
@@ -91,7 +95,7 @@ adminRouter.put(
 );
 
 adminRouter.delete(
-  '/hints/:id(\\d+)',
+  "/hints/:id(\\d+)",
   asyncHandler(async (req, res) => {
     await deleteHint(Number(req.params.id));
     res.json({ success: true, data: { deleted: true } });
@@ -101,15 +105,15 @@ adminRouter.delete(
 // --- Events -------------------------------------------------------------
 
 adminRouter.get(
-  '/events',
+  "/events",
   asyncHandler(async (req, res) => {
-    const data = await listEvents('all', req.user!.id);
+    const data = await listEvents("all", req.user!.id);
     res.json({ success: true, data });
   }),
 );
 
 adminRouter.post(
-  '/events',
+  "/events",
   validateBody(createEventSchema),
   asyncHandler(async (req, res) => {
     const data = await createEvent(req.body, req.user!.id);
@@ -118,7 +122,7 @@ adminRouter.post(
 );
 
 adminRouter.patch(
-  '/events/:id(\\d+)',
+  "/events/:id(\\d+)",
   validateBody(updateEventSchema),
   asyncHandler(async (req, res) => {
     const data = await updateEvent(Number(req.params.id), req.body);
@@ -127,7 +131,7 @@ adminRouter.patch(
 );
 
 adminRouter.delete(
-  '/events/:id(\\d+)',
+  "/events/:id(\\d+)",
   asyncHandler(async (req, res) => {
     await deleteEvent(Number(req.params.id));
     res.json({ success: true, data: { deleted: true } });
@@ -135,7 +139,7 @@ adminRouter.delete(
 );
 
 adminRouter.post(
-  '/events/:id(\\d+)/challenges',
+  "/events/:id(\\d+)/challenges",
   validateBody(createEventChallengeSchema),
   asyncHandler(async (req, res) => {
     const data = await addEventChallenge(Number(req.params.id), req.body);
@@ -144,7 +148,7 @@ adminRouter.post(
 );
 
 adminRouter.patch(
-  '/event-challenges/:id(\\d+)',
+  "/event-challenges/:id(\\d+)",
   validateBody(updateEventChallengeSchema),
   asyncHandler(async (req, res) => {
     const data = await updateEventChallenge(Number(req.params.id), req.body);
@@ -153,7 +157,7 @@ adminRouter.patch(
 );
 
 adminRouter.delete(
-  '/event-challenges/:id(\\d+)',
+  "/event-challenges/:id(\\d+)",
   asyncHandler(async (req, res) => {
     await removeEventChallenge(Number(req.params.id));
     res.json({ success: true, data: { deleted: true } });
@@ -163,7 +167,7 @@ adminRouter.delete(
 // --- Announcements ------------------------------------------------------
 
 adminRouter.post(
-  '/announcements',
+  "/announcements",
   validateBody(createAnnouncementSchema),
   asyncHandler(async (req, res) => {
     const data = await createAnnouncement(req.body, req.user!.id);
@@ -172,7 +176,7 @@ adminRouter.post(
 );
 
 adminRouter.patch(
-  '/announcements/:id(\\d+)',
+  "/announcements/:id(\\d+)",
   validateBody(updateAnnouncementSchema),
   asyncHandler(async (req, res) => {
     const data = await updateAnnouncement(Number(req.params.id), req.body);
@@ -181,7 +185,7 @@ adminRouter.patch(
 );
 
 adminRouter.delete(
-  '/announcements/:id(\\d+)',
+  "/announcements/:id(\\d+)",
   asyncHandler(async (req, res) => {
     await deleteAnnouncement(Number(req.params.id));
     res.json({ success: true, data: { deleted: true } });

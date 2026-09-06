@@ -1,0 +1,2384 @@
+{
+  "info": {
+    "_postman_id": "b8d4f02a-9e12-4c28-94f3-c5eb793ef180",
+    "name": "Mobile CTF Platform API",
+    "description": "# Mobile CTF Platform API Collection\n\nComprehensive Postman Collection for the Mobile CTF Platform backend service.\nIncludes endpoints for Authentication, Challenges, Submissions, Leaderboards, Terminal Containers, Events, Teams, Announcements, Offline Notes Sync, Bookmarks, and Admin Operations.\n\n## Quick Start\n1. Ensure the backend is running locally at `http://localhost:4000`.\n2. Send **Authentication > Login (Player)** to automatically store `accessToken` and `refreshToken` into collection variables.\n3. Send **Authentication > Login (Admin)** to automatically store `adminAccessToken` into collection variables.\n4. Execute any authenticated endpoint — tokens are injected automatically.\n\n## Rate Limits\n- Login: 5 requests / min / IP\n- Submissions: 5 attempts / min / user / challenge\n- General API: 100 requests / min / user (or IP)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000",
+      "type": "string",
+      "description": "API base URL"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string",
+      "description": "Player access token (auto-populated on login/register)"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Player refresh token (auto-populated on login/register)"
+    },
+    {
+      "key": "adminAccessToken",
+      "value": "",
+      "type": "string",
+      "description": "Admin access token (auto-populated on admin login)"
+    },
+    {
+      "key": "adminRefreshToken",
+      "value": "",
+      "type": "string",
+      "description": "Admin refresh token (auto-populated on admin login)"
+    },
+    {
+      "key": "challengeId",
+      "value": "1",
+      "type": "string",
+      "description": "Sample Challenge ID (1: Caesar's Secret)"
+    },
+    {
+      "key": "hintId",
+      "value": "1",
+      "type": "string",
+      "description": "Sample Hint ID"
+    },
+    {
+      "key": "eventId",
+      "value": "1",
+      "type": "string",
+      "description": "Sample Event ID"
+    },
+    {
+      "key": "teamId",
+      "value": "1",
+      "type": "string",
+      "description": "Sample Team ID"
+    },
+    {
+      "key": "userId",
+      "value": "2",
+      "type": "string",
+      "description": "Target User ID for team role/management"
+    },
+    {
+      "key": "clientKey",
+      "value": "note-sample-uuid-001",
+      "type": "string",
+      "description": "Client-side key for offline notes"
+    },
+    {
+      "key": "sessionId",
+      "value": "tm_example",
+      "type": "string",
+      "description": "Terminal container session ID (tm_<hash>)"
+    },
+    {
+      "key": "joinCode",
+      "value": "DEMO01",
+      "type": "string",
+      "description": "Sample team join code"
+    },
+    {
+      "key": "inviteCode",
+      "value": "DEMOINV1",
+      "type": "string",
+      "description": "Sample team invite code"
+    },
+    {
+      "key": "eventChallengeId",
+      "value": "1",
+      "type": "string",
+      "description": "Event-to-Challenge mapping ID"
+    },
+    {
+      "key": "announcementId",
+      "value": "1",
+      "type": "string",
+      "description": "Sample Announcement ID"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "1. System & Health",
+      "description": "Liveness, readiness, and metrics monitoring endpoints.",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Returns service status, application version, process uptime, and current UTC timestamp."
+          }
+        },
+        {
+          "name": "Readiness Check",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ready",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ready"]
+            },
+            "description": "Checks connectivity to PostgreSQL database, Redis instance, and Docker Sandbox container daemon. Returns HTTP 200 when ready or 503 when any dependency is down."
+          }
+        },
+        {
+          "name": "Prometheus Metrics",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "metrics"]
+            },
+            "description": "Returns runtime metrics in Prometheus text format (process uptime, memory RSS)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Authentication",
+      "description": "User registration, login, JWT token rotation, session management, and password resets.",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var res = pm.response.json();",
+                  "    if (res.data && res.data.tokens) {",
+                  "        pm.collectionVariables.set(\"accessToken\", res.data.tokens.accessToken);",
+                  "        pm.collectionVariables.set(\"refreshToken\", res.data.tokens.refreshToken);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"hacker@ctf.test\",\n  \"username\": \"coolhacker\",\n  \"password\": \"ctfpass123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Registers a new user account with role USER and returns access and refresh JWT tokens."
+          }
+        },
+        {
+          "name": "Login (Player)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var res = pm.response.json();",
+                  "    if (res.data && res.data.tokens) {",
+                  "        pm.collectionVariables.set(\"accessToken\", res.data.tokens.accessToken);",
+                  "        pm.collectionVariables.set(\"refreshToken\", res.data.tokens.refreshToken);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@ctf.test\",\n  \"password\": \"ctfpass123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Authenticates player credentials. Rate limited to 5 attempts/minute/IP. Automatically sets `accessToken` and `refreshToken` in collection variables."
+          }
+        },
+        {
+          "name": "Login (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var res = pm.response.json();",
+                  "    if (res.data && res.data.tokens) {",
+                  "        pm.collectionVariables.set(\"adminAccessToken\", res.data.tokens.accessToken);",
+                  "        pm.collectionVariables.set(\"adminRefreshToken\", res.data.tokens.refreshToken);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@ctf.test\",\n  \"password\": \"ctfpass123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Authenticates default seeded Admin user. Sets `adminAccessToken` in collection variables."
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var res = pm.response.json();",
+                  "    if (res.data && res.data.tokens) {",
+                  "        pm.collectionVariables.set(\"accessToken\", res.data.tokens.accessToken);",
+                  "        pm.collectionVariables.set(\"refreshToken\", res.data.tokens.refreshToken);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "refresh"]
+            },
+            "description": "Rotates the refresh token and issues a new access token and refresh token."
+          }
+        },
+        {
+          "name": "Get Current Profile (Me)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Returns profile details of the authenticated user (id, username, email, role, lastLoginAt)."
+          }
+        },
+        {
+          "name": "Logout Current Session",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout"]
+            },
+            "description": "Revokes the specified refresh token session."
+          }
+        },
+        {
+          "name": "Logout All Sessions",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout-all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout-all"]
+            },
+            "description": "Invalidates all active sessions and refresh tokens for the current user."
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@ctf.test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "forgot-password"]
+            },
+            "description": "Requests a password reset token. In non-production environments, returns `devResetLink` directly in response."
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"SAMPLE_RESET_TOKEN_HERE\",\n  \"newPassword\": \"newSecretPass123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "reset-password"]
+            },
+            "description": "Resets the user password using a valid reset token."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Challenges & Submissions",
+      "description": "Browsing challenges, fetching details, unlocking hints, and submitting flags.",
+      "item": [
+        {
+          "name": "List Challenges",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/challenges?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "challenges"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page (max 100)",
+                  "disabled": false
+                },
+                {
+                  "key": "category",
+                  "value": "crypto",
+                  "description": "Category slug (crypto, web, forensics, reversing, osint, misc)",
+                  "disabled": true
+                },
+                {
+                  "key": "difficulty",
+                  "value": "EASY",
+                  "description": "Difficulty (EASY, MEDIUM, HARD, EXPERT)",
+                  "disabled": true
+                },
+                {
+                  "key": "tag",
+                  "value": "classic",
+                  "description": "Tag filter",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "caesar",
+                  "description": "Search term (min 2 chars)",
+                  "disabled": true
+                },
+                {
+                  "key": "solved",
+                  "value": "unsolved",
+                  "description": "solved or unsolved filter",
+                  "disabled": true
+                },
+                {
+                  "key": "event",
+                  "value": "{{eventId}}",
+                  "description": "Scope challenge list to specific event",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Paginated challenge list. When authenticated, indicates which challenges have been solved or bookmarked."
+          }
+        },
+        {
+          "name": "List Categories",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/challenges/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "challenges", "categories"]
+            },
+            "description": "Lists all available challenge categories with icons, sort orders, and challenge counts."
+          }
+        },
+        {
+          "name": "List Tags",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/challenges/tags",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "challenges", "tags"]
+            },
+            "description": "Lists all challenge tags with usage counts."
+          }
+        },
+        {
+          "name": "Get Challenge by ID",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/challenges/{{challengeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "challenges", "{{challengeId}}"],
+              "query": [
+                {
+                  "key": "event",
+                  "value": "{{eventId}}",
+                  "description": "Optional event context to check unlock rules",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Fetches detailed markdown description, hints (with bodies masked until unlocked), attachments, and solve status. Raw flags or hashes are never exposed."
+          }
+        },
+        {
+          "name": "Submit Flag",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"flag\": \"ctf{caesar_would_be_proud}\",\n  \"idempotencyKey\": \"sub-1-unique-nonce-001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/challenges/{{challengeId}}/submissions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "challenges", "{{challengeId}}", "submissions"],
+              "query": [
+                {
+                  "key": "event",
+                  "value": "{{eventId}}",
+                  "description": "Event ID if submitting inside a competition event",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Submits a flag attempt. Rate limited to 5 attempts/minute/challenge. Computes hint penalties, 10% first-blood bonus, global/event leaderboard scores, and rank update."
+          }
+        },
+        {
+          "name": "Unlock Hint",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/challenges/{{challengeId}}/hints/{{hintId}}/unlock",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "challenges",
+                "{{challengeId}}",
+                "hints",
+                "{{hintId}}",
+                "unlock"
+              ]
+            },
+            "description": "Unlocks a hint for the user. Deducts hint penalty points from the eventual solve score and returns the revealed hint body."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Leaderboard",
+      "description": "Global, daily, and weekly competitive ranking tables.",
+      "item": [
+        {
+          "name": "Get Global Leaderboard",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/leaderboard?scope=global&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "leaderboard"],
+              "query": [
+                {
+                  "key": "scope",
+                  "value": "global",
+                  "description": "Leaderboard scope (global, daily, weekly)",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Number of top entries (1..100)",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Returns top scorers and personal rank. Redis ZSET powered."
+          }
+        },
+        {
+          "name": "Get Daily Leaderboard",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/leaderboard?scope=daily&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "leaderboard"],
+              "query": [
+                {
+                  "key": "scope",
+                  "value": "daily",
+                  "description": "Daily UTC point accumulation",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Top entries limit",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Returns leaderboard for points scored today (UTC)."
+          }
+        },
+        {
+          "name": "Get Weekly Leaderboard",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/leaderboard?scope=weekly&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "leaderboard"],
+              "query": [
+                {
+                  "key": "scope",
+                  "value": "weekly",
+                  "description": "Weekly UTC point accumulation",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Top entries limit",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Returns leaderboard for points scored this week (Monday UTC)."
+          }
+        },
+        {
+          "name": "Get My Global Rank",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/leaderboard/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "leaderboard", "me"]
+            },
+            "description": "Returns the current user's global rank, total score, and solve count."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Terminal & Sandbox",
+      "description": "Isolated ephemeral container sessions for command-line security challenges.",
+      "item": [
+        {
+          "name": "Create Terminal Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var res = pm.response.json();",
+                  "    if (res.data && res.data.session) {",
+                  "        pm.collectionVariables.set(\"sessionId\", res.data.session.id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/terminal/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "terminal", "sessions"]
+            },
+            "description": "Spawns an isolated, non-root Alpine container (ctf-sandbox). Bounded concurrency, no host access, auto-expiring in 30 minutes. Limits: max 2 active sessions per user."
+          }
+        },
+        {
+          "name": "List Active Terminal Sessions",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/terminal/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "terminal", "sessions"]
+            },
+            "description": "Returns all terminal sessions belonging to the current user with statuses and expiry times."
+          }
+        },
+        {
+          "name": "Get Terminal Session Details",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/terminal/sessions/{{sessionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "terminal", "sessions", "{{sessionId}}"]
+            },
+            "description": "Fetches status and metadata for a specific terminal session ID (format: `tm_<hash>`)."
+          }
+        },
+        {
+          "name": "Close / Terminate Terminal Session",
+          "request": {
+            "method": "DELETE",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/terminal/sessions/{{sessionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "terminal", "sessions", "{{sessionId}}"]
+            },
+            "description": "Gracefully closes and destroys the container sandbox session."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Events & Competitions",
+      "description": "Scheduled CTF events, countdowns, unlock rules, and event-scoped rankings.",
+      "item": [
+        {
+          "name": "List Events",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events?scope=all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events"],
+              "query": [
+                {
+                  "key": "scope",
+                  "value": "all",
+                  "description": "Filter events: all, upcoming, running, ended",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Lists CTF events with start/end windows, registration status, and participant counts."
+          }
+        },
+        {
+          "name": "Get Event Details",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events", "{{eventId}}"]
+            },
+            "description": "Returns event overview, registration status, countdown, and active team affiliation."
+          }
+        },
+        {
+          "name": "Join Event",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}/join",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events", "{{eventId}}", "join"]
+            },
+            "description": "Registers the authenticated user (and their active team, if applicable) in the event."
+          }
+        },
+        {
+          "name": "Leave Event",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}/leave",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events", "{{eventId}}", "leave"]
+            },
+            "description": "Unregisters the user/team from the specified event."
+          }
+        },
+        {
+          "name": "Get Event Leaderboard",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}/leaderboard?scope=participants&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events", "{{eventId}}", "leaderboard"],
+              "query": [
+                {
+                  "key": "scope",
+                  "value": "participants",
+                  "description": "Leaderboard scope: participants or teams",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Limit (1..100)",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Returns event-specific leaderboard for individual participants or teams."
+          }
+        },
+        {
+          "name": "Get Event Challenges",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{eventId}}/challenges",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "events", "{{eventId}}", "challenges"]
+            },
+            "description": "Lists all challenges in the event along with dynamic unlock rules (TIME, PREREQUISITE, SCORE, ALWAYS) and lock status."
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Teams",
+      "description": "Team formation, join codes, invitations, and member role management.",
+      "item": [
+        {
+          "name": "List Teams",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "teams"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "Demo",
+                  "description": "Filter by team name substring",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Searches and lists public teams, member counts, and team leaders."
+          }
+        },
+        {
+          "name": "Get My Team",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var res = pm.response.json();",
+                  "    if (res.data && res.data.team) {",
+                  "        pm.collectionVariables.set(\"teamId\", res.data.team.id);",
+                  "        if (res.data.team.joinCode) pm.collectionVariables.set(\"joinCode\", res.data.team.joinCode);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/mine",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "teams", "mine"]
+            },
+            "description": "Returns the current user's team membership, join code, and member list."
+          }
+        },
+        {
+          "name": "Get Team by ID",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "teams", "{{teamId}}"]
+            },
+            "description": "Returns team details, description, and public roster."
+          }
+        },
+        {
+          "name": "Create Team",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var res = pm.response.json();",
+                  "    if (res.data && res.data.team) {",
+                  "        pm.collectionVariables.set(\"teamId\", res.data.team.id);",
+                  "        pm.collectionVariables.set(\"joinCode\", res.data.team.joinCode);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Binary Bandits\",\n  \"description\": \"We reverse binaries and solve cryptos.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/teams",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "teams"]
+            },
+            "description": "Creates a new team. The creator automatically becomes the LEADER. Generates a unique 6-character join code."
+          }
+        },
+        {
+          "name": "Join Team by Code",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"joinCode\": \"{{joinCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/join",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "teams", "join"]
+            },
+            "description": "Joins an existing team using its 6-character join code."
+          }
+        },
+        {
+          "name": "Send Team Invite",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var res = pm.response.json();",
+                  "    if (res.data && res.data.invite) {",
+                  "        pm.collectionVariables.set(\"inviteCode\", res.data.invite.inviteCode);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"coolhacker\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/invites",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "teams", "{{teamId}}", "invites"]
+            },
+            "description": "Leader-only: invites a registered user to the team, generating an 8-character invite code."
+          }
+        },
+        {
+          "name": "Accept Team Invite",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inviteCode\": \"{{inviteCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/invites/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "teams", "invites", "accept"]
+            },
+            "description": "Accepts an invite using the received invite code."
+          }
+        },
+        {
+          "name": "Update Member Role",
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"LEADER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/members/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "teams", "{{teamId}}", "members", "{{userId}}"]
+            },
+            "description": "Promotes or demotes a team member (LEADER or MEMBER)."
+          }
+        },
+        {
+          "name": "Remove Member / Leave Team",
+          "request": {
+            "method": "DELETE",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}/members/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "teams", "{{teamId}}", "members", "{{userId}}"]
+            },
+            "description": "Removes a member from the team, or allows a member to leave. Auto-promotes the oldest member if the leader departs."
+          }
+        },
+        {
+          "name": "Disband / Delete Team",
+          "request": {
+            "method": "DELETE",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/teams/{{teamId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "teams", "{{teamId}}"]
+            },
+            "description": "Leader-only: deletes and disbands the team."
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Announcements",
+      "description": "Platform and event broadcast announcements.",
+      "item": [
+        {
+          "name": "List Announcements",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/announcements?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "announcements"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Limit announcement count",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Returns announcements, prioritized by pinned status then creation date."
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Notes & Offline Sync",
+      "description": "Offline-first personal challenge notes with conflict-free Last-Write-Wins (LWW) synchronization.",
+      "item": [
+        {
+          "name": "List Active Notes",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notes"]
+            },
+            "description": "Returns all non-deleted notes for the authenticated user ordered by update time."
+          }
+        },
+        {
+          "name": "Sync Notes Batch (LWW)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"clientKey\": \"note-sample-uuid-001\",\n      \"title\": \"XOR Challenge Scratchpad\",\n      \"body\": \"Single-byte key brute-force. Start with ctf prefix (0x63, 0x74, 0x66).\",\n      \"deleted\": false,\n      \"updatedAt\": \"2026-09-05T10:19:09.875Z\"\n    },\n    {\n      \"clientKey\": \"note-sample-uuid-002\",\n      \"title\": \"SQLi Notes\",\n      \"body\": \"Payload: admin'--\",\n      \"deleted\": false,\n      \"updatedAt\": \"2026-09-05T10:19:09.876Z\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/notes/sync",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notes", "sync"]
+            },
+            "description": "Batch synchronizes client notes. Compares client and server timestamps using Last-Write-Wins and returns the authoritative state of all user notes."
+          }
+        },
+        {
+          "name": "Upsert Single Note",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientKey\": \"{{clientKey}}\",\n  \"title\": \"Caesar Cipher Clues\",\n  \"body\": \"Wkh iodj lv -> shift backwards by 3 -> The flag is\",\n  \"updatedAt\": \"2026-09-05T10:19:09.876Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/notes/{{clientKey}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notes", "{{clientKey}}"]
+            },
+            "description": "Creates or updates a single note by its clientKey."
+          }
+        },
+        {
+          "name": "Delete Note",
+          "request": {
+            "method": "DELETE",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notes/{{clientKey}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notes", "{{clientKey}}"]
+            },
+            "description": "Soft-deletes a note so it is excluded from active lists while propagating tombstone across syncing devices."
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Bookmarks",
+      "description": "Personal pinned challenges for quick mobile reference.",
+      "item": [
+        {
+          "name": "List Bookmarks",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookmarks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookmarks"]
+            },
+            "description": "Returns all challenges bookmarked by the user with solve status."
+          }
+        },
+        {
+          "name": "Add Bookmark",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookmarks/{{challengeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookmarks", "{{challengeId}}"]
+            },
+            "description": "Bookmarks a challenge. Automatically evaluates and triggers the CURATOR achievement."
+          }
+        },
+        {
+          "name": "Remove Bookmark",
+          "request": {
+            "method": "DELETE",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookmarks/{{challengeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookmarks", "{{challengeId}}"]
+            },
+            "description": "Removes a challenge from bookmarks."
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Achievements",
+      "description": "Gamification badges, streaks, and milestone tracking.",
+      "item": [
+        {
+          "name": "Get Achievements",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/achievements",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "achievements"]
+            },
+            "description": "Returns all platform achievement definitions (FIRST_BLOOD, SPEED_DEMON, CURATOR, POLYGLOT, STREAK_3, etc.) and timestamps when earned by the user."
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Admin Operations",
+      "description": "Authoring and management endpoints for Challenges, Hints, Events, and Announcements. Requires MODERATOR or ADMIN role.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{adminAccessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Challenges",
+          "description": "Create, update, version, and delete challenges.",
+          "item": [
+            {
+              "name": "Admin - Create Challenge",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var res = pm.response.json();",
+                      "    if (res.data && res.data.id) {",
+                      "        pm.collectionVariables.set(\"challengeId\", res.data.id);",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Header Hunter\",\n  \"slug\": \"header-hunter\",\n  \"description\": \"# Header Hunter\\n\\nInspect the custom HTTP response headers to find the secret flag.\\n\\nVisit: `http://challenges.example/headers`\",\n  \"categoryId\": 2,\n  \"difficulty\": \"EASY\",\n  \"basePoints\": 100,\n  \"flag\": \"ctf{custom_headers_tell_all}\",\n  \"tagIds\": [\n    1\n  ],\n  \"published\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/challenges",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "challenges"]
+                },
+                "description": "Creates a new challenge with hashed flag and initial v1 version history snapshot."
+              }
+            },
+            {
+              "name": "Admin - Update Challenge",
+              "request": {
+                "method": "PUT",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Header Hunter (Revised)\",\n  \"basePoints\": 150,\n  \"published\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/challenges/{{challengeId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "challenges", "{{challengeId}}"]
+                },
+                "description": "Updates challenge parameters and snapshots a new ChallengeVersion."
+              }
+            },
+            {
+              "name": "Admin - Delete Challenge",
+              "request": {
+                "method": "DELETE",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/challenges/{{challengeId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "challenges", "{{challengeId}}"]
+                },
+                "description": "Deletes a challenge and cascading relationships."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hints",
+          "description": "Create, modify, and delete challenge hints with point penalties.",
+          "item": [
+            {
+              "name": "Admin - Create Hint",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var res = pm.response.json();",
+                      "    if (res.data && res.data.id) {",
+                      "        pm.collectionVariables.set(\"hintId\", res.data.id);",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Check curl -I\",\n  \"body\": \"Use `curl -I <url>` to view only the HTTP response headers.\",\n  \"penaltyPoints\": 20,\n  \"sortOrder\": 1\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/challenges/{{challengeId}}/hints",
+                  "host": ["{{baseUrl}}"],
+                  "path": [
+                    "api",
+                    "admin",
+                    "challenges",
+                    "{{challengeId}}",
+                    "hints"
+                  ]
+                },
+                "description": "Adds a hint with penalty points to a challenge."
+              }
+            },
+            {
+              "name": "Admin - Update Hint",
+              "request": {
+                "method": "PUT",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Check curl -i or curl -I\",\n  \"penaltyPoints\": 10\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/hints/{{hintId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "hints", "{{hintId}}"]
+                },
+                "description": "Modifies hint details or penalty value."
+              }
+            },
+            {
+              "name": "Admin - Delete Hint",
+              "request": {
+                "method": "DELETE",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/hints/{{hintId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "hints", "{{hintId}}"]
+                },
+                "description": "Deletes a hint."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Events & Rules",
+          "description": "Manage competitions and dynamic unlock rules.",
+          "item": [
+            {
+              "name": "Admin - List All Events",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/events",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "events"]
+                },
+                "description": "Lists all events including DRAFT and SCHEDULED states."
+              }
+            },
+            {
+              "name": "Admin - Create Event",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "    var res = pm.response.json();",
+                      "    if (res.data && res.data.id) {",
+                      "        pm.collectionVariables.set(\"eventId\", res.data.id);",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Winter Cyber Clash 2026\",\n  \"slug\": \"winter-cyber-clash-2026\",\n  \"description\": \"# Winter Cyber Clash\\n\\n48-hour competitive CTF.\",\n  \"startsAt\": \"2026-12-01T00:00:00.000Z\",\n  \"endsAt\": \"2026-12-03T00:00:00.000Z\",\n  \"status\": \"SCHEDULED\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/events",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "events"]
+                },
+                "description": "Creates a new scheduled CTF competition event."
+              }
+            },
+            {
+              "name": "Admin - Update Event",
+              "request": {
+                "method": "PATCH",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"RUNNING\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/events/{{eventId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "events", "{{eventId}}"]
+                },
+                "description": "Updates event parameters or status (DRAFT, SCHEDULED, RUNNING, ENDED)."
+              }
+            },
+            {
+              "name": "Admin - Delete Event",
+              "request": {
+                "method": "DELETE",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/events/{{eventId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "events", "{{eventId}}"]
+                },
+                "description": "Deletes an event and its mappings."
+              }
+            },
+            {
+              "name": "Admin - Add Challenge to Event (with Unlock Rule)",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"challengeId\": 1,\n  \"sortOrder\": 0,\n  \"unlock\": {\n    \"type\": \"SCORE\",\n    \"minScore\": 100\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/events/{{eventId}}/challenges",
+                  "host": ["{{baseUrl}}"],
+                  "path": [
+                    "api",
+                    "admin",
+                    "events",
+                    "{{eventId}}",
+                    "challenges"
+                  ]
+                },
+                "description": "Maps a challenge to the event with an optional unlock rule (ALWAYS, TIME, PREREQUISITE, SCORE)."
+              }
+            },
+            {
+              "name": "Admin - Update Event Challenge Rule",
+              "request": {
+                "method": "PATCH",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"sortOrder\": 1,\n  \"unlock\": {\n    \"type\": \"ALWAYS\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/event-challenges/{{eventChallengeId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": [
+                    "api",
+                    "admin",
+                    "event-challenges",
+                    "{{eventChallengeId}}"
+                  ]
+                },
+                "description": "Updates sort order or unlock condition for an event challenge."
+              }
+            },
+            {
+              "name": "Admin - Remove Challenge from Event",
+              "request": {
+                "method": "DELETE",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/event-challenges/{{eventChallengeId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": [
+                    "api",
+                    "admin",
+                    "event-challenges",
+                    "{{eventChallengeId}}"
+                  ]
+                },
+                "description": "Removes a challenge from the event."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Announcements",
+          "description": "Publish and manage broadcast announcements.",
+          "item": [
+            {
+              "name": "Admin - Create Announcement",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Scheduled Platform Maintenance\",\n  \"body\": \"The platform will undergo brief maintenance at 03:00 UTC.\",\n  \"pinned\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/announcements",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "admin", "announcements"]
+                },
+                "description": "Publishes a new announcement."
+              }
+            },
+            {
+              "name": "Admin - Update Announcement",
+              "request": {
+                "method": "PATCH",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"pinned\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/announcements/{{announcementId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": [
+                    "api",
+                    "admin",
+                    "announcements",
+                    "{{announcementId}}"
+                  ]
+                },
+                "description": "Updates announcement content or pinned flag."
+              }
+            },
+            {
+              "name": "Admin - Delete Announcement",
+              "request": {
+                "method": "DELETE",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminAccessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/admin/announcements/{{announcementId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": [
+                    "api",
+                    "admin",
+                    "announcements",
+                    "{{announcementId}}"
+                  ]
+                },
+                "description": "Deletes an announcement."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

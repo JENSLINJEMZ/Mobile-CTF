@@ -1,10 +1,8 @@
-import type {
-  LeaderboardSocketEvent,
-} from '@ctf/shared';
-import { io, type Socket } from 'socket.io-client';
+import type { LeaderboardSocketEvent } from "@ctf/shared";
+import { io, type Socket } from "socket.io-client";
 
-import { API_URL } from './http';
-import { getStoredTokens } from './token-storage';
+import { API_URL } from "./http";
+import { getStoredTokens } from "./token-storage";
 
 export function leaderboardEndpoint(): string {
   return `${API_URL}/leaderboard`;
@@ -21,10 +19,10 @@ async function openSocket(): Promise<void> {
 
   socket?.disconnect();
   socket = io(leaderboardEndpoint(), {
-    transports: ['websocket'],
+    transports: ["websocket"],
     auth: { token: accessToken },
   });
-  socket.on('leaderboard:update', (event: LeaderboardSocketEvent) => {
+  socket.on("leaderboard:update", (event: LeaderboardSocketEvent) => {
     for (const handler of updateHandlers) {
       handler(event);
     }

@@ -1,16 +1,11 @@
-import type { AuthResponse, UserDto } from '@ctf/shared';
-import { create } from 'zustand';
+import type { AuthResponse, UserDto } from "@ctf/shared";
+import { create } from "zustand";
 
-import {
-  fetchMe,
-  loginUser,
-  logoutAll,
-  registerUser,
-} from '@/services/auth';
-import { ApiClientError } from '@/services/http';
-import { clearStoredTokens, storeTokens } from '@/services/token-storage';
+import { fetchMe, loginUser, logoutAll, registerUser } from "@/services/auth";
+import { ApiClientError } from "@/services/http";
+import { clearStoredTokens, storeTokens } from "@/services/token-storage";
 
-export type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
+export type AuthStatus = "loading" | "authenticated" | "anonymous";
 
 interface AuthState {
   status: AuthStatus;
@@ -18,13 +13,19 @@ interface AuthState {
   error: string | null;
   hydrate: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, username: string, password: string) => Promise<void>;
+  register: (
+    email: string,
+    username: string,
+    password: string,
+  ) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
 
 function messageOf(err: unknown): string {
-  return err instanceof ApiClientError ? err.message : 'Something went wrong. Please try again.';
+  return err instanceof ApiClientError
+    ? err.message
+    : "Something went wrong. Please try again.";
 }
 
 async function persistSession(auth: AuthResponse): Promise<void> {
@@ -32,17 +33,17 @@ async function persistSession(auth: AuthResponse): Promise<void> {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  status: 'loading',
+  status: "loading",
   user: null,
   error: null,
 
   hydrate: async () => {
     try {
       const user = await fetchMe();
-      set({ status: 'authenticated', user, error: null });
+      set({ status: "authenticated", user, error: null });
     } catch {
       await clearStoredTokens();
-      set({ status: 'anonymous', user: null, error: null });
+      set({ status: "anonymous", user: null, error: null });
     }
   },
 
@@ -50,7 +51,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const auth = await loginUser({ email, password });
       await persistSession(auth);
-      set({ status: 'authenticated', user: auth.user, error: null });
+      set({ status: "authenticated", user: auth.user, error: null });
     } catch (err) {
       set({ error: messageOf(err) });
       throw err;
@@ -61,7 +62,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const auth = await registerUser({ email, username, password });
       await persistSession(auth);
-      set({ status: 'authenticated', user: auth.user, error: null });
+      set({ status: "authenticated", user: auth.user, error: null });
     } catch (err) {
       set({ error: messageOf(err) });
       throw err;
@@ -71,7 +72,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: async () => {
     await logoutAll().catch(() => undefined);
     await clearStoredTokens();
-    set({ status: 'anonymous', user: null, error: null });
+    set({ status: "anonymous", user: null, error: null });
   },
 
   clearError: () => set({ error: null }),

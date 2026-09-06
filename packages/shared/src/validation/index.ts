@@ -1,13 +1,14 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-export * from './id';
-export * from './auth';
-export * from './challenge';
-export * from './leaderboard';
-export * from './terminal';
-export * from './events';
-export * from './teams';
-export * from './announcements';
+export * from "./id";
+export * from "./auth";
+export * from "./challenge";
+export * from "./leaderboard";
+export * from "./terminal";
+export * from "./events";
+export * from "./teams";
+export * from "./announcements";
+export * from "./note";
 
 export const paginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -15,9 +16,9 @@ export const paginationSchema = z.object({
 });
 
 export const roleSchema = z.enum([
-  'USER',
-  'AUTHOR',
-  'MODERATOR',
-  'ADMIN',
-  'SUPER_ADMIN',
+  "USER",
+  "AUTHOR",
+  "MODERATOR",
+  "ADMIN",
+  "SUPER_ADMIN",
 ]);

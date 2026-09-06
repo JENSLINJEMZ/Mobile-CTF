@@ -1,4 +1,4 @@
-import type { Duplex } from 'node:stream';
+import type { Duplex } from "node:stream";
 
 export interface SandboxInstance {
   containerId: string;

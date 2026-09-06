@@ -11,7 +11,7 @@ const NON_PRINTABLE =
  * before it is relayed to mobile clients (which render plain text only).
  */
 export function stripAnsi(input: string, maxLength = Infinity): string {
-  const clean = input.replace(ANSI_ESCAPE, '').replace(NON_PRINTABLE, '');
+  const clean = input.replace(ANSI_ESCAPE, "").replace(NON_PRINTABLE, "");
   if (clean.length <= maxLength) return clean;
   return clean.slice(clean.length - maxLength);
 }

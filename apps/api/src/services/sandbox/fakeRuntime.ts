@@ -1,7 +1,7 @@
-import { randomBytes } from 'node:crypto';
-import { PassThrough } from 'node:stream';
+import { randomBytes } from "node:crypto";
+import { PassThrough } from "node:stream";
 
-import type { SandboxInstance, SandboxRuntime } from './types';
+import type { SandboxInstance, SandboxRuntime } from "./types";
 
 interface FakeContainer {
   containerId: string;
@@ -16,7 +16,7 @@ let serial = 0;
 
 function fakeContainerId(): string {
   serial += 1;
-  return `fake-${serial}-${randomBytes(4).toString('hex')}`;
+  return `fake-${serial}-${randomBytes(4).toString("hex")}`;
 }
 
 /**
@@ -26,7 +26,7 @@ function fakeContainerId(): string {
  * daemon.
  */
 export class FakeSandboxRuntime implements SandboxRuntime {
-  readonly type = 'fake';
+  readonly type = "fake";
 
   readonly containers = new Map<string, FakeContainer>();
   killCalls: string[] = [];
@@ -54,7 +54,7 @@ export class FakeSandboxRuntime implements SandboxRuntime {
     };
     this.containers.set(sessionId, container);
 
-    stream.on('close', () => {
+    stream.on("close", () => {
       if (!container.ended) {
         container.ended = true;
         resolveExit(null);
@@ -67,7 +67,7 @@ export class FakeSandboxRuntime implements SandboxRuntime {
   async write(containerId: string, data: string): Promise<void> {
     for (const container of this.containers.values()) {
       if (container.containerId === containerId) {
-        container.inputs.push(Buffer.from(data, 'utf8'));
+        container.inputs.push(Buffer.from(data, "utf8"));
         if (!container.stream.destroyed) container.stream.write(data);
         return;
       }

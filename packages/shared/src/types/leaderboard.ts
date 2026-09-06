@@ -1,4 +1,4 @@
-export type LeaderboardScope = 'global' | 'daily' | 'weekly';
+export type LeaderboardScope = "global" | "daily" | "weekly";
 
 export interface LeaderboardEntryDto {
   rank: number;
@@ -21,10 +21,10 @@ export interface LeaderboardResponse {
 }
 
 export interface LeaderboardSocketEvent {
-  type: 'solved';
+  type: "solved";
   userId: number;
   username: string;
   pointsAwarded: number;
-  scope: 'global';
+  scope: "global";
   at: string;
 }

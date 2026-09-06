@@ -1,13 +1,17 @@
-import type { LeaderboardMeDto, LeaderboardResponse, LeaderboardScope } from '@ctf/shared';
-import { LEADERBOARD } from '@ctf/shared';
-import { prisma } from '@ctf/database';
+import type {
+  LeaderboardMeDto,
+  LeaderboardResponse,
+  LeaderboardScope,
+} from "@ctf/shared";
+import { LEADERBOARD } from "@ctf/shared";
+import { prisma } from "@ctf/database";
 
-import { sumTotalScore } from './scoring';
-import { getRedis } from './dependencies';
+import { sumTotalScore } from "./scoring";
+import { getRedis } from "./dependencies";
 
-const GLOBAL_KEY = 'lb:global';
-const DAILY_PREFIX = 'lb:daily:';
-const WEEKLY_PREFIX = 'lb:weekly:';
+const GLOBAL_KEY = "lb:global";
+const DAILY_PREFIX = "lb:daily:";
+const WEEKLY_PREFIX = "lb:weekly:";
 
 function toUtcDateKey(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -22,18 +26,21 @@ function thisMonday(date: Date): Date {
   return copy;
 }
 
-export function leaderboardKey(scope: LeaderboardScope, at: Date = new Date()): string {
-  if (scope === 'global') return GLOBAL_KEY;
-  if (scope === 'daily') return `${DAILY_PREFIX}${toUtcDateKey(at)}`;
+export function leaderboardKey(
+  scope: LeaderboardScope,
+  at: Date = new Date(),
+): string {
+  if (scope === "global") return GLOBAL_KEY;
+  if (scope === "daily") return `${DAILY_PREFIX}${toUtcDateKey(at)}`;
   return `${WEEKLY_PREFIX}${toUtcDateKey(thisMonday(at))}`;
 }
 
 export function activeDailyKeys(at: Date = new Date()): string[] {
-  return [leaderboardKey('daily', at)];
+  return [leaderboardKey("daily", at)];
 }
 
 export function activeWeeklyKeys(at: Date = new Date()): string[] {
-  return [leaderboardKey('weekly', at)];
+  return [leaderboardKey("weekly", at)];
 }
 
 export async function getUserTotalScore(userId: number): Promise<number> {
@@ -64,8 +71,8 @@ export async function recordSolve(
     const redis = getRedis();
     await redis
       .pipeline()
-      .zincrby(leaderboardKey('daily', at), pointsAwarded, String(userId))
-      .zincrby(leaderboardKey('weekly', at), pointsAwarded, String(userId))
+      .zincrby(leaderboardKey("daily", at), pointsAwarded, String(userId))
+      .zincrby(leaderboardKey("weekly", at), pointsAwarded, String(userId))
       .exec();
   }
   return total;
@@ -109,7 +116,7 @@ export async function getLeaderboard(
   let viewerRank: number | null = null;
   let viewerScore: number | null = null;
   if (viewerId) {
-    if (scope === 'global') {
+    if (scope === "global") {
       await rebuildGlobalScore(viewerId);
     }
     const [rank, score] = await Promise.all([
@@ -120,7 +127,7 @@ export async function getLeaderboard(
     viewerScore = score === null ? null : Number(score);
   }
 
-  const entries = await redis.zrevrange(key, 0, limit - 1, 'WITHSCORES');
+  const entries = await redis.zrevrange(key, 0, limit - 1, "WITHSCORES");
 
   const me: LeaderboardMeDto | null =
     viewerId === undefined
@@ -128,7 +135,9 @@ export async function getLeaderboard(
       : {
           rank: viewerRank,
           score: Math.round(viewerScore ?? 0),
-          solves: await prisma.submission.count({ where: { userId: viewerId } }),
+          solves: await prisma.submission.count({
+            where: { userId: viewerId },
+          }),
         };
 
   if (entries.length === 0) {
@@ -137,7 +146,10 @@ export async function getLeaderboard(
 
   const memberScores: { userId: number; score: number }[] = [];
   for (let i = 0; i < entries.length; i += 2) {
-    memberScores.push({ userId: Number(entries[i]), score: Math.round(Number(entries[i + 1])) });
+    memberScores.push({
+      userId: Number(entries[i]),
+      score: Math.round(Number(entries[i + 1])),
+    });
   }
   const userIds = memberScores.map((e) => e.userId);
   const users = await prisma.user.findMany({

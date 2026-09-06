@@ -1,9 +1,9 @@
-import { defineConfig } from 'tsup';
+import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ['src/server.ts'],
-  format: ['esm'],
-  outDir: 'dist',
+  entry: ["src/server.ts"],
+  format: ["esm"],
+  outDir: "dist",
   clean: true,
   sourcemap: true,
   // Bundle our TypeScript workspace packages (they ship .ts source only),

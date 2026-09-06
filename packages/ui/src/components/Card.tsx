@@ -1,6 +1,6 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from "react";
 
-import { colors, radius, shadows, spacing } from '../tokens';
+import { colors, radius, shadows, spacing } from "../tokens";
 
 export interface CardProps {
   children: ReactNode;

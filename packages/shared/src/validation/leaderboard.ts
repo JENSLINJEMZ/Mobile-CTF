@@ -1,12 +1,12 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-import { LEADERBOARD, PAGINATION } from '../constants';
-import type { LeaderboardScope } from '../types/leaderboard';
+import { LEADERBOARD, PAGINATION } from "../constants";
+import type { LeaderboardScope } from "../types/leaderboard";
 
 export const leaderboardScopeSchema = z.enum(LEADERBOARD.SCOPES);
 
 export const leaderboardQuerySchema = z.object({
-  scope: leaderboardScopeSchema.default('global'),
+  scope: leaderboardScopeSchema.default("global"),
   limit: z.coerce
     .number()
     .int()

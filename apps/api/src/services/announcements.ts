@@ -1,14 +1,16 @@
-import type { AnnouncementDto } from '@ctf/shared';
-import { ErrorCode } from '@ctf/shared';
-import { prisma } from '@ctf/database';
+import type { AnnouncementDto } from "@ctf/shared";
+import { ErrorCode } from "@ctf/shared";
+import { prisma } from "@ctf/database";
 
-import { ApiError } from '../middleware/errors';
+import { ApiError } from "../middleware/errors";
 
 const MAX_LIST = 50;
 
-export async function listAnnouncements(limit = 10): Promise<AnnouncementDto[]> {
+export async function listAnnouncements(
+  limit = 10,
+): Promise<AnnouncementDto[]> {
   const rows = await prisma.announcement.findMany({
-    orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
+    orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
     take: Math.min(Math.max(1, limit), MAX_LIST),
   });
   return rows.map(toDto);
@@ -60,7 +62,8 @@ export async function updateAnnouncement(
   input: UpdateAnnouncementInput,
 ): Promise<AnnouncementDto> {
   const existing = await prisma.announcement.findUnique({ where: { id } });
-  if (!existing) throw new ApiError(404, ErrorCode.NOT_FOUND, 'Announcement not found');
+  if (!existing)
+    throw new ApiError(404, ErrorCode.NOT_FOUND, "Announcement not found");
   const row = await prisma.announcement.update({
     where: { id },
     data: {
@@ -73,7 +76,11 @@ export async function updateAnnouncement(
 }
 
 export async function deleteAnnouncement(id: number): Promise<void> {
-  const existing = await prisma.announcement.findUnique({ where: { id }, select: { id: true } });
-  if (!existing) throw new ApiError(404, ErrorCode.NOT_FOUND, 'Announcement not found');
+  const existing = await prisma.announcement.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!existing)
+    throw new ApiError(404, ErrorCode.NOT_FOUND, "Announcement not found");
   await prisma.announcement.delete({ where: { id } });
 }

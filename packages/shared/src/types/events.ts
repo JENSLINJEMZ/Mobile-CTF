@@ -1,15 +1,15 @@
-import type { Difficulty } from './enums';
+import type { Difficulty } from "./enums";
 
-export type EventStatus = 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'ENDED';
-export type UnlockRuleType = 'TIME' | 'PREREQUISITE' | 'SCORE' | 'ALWAYS';
+export type EventStatus = "DRAFT" | "SCHEDULED" | "RUNNING" | "ENDED";
+export type UnlockRuleType = "TIME" | "PREREQUISITE" | "SCORE" | "ALWAYS";
 
 export type UnlockLockedReason =
-  | 'not_started'
-  | 'time_lock'
-  | 'prerequisite'
-  | 'score'
-  | 'ended'
-  | 'join_required';
+  | "not_started"
+  | "time_lock"
+  | "prerequisite"
+  | "score"
+  | "ended"
+  | "join_required";
 
 export interface UnlockRuleDto {
   type: UnlockRuleType;
@@ -59,7 +59,7 @@ export interface EventLeaderboardEntryDto {
   score: number;
 }
 
-export type EventLeaderboardScope = 'participants' | 'teams';
+export type EventLeaderboardScope = "participants" | "teams";
 
 export interface EventLeaderboardResponse {
   eventId: number;

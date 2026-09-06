@@ -1,6 +1,6 @@
-import type { ChallengeDetailDto, SubmitFlagResponse } from '@ctf/shared';
-import { useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ChallengeDetailDto, SubmitFlagResponse } from "@ctf/shared";
+import { useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -9,21 +9,34 @@ import {
   TextInput,
   useColorScheme,
   type TextStyle,
-} from 'react-native';
-import Markdown from 'react-native-markdown-display';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import Markdown from "react-native-markdown-display";
 
-import { ScreenShell } from '@/components/screen-shell';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { getChallenge, submitFlag, unlockHint } from '@/services/challenges';
-import { useAuthStore } from '@/store/auth-store';
+import { OfflineBanner } from "@/components/offline-banner";
+import { ScreenShell } from "@/components/screen-shell";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { Spacing } from "@/constants/theme";
+import { useNetwork } from "@/hooks/use-network";
+import { addBookmark, removeBookmark } from "@/services/bookmarks";
+import { getChallenge, submitFlag, unlockHint } from "@/services/challenges";
+import {
+  enqueueSubmission,
+  queueSize,
+  type PendingSubmission,
+} from "@/services/offline-queue";
+import {
+  loadSubmissionQueue,
+  saveSubmissionQueue,
+} from "@/services/queue-storage";
+import { useAuthStore } from "@/store/auth-store";
 
 const DIFFICULTY_COLORS: Record<string, string> = {
-  EASY: '#16a34a',
-  MEDIUM: '#d97706',
-  HARD: '#dc2626',
-  EXPERT: '#7c3aed',
+  EASY: "#16a34a",
+  MEDIUM: "#d97706",
+  HARD: "#dc2626",
+  EXPERT: "#7c3aed",
 };
 
 function difficultyLabel(value: string): string {
@@ -37,39 +50,47 @@ export default function ChallengeDetailScreen() {
   const colorScheme = useColorScheme();
   const authStatus = useAuthStore((s) => s.status);
 
-  const isDark = colorScheme === 'dark';
-  const surface = isDark ? '#1f2937' : '#f3f4f6';
+  const isDark = colorScheme === "dark";
+  const surface = isDark ? "#1f2937" : "#f3f4f6";
   const markdownTheme = useMemo(
     () => ({
-      body: { color: isDark ? '#f9fafb' : '#111827', fontSize: 16, lineHeight: 24 },
+      body: {
+        color: isDark ? "#f9fafb" : "#111827",
+        fontSize: 16,
+        lineHeight: 24,
+      },
       heading1: {
-        color: isDark ? '#ffffff' : '#111827',
+        color: isDark ? "#ffffff" : "#111827",
         fontSize: 24,
-        fontWeight: '700' as TextStyle['fontWeight'],
+        fontWeight: "700" as TextStyle["fontWeight"],
         marginBottom: Spacing.two,
-        flexDirection: 'row' as TextStyle['flexDirection'],
-        justifyContent: 'center' as TextStyle['justifyContent'],
+        flexDirection: "row" as TextStyle["flexDirection"],
+        justifyContent: "center" as TextStyle["justifyContent"],
       },
       heading2: {
-        color: isDark ? '#ffffff' : '#111827',
+        color: isDark ? "#ffffff" : "#111827",
         fontSize: 20,
-        fontWeight: '700' as TextStyle['fontWeight'],
+        fontWeight: "700" as TextStyle["fontWeight"],
         marginTop: Spacing.three,
       },
       paragraph: { marginVertical: Spacing.one },
       code_inline: {
-        backgroundColor: isDark ? '#111827' : '#e5e7eb',
-        color: isDark ? '#a5f3fc' : '#1e3a8a',
-        fontFamily: 'monospace',
+        backgroundColor: isDark ? "#111827" : "#e5e7eb",
+        color: isDark ? "#a5f3fc" : "#1e3a8a",
+        fontFamily: "monospace",
         fontSize: 14,
       },
       fence: {
-        backgroundColor: isDark ? '#111827' : '#e5e7eb',
+        backgroundColor: isDark ? "#111827" : "#e5e7eb",
         padding: Spacing.three,
         borderRadius: 8,
       },
-      code_block: { color: isDark ? '#a5f3fc' : '#1e3a8a', fontFamily: 'monospace', fontSize: 13 },
-      strong: { fontWeight: '700' as TextStyle['fontWeight'] },
+      code_block: {
+        color: isDark ? "#a5f3fc" : "#1e3a8a",
+        fontFamily: "monospace",
+        fontSize: 13,
+      },
+      strong: { fontWeight: "700" as TextStyle["fontWeight"] },
     }),
     [isDark],
   );
@@ -78,11 +99,14 @@ export default function ChallengeDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [flag, setFlag] = useState('');
+  const [flag, setFlag] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SubmitFlagResponse | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [queued, setQueued] = useState(false);
   const [unlockingId, setUnlockingId] = useState<number | null>(null);
+  const [isBookmarking, setIsBookmarking] = useState(false);
+  const isOnline = useNetwork();
 
   const load = useCallback(async () => {
     try {
@@ -91,7 +115,9 @@ export default function ChallengeDetailScreen() {
       setChallenge(data);
       setResult(null);
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : 'Failed to load challenge');
+      setLoadError(
+        err instanceof Error ? err.message : "Failed to load challenge",
+      );
     } finally {
       setLoading(false);
     }
@@ -106,19 +132,55 @@ export default function ChallengeDetailScreen() {
     setSubmitting(true);
     setSubmitError(null);
     setResult(null);
+    setQueued(false);
     try {
+      if (!isOnline) {
+        const queuedItem: PendingSubmission = {
+          idempotencyKey: `sub-${challengeId}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+          challengeId,
+          flag: flag.trim(),
+          eventId,
+          queuedAt: new Date().toISOString(),
+        };
+        const queue = await loadSubmissionQueue();
+        const next = enqueueSubmission(queue, queuedItem);
+        await saveSubmissionQueue(next);
+        setQueued(true);
+        if (challenge?.solvedByMe) setFlag("");
+        return;
+      }
       const response = await submitFlag(challengeId, flag.trim(), eventId);
       setResult(response);
       if (response.correct) {
-        setFlag('');
+        setFlag("");
         void load();
       }
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Submission failed');
+      setSubmitError(err instanceof Error ? err.message : "Submission failed");
     } finally {
       setSubmitting(false);
     }
-  }, [challengeId, flag, submitting, load, eventId]);
+  }, [
+    challengeId,
+    flag,
+    submitting,
+    load,
+    eventId,
+    isOnline,
+    challenge?.solvedByMe,
+  ]);
+
+  useEffect(() => {
+    if (!isOnline) return;
+    void (async () => {
+      const queue = await loadSubmissionQueue();
+      const stillPending = queueSize(queue);
+      if (stillPending > 0) {
+        setQueued(true);
+        void load();
+      }
+    })();
+  }, [isOnline, load]);
 
   const onUnlockHint = useCallback(
     async (hintId: number) => {
@@ -130,12 +192,18 @@ export default function ChallengeDetailScreen() {
           prev
             ? {
                 ...prev,
-                hints: prev.hints.map((h) => (h.id === hintId ? { ...h, unlocked: true, body: hint.body } : h)),
+                hints: prev.hints.map((h) =>
+                  h.id === hintId
+                    ? { ...h, unlocked: true, body: hint.body }
+                    : h,
+                ),
               }
             : prev,
         );
       } catch (err) {
-        setSubmitError(err instanceof Error ? err.message : 'Could not unlock hint');
+        setSubmitError(
+          err instanceof Error ? err.message : "Could not unlock hint",
+        );
       } finally {
         setUnlockingId(null);
       }
@@ -143,7 +211,28 @@ export default function ChallengeDetailScreen() {
     [challengeId, unlockingId],
   );
 
-  const needsAuth = authStatus !== 'authenticated';
+  const onToggleBookmark = useCallback(async () => {
+    if (isBookmarking || !challenge) return;
+    setIsBookmarking(true);
+    try {
+      if (challenge.bookmarkedByMe) {
+        await removeBookmark(challenge.id);
+      } else {
+        await addBookmark(challenge.id);
+      }
+      setChallenge((prev) =>
+        prev ? { ...prev, bookmarkedByMe: !prev.bookmarkedByMe } : prev,
+      );
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : "Could not update bookmark",
+      );
+    } finally {
+      setIsBookmarking(false);
+    }
+  }, [challenge, isBookmarking]);
+
+  const needsAuth = authStatus !== "authenticated";
 
   return (
     <ScreenShell title="Challenge">
@@ -151,7 +240,7 @@ export default function ChallengeDetailScreen() {
         <ActivityIndicator style={{ marginTop: Spacing.five }} />
       ) : loadError ? (
         <Pressable onPress={() => void load()}>
-          <ThemedText type="small" style={{ color: '#dc2626' }}>
+          <ThemedText type="small" style={{ color: "#dc2626" }}>
             {loadError} — tap to retry
           </ThemedText>
         </Pressable>
@@ -160,23 +249,56 @@ export default function ChallengeDetailScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <ThemedText type="subtitle">{challenge.title}</ThemedText>
+          <OfflineBanner />
+          <ThemedView style={styles.titleRow}>
+            <ThemedText type="subtitle" style={styles.titleText}>
+              {challenge.title}
+            </ThemedText>
+            {!needsAuth ? (
+              <Pressable
+                disabled={isBookmarking}
+                onPress={() => void onToggleBookmark()}
+                style={({ pressed }) => [
+                  styles.bookmarkButton,
+                  pressed && styles.cardPressed,
+                ]}
+              >
+                {isBookmarking ? (
+                  <ActivityIndicator size="small" />
+                ) : (
+                  <Ionicons
+                    name={
+                      challenge.bookmarkedByMe ? "bookmark" : "bookmark-outline"
+                    }
+                    size={24}
+                    color="#2563eb"
+                  />
+                )}
+              </Pressable>
+            ) : null}
+          </ThemedView>
           <ThemedView style={styles.metaRow}>
             <ThemedText type="small" themeColor="textSecondary">
-              {challenge.category.name} · {difficultyLabel(challenge.difficulty)} ·{' '}
-              {challenge.basePoints} pts
+              {challenge.category.name} ·{" "}
+              {difficultyLabel(challenge.difficulty)} · {challenge.basePoints}{" "}
+              pts
             </ThemedText>
             <ThemedView
-              style={[styles.difficultyDot, { backgroundColor: DIFFICULTY_COLORS[challenge.difficulty] }]}
+              style={[
+                styles.difficultyDot,
+                { backgroundColor: DIFFICULTY_COLORS[challenge.difficulty] },
+              ]}
             />
           </ThemedView>
           {challenge.solvedByMe ? (
-            <ThemedText type="small" style={{ color: '#16a34a' }}>
+            <ThemedText type="small" style={{ color: "#16a34a" }}>
               Solved ✓ · {challenge.solvedCount} total solves
             </ThemedText>
           ) : null}
 
-          <ThemedView style={[styles.markdownBox, { backgroundColor: surface }]}>
+          <ThemedView
+            style={[styles.markdownBox, { backgroundColor: surface }]}
+          >
             <Markdown style={markdownTheme}>{challenge.description}</Markdown>
           </ThemedView>
 
@@ -184,8 +306,14 @@ export default function ChallengeDetailScreen() {
             <ThemedView style={styles.section}>
               <ThemedText type="smallBold">Attachments</ThemedText>
               {challenge.attachments.map((attachment) => (
-                <ThemedText key={attachment.id} type="code" themeColor="textSecondary">
-                  {attachment.title} ({Math.max(1, Math.round((attachment.sizeBytes ?? 0) / 1024))} KB)
+                <ThemedText
+                  key={attachment.id}
+                  type="code"
+                  themeColor="textSecondary"
+                >
+                  {attachment.title} (
+                  {Math.max(1, Math.round((attachment.sizeBytes ?? 0) / 1024))}{" "}
+                  KB)
                 </ThemedText>
               ))}
             </ThemedView>
@@ -199,11 +327,15 @@ export default function ChallengeDetailScreen() {
               </ThemedText>
             ) : null}
             {challenge.hints.map((hint) => (
-              <ThemedView key={hint.id} type="backgroundElement" style={styles.hintCard}>
+              <ThemedView
+                key={hint.id}
+                type="backgroundElement"
+                style={styles.hintCard}
+              >
                 {hint.unlocked ? (
                   <>
                     <ThemedText type="smallBold">{hint.title}</ThemedText>
-                    <Markdown style={markdownTheme}>{hint.body ?? ''}</Markdown>
+                    <Markdown style={markdownTheme}>{hint.body ?? ""}</Markdown>
                   </>
                 ) : (
                   <ThemedView style={styles.hintRow}>
@@ -212,7 +344,7 @@ export default function ChallengeDetailScreen() {
                       <ThemedText type="small" themeColor="textSecondary">
                         {hint.penaltyPoints > 0
                           ? `Costs ${hint.penaltyPoints} pts`
-                          : 'Free to unlock'}
+                          : "Free to unlock"}
                       </ThemedText>
                     </ThemedView>
                     <Pressable
@@ -220,14 +352,18 @@ export default function ChallengeDetailScreen() {
                       onPress={() => void onUnlockHint(hint.id)}
                       style={({ pressed }) => [
                         styles.unlockButton,
-                        (needsAuth || unlockingId !== null) && styles.unlockDisabled,
+                        (needsAuth || unlockingId !== null) &&
+                          styles.unlockDisabled,
                         pressed && styles.cardPressed,
                       ]}
                     >
                       {unlockingId === hint.id ? (
                         <ActivityIndicator color="#ffffff" size="small" />
                       ) : (
-                        <ThemedText type="small" style={{ color: '#ffffff', fontWeight: '600' }}>
+                        <ThemedText
+                          type="small"
+                          style={{ color: "#ffffff", fontWeight: "600" }}
+                        >
                           Unlock
                         </ThemedText>
                       )}
@@ -249,7 +385,7 @@ export default function ChallengeDetailScreen() {
               value={flag}
               onChangeText={setFlag}
               placeholder="ctf{...}"
-              placeholderTextColor={isDark ? '#9ca3af' : '#6b7280'}
+              placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
               style={[styles.flagInput, { backgroundColor: surface }]}
               autoCapitalize="none"
               autoCorrect={false}
@@ -260,35 +396,48 @@ export default function ChallengeDetailScreen() {
               onPress={() => void onSubmit()}
               style={({ pressed }) => [
                 styles.submitButton,
-                (needsAuth || submitting || flag.trim().length === 0) && styles.unlockDisabled,
+                (needsAuth || submitting || flag.trim().length === 0) &&
+                  styles.unlockDisabled,
                 pressed && styles.cardPressed,
               ]}
             >
               {submitting ? (
                 <ActivityIndicator color="#ffffff" size="small" />
               ) : (
-                <ThemedText style={{ color: '#ffffff', fontWeight: '600' }}>Submit</ThemedText>
+                <ThemedText style={{ color: "#ffffff", fontWeight: "600" }}>
+                  Submit
+                </ThemedText>
               )}
             </Pressable>
+
+            {queued ? (
+              <ThemedText type="smallBold" style={{ color: "#b45309" }}>
+                Flag queued — it will be submitted automatically when
+                you&apos;re back online.
+              </ThemedText>
+            ) : null}
 
             {result ? (
               <ThemedView
                 style={[
                   styles.resultBox,
-                  { backgroundColor: result.correct ? '#dcfce7' : '#fee2e2' },
+                  { backgroundColor: result.correct ? "#dcfce7" : "#fee2e2" },
                 ]}
               >
                 <ThemedText
                   type="smallBold"
-                  style={{ color: result.correct ? '#15803d' : '#b91c1c' }}
+                  style={{ color: result.correct ? "#15803d" : "#b91c1c" }}
                 >
                   {result.message}
                 </ThemedText>
-                <ThemedText type="small" style={{ color: result.correct ? '#166534' : '#991b1b' }}>
+                <ThemedText
+                  type="small"
+                  style={{ color: result.correct ? "#166534" : "#991b1b" }}
+                >
                   Total score: {result.totalScore}
                 </ThemedText>
                 {result.correct && result.rank != null ? (
-                  <ThemedText type="small" style={{ color: '#166534' }}>
+                  <ThemedText type="small" style={{ color: "#166534" }}>
                     Global rank: #{result.rank}
                   </ThemedText>
                 ) : null}
@@ -296,7 +445,7 @@ export default function ChallengeDetailScreen() {
             ) : null}
 
             {submitError ? (
-              <ThemedText type="small" style={{ color: '#dc2626' }}>
+              <ThemedText type="small" style={{ color: "#dc2626" }}>
                 {submitError}
               </ThemedText>
             ) : null}
@@ -312,10 +461,22 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     paddingBottom: Spacing.four,
   },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: Spacing.two,
+  },
+  titleText: {
+    flex: 1,
+  },
+  bookmarkButton: {
+    padding: Spacing.one,
+  },
   metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: Spacing.two,
   },
   difficultyDot: {
@@ -326,7 +487,7 @@ const styles = StyleSheet.create({
   markdownBox: {
     borderRadius: 12,
     padding: Spacing.three,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   section: {
     gap: Spacing.two,
@@ -337,8 +498,8 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
   },
   hintRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.two,
   },
   hintLockedText: {
@@ -346,28 +507,28 @@ const styles = StyleSheet.create({
     gap: Spacing.half,
   },
   unlockButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
     borderRadius: 10,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     minWidth: 80,
-    alignItems: 'center',
+    alignItems: "center",
   },
   unlockDisabled: {
     opacity: 0.5,
   },
   flagInput: {
-    width: '100%',
+    width: "100%",
     borderRadius: 12,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two + Spacing.half,
     fontSize: 15,
-    fontFamily: 'monospace',
+    fontFamily: "monospace",
   },
   submitButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Spacing.three,
   },
   cardPressed: {

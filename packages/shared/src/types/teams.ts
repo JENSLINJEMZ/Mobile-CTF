@@ -1,4 +1,4 @@
-export type TeamMemberRole = 'LEADER' | 'MEMBER';
+export type TeamMemberRole = "LEADER" | "MEMBER";
 
 export interface TeamMemberDto {
   userId: number;

@@ -1,37 +1,44 @@
-import { Router } from 'express';
+import { Router } from "express";
 
-import { env } from '../config/env';
-import { createRateLimiter } from '../middleware/rateLimit';
-import { adminRouter } from './admin';
-import { announcementsRouter } from './announcements';
-import { authRouter } from './auth';
-import { challengesRouter } from './challenges';
-import { eventsRouter } from './events';
-import { healthRouter } from './health';
-import { leaderboardRouter } from './leaderboard';
-import { metricsRouter } from './metrics';
-import { readyRouter } from './ready';
-import { teamsRouter } from './teams';
-import { terminalRouter } from './terminal';
+import { env } from "../config/env";
+import { createRateLimiter } from "../middleware/rateLimit";
+import { adminRouter } from "./admin";
+import { announcementsRouter } from "./announcements";
+import { authRouter } from "./auth";
+import { achievementsRouter } from "./achievements";
+import { bookmarksRouter } from "./bookmarks";
+import { challengesRouter } from "./challenges";
+import { eventsRouter } from "./events";
+import { healthRouter } from "./health";
+import { leaderboardRouter } from "./leaderboard";
+import { metricsRouter } from "./metrics";
+import { notesRouter } from "./notes";
+import { readyRouter } from "./ready";
+import { teamsRouter } from "./teams";
+import { terminalRouter } from "./terminal";
 
 export const apiRouter = Router();
 
 const generalLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   limit: env.rateLimitGeneral,
-  keyPrefix: 'general',
-  keyGenerator: (req) => (req.user ? `user:${req.user.id}` : `ip:${req.ip ?? 'unknown'}`),
+  keyPrefix: "general",
+  keyGenerator: (req) =>
+    req.user ? `user:${req.user.id}` : `ip:${req.ip ?? "unknown"}`,
 });
 
 apiRouter.use(healthRouter);
 apiRouter.use(readyRouter);
 apiRouter.use(metricsRouter);
 apiRouter.use(generalLimiter);
-apiRouter.use('/auth', authRouter);
-apiRouter.use('/challenges', challengesRouter);
-apiRouter.use('/leaderboard', leaderboardRouter);
-apiRouter.use('/terminal', terminalRouter);
-apiRouter.use('/events', eventsRouter);
-apiRouter.use('/teams', teamsRouter);
-apiRouter.use('/announcements', announcementsRouter);
-apiRouter.use('/admin', adminRouter);
+apiRouter.use("/auth", authRouter);
+apiRouter.use("/challenges", challengesRouter);
+apiRouter.use("/leaderboard", leaderboardRouter);
+apiRouter.use("/terminal", terminalRouter);
+apiRouter.use("/events", eventsRouter);
+apiRouter.use("/teams", teamsRouter);
+apiRouter.use("/announcements", announcementsRouter);
+apiRouter.use("/notes", notesRouter);
+apiRouter.use("/achievements", achievementsRouter);
+apiRouter.use("/bookmarks", bookmarksRouter);
+apiRouter.use("/admin", adminRouter);

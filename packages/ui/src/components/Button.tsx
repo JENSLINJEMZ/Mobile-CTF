@@ -1,16 +1,16 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from "react";
 
-import { colors, radius, spacing, typography } from '../tokens';
+import { colors, radius, spacing, typography } from "../tokens";
 
-type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
-type Size = 'sm' | 'md' | 'lg';
+type Variant = "primary" | "secondary" | "danger" | "ghost";
+type Size = "sm" | "md" | "lg";
 
 export interface ButtonProps {
   children: ReactNode;
   variant?: Variant;
   size?: Size;
   disabled?: boolean;
-  type?: 'button' | 'submit' | 'reset';
+  type?: "button" | "submit" | "reset";
   onClick?: () => void;
   style?: CSSProperties;
 }
@@ -32,9 +32,9 @@ const variantStyles: Record<Variant, CSSProperties> = {
     border: `1px solid ${colors.danger}`,
   },
   ghost: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     color: colors.primary,
-    border: '1px solid transparent',
+    border: "1px solid transparent",
   },
 };
 
@@ -55,10 +55,10 @@ const sizeStyles: Record<Size, CSSProperties> = {
 
 export function Button({
   children,
-  variant = 'primary',
-  size = 'md',
+  variant = "primary",
+  size = "md",
   disabled = false,
-  type = 'button',
+  type = "button",
   onClick,
   style,
 }: ButtonProps) {
@@ -72,9 +72,9 @@ export function Button({
         ...sizeStyles[size],
         borderRadius: radius.md,
         fontWeight: typography.fontWeight.semibold,
-        cursor: disabled ? 'not-allowed' : 'pointer',
+        cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.5 : 1,
-        outline: 'none',
+        outline: "none",
         margin: 0,
         ...style,
       }}

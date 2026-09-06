@@ -1,4 +1,5 @@
-export type TerminalSessionStatus = 'CREATING' | 'RUNNING' | 'CLOSED' | 'EXPIRED' | 'FAILED';
+export type TerminalSessionStatus =
+  "CREATING" | "RUNNING" | "CLOSED" | "EXPIRED" | "FAILED";
 
 export interface TerminalSessionDto {
   id: string;
@@ -18,7 +19,7 @@ export interface ListTerminalSessionsResponse {
 }
 
 export interface TerminalInputEvent {
-  type: 'input';
+  type: "input";
   data: string;
 }
 

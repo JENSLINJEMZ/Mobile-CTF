@@ -3,9 +3,9 @@ import type {
   EventLeaderboardEntryDto,
   EventLeaderboardScope,
   EventSummaryDto,
-} from '@ctf/shared';
-import { Link, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+} from "@ctf/shared";
+import { Link, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -13,47 +13,53 @@ import {
   StyleSheet,
   useColorScheme,
   type TextStyle,
-} from 'react-native';
-import Markdown from 'react-native-markdown-display';
+} from "react-native";
+import Markdown from "react-native-markdown-display";
 
-import { ScreenShell } from '@/components/screen-shell';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { getEvent, getEventChallenges, getEventLeaderboard, joinEvent, leaveEvent } from '@/services/events';
-import { useAuthStore } from '@/store/auth-store';
+import { ScreenShell } from "@/components/screen-shell";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { Spacing } from "@/constants/theme";
+import {
+  getEvent,
+  getEventChallenges,
+  getEventLeaderboard,
+  joinEvent,
+  leaveEvent,
+} from "@/services/events";
+import { useAuthStore } from "@/store/auth-store";
 
 const LOCKED_LABELS: Record<string, string> = {
-  not_started: 'Starts soon',
-  time_lock: 'Unlocks later',
-  prerequisite: 'Solve prerequisite',
-  score: 'Needs higher score',
-  ended: 'Event ended',
-  join_required: 'Join to access',
+  not_started: "Starts soon",
+  time_lock: "Unlocks later",
+  prerequisite: "Solve prerequisite",
+  score: "Needs higher score",
+  ended: "Event ended",
+  join_required: "Join to access",
 };
 
 function difficultyColor(value: string): string {
   switch (value) {
-    case 'EASY':
-      return '#16a34a';
-    case 'MEDIUM':
-      return '#d97706';
-    case 'HARD':
-      return '#dc2626';
+    case "EASY":
+      return "#16a34a";
+    case "MEDIUM":
+      return "#d97706";
+    case "HARD":
+      return "#dc2626";
     default:
-      return '#7c3aed';
+      return "#7c3aed";
   }
 }
 
 function statusText(event: EventSummaryDto): string {
-  if (event.status === 'RUNNING') {
+  if (event.status === "RUNNING") {
     const diff = new Date(event.endsAt).getTime() - Date.now();
     const h = Math.floor(diff / 3600000);
     const m = Math.floor((diff % 3600000) / 60000);
     return h > 0 ? `${h}h ${m}m left` : `${m}m left`;
   }
-  if (event.status === 'SCHEDULED') return 'Upcoming';
-  return event.status === 'ENDED' ? 'Ended' : 'Draft';
+  if (event.status === "SCHEDULED") return "Upcoming";
+  return event.status === "ENDED" ? "Ended" : "Draft";
 }
 
 export default function EventDetailScreen() {
@@ -61,19 +67,23 @@ export default function EventDetailScreen() {
   const eventId = Number(id);
   const colorScheme = useColorScheme();
   const authStatus = useAuthStore((s) => s.status);
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
 
   const markdownTheme = useMemo(
     () => ({
-      body: { color: isDark ? '#f9fafb' : '#111827', fontSize: 15, lineHeight: 22 },
+      body: {
+        color: isDark ? "#f9fafb" : "#111827",
+        fontSize: 15,
+        lineHeight: 22,
+      },
       heading1: {
-        color: isDark ? '#ffffff' : '#111827',
+        color: isDark ? "#ffffff" : "#111827",
         fontSize: 20,
-        fontWeight: '700' as TextStyle['fontWeight'],
+        fontWeight: "700" as TextStyle["fontWeight"],
         marginTop: Spacing.two,
       },
       paragraph: { marginVertical: Spacing.one },
-      strong: { fontWeight: '700' as TextStyle['fontWeight'] },
+      strong: { fontWeight: "700" as TextStyle["fontWeight"] },
     }),
     [isDark],
   );
@@ -84,7 +94,7 @@ export default function EventDetailScreen() {
     scope: EventLeaderboardScope;
     entries: EventLeaderboardEntryDto[];
     me: { rank: number | null; score: number } | null;
-  }>({ scope: 'participants', entries: [], me: null });
+  }>({ scope: "participants", entries: [], me: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -102,7 +112,11 @@ export default function EventDetailScreen() {
     async (targetEventId: number, scope: EventLeaderboardScope) => {
       try {
         const board = await getEventLeaderboard(targetEventId, scope, 20);
-        setLeaderboard({ scope: board.scope, entries: board.entries, me: board.me });
+        setLeaderboard({
+          scope: board.scope,
+          entries: board.entries,
+          me: board.me,
+        });
       } catch {
         setLeaderboard((prev) => ({ ...prev, entries: [], me: null }));
       }
@@ -120,7 +134,7 @@ export default function EventDetailScreen() {
         loadLeaderboard(eventId, leaderboard.scope),
       ]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load event');
+      setError(err instanceof Error ? err.message : "Failed to load event");
     } finally {
       setLoading(false);
     }
@@ -143,13 +157,13 @@ export default function EventDetailScreen() {
       }
       void load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Action failed');
+      setError(err instanceof Error ? err.message : "Action failed");
     } finally {
       setBusy(false);
     }
   }, [busy, event, load]);
 
-  const isAuthenticated = authStatus === 'authenticated';
+  const isAuthenticated = authStatus === "authenticated";
   const solvedCount = challenges.filter((c) => c.solvedByMe).length;
 
   return (
@@ -158,7 +172,7 @@ export default function EventDetailScreen() {
         <ActivityIndicator style={{ marginTop: Spacing.five }} />
       ) : error && !event ? (
         <Pressable onPress={() => void load()}>
-          <ThemedText type="small" style={{ color: '#dc2626' }}>
+          <ThemedText type="small" style={{ color: "#dc2626" }}>
             {error} — tap to retry
           </ThemedText>
         </Pressable>
@@ -166,21 +180,25 @@ export default function EventDetailScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <ThemedText type="subtitle">{event.title}</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            {statusText(event)} · {event.participantCount} participants · {event.joinedByMe ? 'Joined' : 'Not joined'}
+            {statusText(event)} · {event.participantCount} participants ·{" "}
+            {event.joinedByMe ? "Joined" : "Not joined"}
           </ThemedText>
 
           {event.description ? (
             <ThemedView
               type="backgroundElement"
-              style={[styles.markdownBox, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}
+              style={[
+                styles.markdownBox,
+                { backgroundColor: isDark ? "#1f2937" : "#f3f4f6" },
+              ]}
             >
               <Markdown style={markdownTheme}>{event.description}</Markdown>
             </ThemedView>
           ) : null}
 
-          {isAuthenticated && event.status !== 'ENDED' ? (
+          {isAuthenticated && event.status !== "ENDED" ? (
             <Pressable
-              disabled={busy || event.status === 'DRAFT'}
+              disabled={busy || event.status === "DRAFT"}
               onPress={() => void onToggleJoin()}
               style={({ pressed }) => [
                 styles.joinButton,
@@ -192,8 +210,8 @@ export default function EventDetailScreen() {
               {busy ? (
                 <ActivityIndicator color="#ffffff" size="small" />
               ) : (
-                <ThemedText style={{ color: '#ffffff', fontWeight: '600' }}>
-                  {event.joinedByMe ? 'Leave event' : 'Join event'}
+                <ThemedText style={{ color: "#ffffff", fontWeight: "600" }}>
+                  {event.joinedByMe ? "Leave event" : "Join event"}
                 </ThemedText>
               )}
             </Pressable>
@@ -208,8 +226,16 @@ export default function EventDetailScreen() {
                 </ThemedText>
               </ThemedView>
               <Link href="/teams" asChild>
-                <Pressable style={({ pressed }) => [styles.teamLink, pressed && styles.pressed]}>
-                  <ThemedText type="small" style={{ color: '#2563eb', fontWeight: '600' }}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.teamLink,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <ThemedText
+                    type="small"
+                    style={{ color: "#2563eb", fontWeight: "600" }}
+                  >
                     Manage team →
                   </ThemedText>
                 </Pressable>
@@ -221,18 +247,28 @@ export default function EventDetailScreen() {
             <ThemedText type="smallBold">Challenges</ThemedText>
             {challenges.length === 0 ? (
               <ThemedText type="small" themeColor="textSecondary">
-                {event.joinedByMe ? 'No challenges in this event yet.' : 'Join the event to see its challenges.'}
+                {event.joinedByMe
+                  ? "No challenges in this event yet."
+                  : "Join the event to see its challenges."}
               </ThemedText>
             ) : (
               challenges.map((item) =>
                 item.locked ? (
-                  <ThemedView key={item.id} type="backgroundElement" style={[styles.challengeRow, styles.lockedRow]}>
+                  <ThemedView
+                    key={item.id}
+                    type="backgroundElement"
+                    style={[styles.challengeRow, styles.lockedRow]}
+                  >
                     <ThemedView style={styles.challengeBody}>
-                      <ThemedText type="smallBold" themeColor="textSecondary" numberOfLines={1}>
+                      <ThemedText
+                        type="smallBold"
+                        themeColor="textSecondary"
+                        numberOfLines={1}
+                      >
                         {item.title}
                       </ThemedText>
-                      <ThemedText type="small" style={{ color: '#9ca3af' }}>
-                        🔒 {LOCKED_LABELS[item.lockedReason ?? ''] ?? 'Locked'}
+                      <ThemedText type="small" style={{ color: "#9ca3af" }}>
+                        🔒 {LOCKED_LABELS[item.lockedReason ?? ""] ?? "Locked"}
                       </ThemedText>
                     </ThemedView>
                     <ThemedText type="smallBold" themeColor="textSecondary">
@@ -245,7 +281,12 @@ export default function EventDetailScreen() {
                     href={`/challenge/${item.challengeId}?event=${event.id}`}
                     asChild
                   >
-                    <Pressable style={({ pressed }) => [styles.challengeRow, pressed && styles.pressed]}>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.challengeRow,
+                        pressed && styles.pressed,
+                      ]}
+                    >
                       <ThemedView style={styles.challengeBody}>
                         <ThemedText type="smallBold" numberOfLines={1}>
                           {item.title}
@@ -254,11 +295,18 @@ export default function EventDetailScreen() {
                           <ThemedView
                             style={[
                               styles.dot,
-                              { backgroundColor: difficultyColor(item.difficulty) },
+                              {
+                                backgroundColor: difficultyColor(
+                                  item.difficulty,
+                                ),
+                              },
                             ]}
                           />
                           {item.solvedByMe ? (
-                            <ThemedText type="small" style={{ color: '#16a34a' }}>
+                            <ThemedText
+                              type="small"
+                              style={{ color: "#16a34a" }}
+                            >
                               Solved ✓
                             </ThemedText>
                           ) : (
@@ -268,7 +316,9 @@ export default function EventDetailScreen() {
                           )}
                         </ThemedView>
                       </ThemedView>
-                      <ThemedText type="smallBold">{item.basePoints} pts</ThemedText>
+                      <ThemedText type="smallBold">
+                        {item.basePoints} pts
+                      </ThemedText>
                     </Pressable>
                   </Link>
                 ),
@@ -276,12 +326,12 @@ export default function EventDetailScreen() {
             )}
           </ThemedView>
 
-          {event.joinedByMe && event.status === 'RUNNING' ? (
+          {event.joinedByMe && event.status === "RUNNING" ? (
             <ThemedView style={styles.section}>
               <ThemedView style={styles.sectionHeader}>
                 <ThemedText type="smallBold">Leaderboard</ThemedText>
                 <ThemedView style={styles.chips}>
-                  {(['participants', 'teams'] as const).map((scope) => {
+                  {(["participants", "teams"] as const).map((scope) => {
                     const active = leaderboard.scope === scope;
                     return (
                       <Pressable
@@ -291,9 +341,12 @@ export default function EventDetailScreen() {
                       >
                         <ThemedText
                           type="small"
-                          style={{ color: active ? '#ffffff' : undefined, fontWeight: '600' }}
+                          style={{
+                            color: active ? "#ffffff" : undefined,
+                            fontWeight: "600",
+                          }}
                         >
-                          {scope === 'participants' ? 'People' : 'Teams'}
+                          {scope === "participants" ? "People" : "Teams"}
                         </ThemedText>
                       </Pressable>
                     );
@@ -315,7 +368,9 @@ export default function EventDetailScreen() {
                       leaderboard.me?.rank === entry.rank && styles.entryMe,
                     ]}
                   >
-                    <ThemedText style={styles.rankCell}>{entry.rank}</ThemedText>
+                    <ThemedText style={styles.rankCell}>
+                      {entry.rank}
+                    </ThemedText>
                     <ThemedText numberOfLines={1} style={styles.nameCell}>
                       {entry.name}
                     </ThemedText>
@@ -339,18 +394,18 @@ const styles = StyleSheet.create({
   markdownBox: {
     borderRadius: 12,
     padding: Spacing.three,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   joinButton: {
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Spacing.three,
   },
   joinFab: {
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
   },
   joinJoined: {
-    backgroundColor: '#dc2626',
+    backgroundColor: "#dc2626",
   },
   sectionCard: {
     borderRadius: 12,
@@ -358,20 +413,20 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: Spacing.two,
   },
   teamLink: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   section: {
     gap: Spacing.two,
   },
   challengeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: 12,
     padding: Spacing.three,
     gap: Spacing.two,
@@ -384,8 +439,8 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   challengeMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.two,
   },
   dot: {
@@ -394,7 +449,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   chips: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Spacing.one,
   },
   chip: {
@@ -403,11 +458,11 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   chipActive: {
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
   },
   leaderboardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.three,
     borderRadius: 12,
     paddingVertical: Spacing.two,
@@ -415,11 +470,11 @@ const styles = StyleSheet.create({
   },
   entryMe: {
     borderWidth: 1,
-    borderColor: '#2563eb',
+    borderColor: "#2563eb",
   },
   rankCell: {
     minWidth: 28,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   nameCell: {
     flex: 1,

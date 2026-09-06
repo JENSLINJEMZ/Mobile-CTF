@@ -1,6 +1,10 @@
-import type { TerminalExitEvent, TerminalOutputEvent, TerminalSessionDto } from '@ctf/shared';
-import { Link } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import type {
+  TerminalExitEvent,
+  TerminalOutputEvent,
+  TerminalSessionDto,
+} from "@ctf/shared";
+import { Link } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -8,15 +12,19 @@ import {
   StyleSheet,
   TextInput,
   View,
-} from 'react-native';
+} from "react-native";
 
-import { ScreenShell } from '@/components/screen-shell';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Fonts, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
-import { useAuthStore } from '@/store/auth-store';
-import { createTerminalSession, closeTerminalSession, listTerminalSessions } from '@/services/terminal';
+import { ScreenShell } from "@/components/screen-shell";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { Fonts, Spacing } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useAuthStore } from "@/store/auth-store";
+import {
+  createTerminalSession,
+  closeTerminalSession,
+  listTerminalSessions,
+} from "@/services/terminal";
 import {
   connectTerminalSocket,
   disconnectTerminalSocket,
@@ -24,20 +32,20 @@ import {
   subscribeTerminalError,
   subscribeTerminalExit,
   subscribeTerminalOutput,
-} from '@/services/terminalSocket';
+} from "@/services/terminalSocket";
 
 const MAX_OUTPUT_CHARS = 64 * 1024;
 
-const STATUS_LABELS: Record<TerminalSessionDto['status'], string> = {
-  CREATING: 'starting',
-  RUNNING: 'running',
-  CLOSED: 'closed',
-  EXPIRED: 'expired',
-  FAILED: 'failed',
+const STATUS_LABELS: Record<TerminalSessionDto["status"], string> = {
+  CREATING: "starting",
+  RUNNING: "running",
+  CLOSED: "closed",
+  EXPIRED: "expired",
+  FAILED: "failed",
 };
 
-function isActive(status: TerminalSessionDto['status']): boolean {
-  return status === 'RUNNING' || status === 'CREATING';
+function isActive(status: TerminalSessionDto["status"]): boolean {
+  return status === "RUNNING" || status === "CREATING";
 }
 
 export default function TerminalScreen() {
@@ -48,8 +56,8 @@ export default function TerminalScreen() {
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
-  const [output, setOutput] = useState('');
-  const [input, setInput] = useState('');
+  const [output, setOutput] = useState("");
+  const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exitNote, setExitNote] = useState<string | null>(null);
@@ -57,7 +65,7 @@ export default function TerminalScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const mountedRef = useRef(true);
 
-  const isAuthenticated = authStatus === 'authenticated';
+  const isAuthenticated = authStatus === "authenticated";
 
   const load = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -67,7 +75,9 @@ export default function TerminalScreen() {
       const results = await listTerminalSessions();
       setSessions(results);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load terminal sessions');
+      setError(
+        err instanceof Error ? err.message : "Failed to load terminal sessions",
+      );
     } finally {
       if (mountedRef.current) setLoading(false);
     }
@@ -88,7 +98,7 @@ export default function TerminalScreen() {
       setBusy(true);
       setError(null);
       setExitNote(null);
-      setOutput('');
+      setOutput("");
       try {
         await connectTerminalSocket(sessionId);
         if (!mountedRef.current) return;
@@ -96,7 +106,11 @@ export default function TerminalScreen() {
         setConnected(true);
       } catch (err) {
         if (mountedRef.current) {
-          setError(err instanceof Error ? err.message : 'Failed to connect to the terminal');
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to connect to the terminal",
+          );
           void load();
         }
       } finally {
@@ -116,7 +130,11 @@ export default function TerminalScreen() {
       setSessions((prev) => [session, ...prev]);
       await openSession(session.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start a sandbox session');
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to start a sandbox session",
+      );
     } finally {
       if (mountedRef.current) setBusy(false);
     }
@@ -131,12 +149,14 @@ export default function TerminalScreen() {
       const closed = await closeTerminalSession(id);
       setSessions((prev) => prev.map((s) => (s.id === id ? closed : s)));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to close the session');
+      setError(
+        err instanceof Error ? err.message : "Failed to close the session",
+      );
     } finally {
       disconnectTerminalSocket();
       setConnected(false);
       setActiveId(null);
-      setOutput('');
+      setOutput("");
       if (mountedRef.current) setBusy(false);
     }
   }, [activeId]);
@@ -146,12 +166,14 @@ export default function TerminalScreen() {
     const offOutput = subscribeTerminalOutput((event: TerminalOutputEvent) => {
       setOutput((prev) => {
         const next = prev + event.data;
-        return next.length > MAX_OUTPUT_CHARS ? next.slice(-MAX_OUTPUT_CHARS) : next;
+        return next.length > MAX_OUTPUT_CHARS
+          ? next.slice(-MAX_OUTPUT_CHARS)
+          : next;
       });
     });
     const offExit = subscribeTerminalExit((event: TerminalExitEvent) => {
       setConnected(false);
-      setExitNote(`Session ended (exit code ${event.code ?? 'n/a'})`);
+      setExitNote(`Session ended (exit code ${event.code ?? "n/a"})`);
       disconnectTerminalSocket();
       void load();
     });
@@ -178,9 +200,9 @@ export default function TerminalScreen() {
   const submitInput = useCallback(() => {
     const command = input;
     if (!command || !connected) return;
-    setInput('');
+    setInput("");
     void sendTerminalInput(`${command}\n`).catch((err) => {
-      setError(err instanceof Error ? err.message : 'Failed to send input');
+      setError(err instanceof Error ? err.message : "Failed to send input");
     });
   }, [input, connected]);
 
@@ -196,7 +218,9 @@ export default function TerminalScreen() {
           </ThemedText>
           <Link href="/auth/login" asChild>
             <Pressable style={styles.signInButton}>
-              <ThemedText style={styles.signInLabel}>Sign in to open a terminal</ThemedText>
+              <ThemedText style={styles.signInLabel}>
+                Sign in to open a terminal
+              </ThemedText>
             </Pressable>
           </Link>
         </ThemedView>
@@ -208,18 +232,26 @@ export default function TerminalScreen() {
             <Pressable
               onPress={() => void createNew()}
               disabled={busy || loading}
-              style={({ pressed }) => [styles.createButton, pressed && styles.cardPressed]}
+              style={({ pressed }) => [
+                styles.createButton,
+                pressed && styles.cardPressed,
+              ]}
             >
               {busy ? (
                 <ActivityIndicator color="#ffffff" size="small" />
               ) : (
-                <ThemedText style={styles.createLabel}>Open terminal session</ThemedText>
+                <ThemedText style={styles.createLabel}>
+                  Open terminal session
+                </ThemedText>
               )}
             </Pressable>
             <Pressable
               onPress={() => void load()}
               disabled={busy}
-              style={({ pressed }) => [styles.refreshButton, pressed && styles.cardPressed]}
+              style={({ pressed }) => [
+                styles.refreshButton,
+                pressed && styles.cardPressed,
+              ]}
             >
               <ThemedText type="small" themeColor="textSecondary">
                 Refresh
@@ -246,22 +278,32 @@ export default function TerminalScreen() {
               {sessions.map((session) => {
                 const active = isActive(session.status);
                 return (
-                  <ThemedView key={session.id} type="backgroundElement" style={styles.row}>
+                  <ThemedView
+                    key={session.id}
+                    type="backgroundElement"
+                    style={styles.row}
+                  >
                     <View style={styles.rowInfo}>
                       <ThemedText type="smallBold" numberOfLines={1}>
                         {session.id.slice(0, 16)}…
                       </ThemedText>
                       <ThemedText type="small" themeColor="textSecondary">
-                        {STATUS_LABELS[session.status]} ·{' '}
+                        {STATUS_LABELS[session.status]} ·{" "}
                         {new Date(session.createdAt).toLocaleString()}
                       </ThemedText>
                     </View>
                     {active ? (
                       <Pressable
                         onPress={() => void openSession(session.id)}
-                        style={({ pressed }) => [styles.rowAction, pressed && styles.cardPressed]}
+                        style={({ pressed }) => [
+                          styles.rowAction,
+                          pressed && styles.cardPressed,
+                        ]}
                       >
-                        <ThemedText type="smallBold" style={styles.rowActionLabel}>
+                        <ThemedText
+                          type="smallBold"
+                          style={styles.rowActionLabel}
+                        >
                           Open
                         </ThemedText>
                       </Pressable>
@@ -281,13 +323,20 @@ export default function TerminalScreen() {
       {isAuthenticated && activeSession ? (
         <ThemedView style={styles.terminalContainer}>
           <ThemedView type="backgroundElement" style={styles.terminalHeader}>
-            <ThemedText type="smallBold" numberOfLines={1} style={styles.terminalHeaderLabel}>
+            <ThemedText
+              type="smallBold"
+              numberOfLines={1}
+              style={styles.terminalHeaderLabel}
+            >
               @ctf sandbox — {activeSession.id.slice(0, 16)}…
             </ThemedText>
             <Pressable
               onPress={() => void closeActive()}
               disabled={busy}
-              style={({ pressed }) => [styles.closeButton, pressed && styles.cardPressed]}
+              style={({ pressed }) => [
+                styles.closeButton,
+                pressed && styles.cardPressed,
+              ]}
             >
               <ThemedText type="small" style={styles.closeLabel}>
                 Close
@@ -301,7 +350,7 @@ export default function TerminalScreen() {
             contentContainerStyle={styles.outputContent}
           >
             <ThemedText style={[styles.outputText, { color: theme.text }]}>
-              {terminalOutput || 'Sandbox connected — type a command below.'}
+              {terminalOutput || "Sandbox connected — type a command below."}
             </ThemedText>
           </ScrollView>
 
@@ -322,7 +371,7 @@ export default function TerminalScreen() {
               style={[styles.input, { color: theme.text }]}
               value={input}
               onChangeText={setInput}
-              placeholder={connected ? 'Type a command…' : 'Session ended'}
+              placeholder={connected ? "Type a command…" : "Session ended"}
               placeholderTextColor="#8e8e93"
               editable={connected}
               autoCapitalize="none"
@@ -335,7 +384,8 @@ export default function TerminalScreen() {
               disabled={!connected || input.trim().length === 0}
               style={({ pressed }) => [
                 styles.sendButton,
-                (!connected || input.trim().length === 0) && styles.sendButtonDisabled,
+                (!connected || input.trim().length === 0) &&
+                  styles.sendButtonDisabled,
                 pressed && styles.cardPressed,
               ]}
             >
@@ -350,44 +400,44 @@ export default function TerminalScreen() {
 
 const styles = StyleSheet.create({
   promptCard: {
-    width: '100%',
+    width: "100%",
     borderRadius: 12,
     padding: Spacing.three,
     gap: Spacing.two,
   },
   signInButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Spacing.two,
   },
   signInLabel: {
-    color: '#ffffff',
-    fontWeight: '600',
+    color: "#ffffff",
+    fontWeight: "600",
   },
   actionsRow: {
-    width: '100%',
-    flexDirection: 'row',
+    width: "100%",
+    flexDirection: "row",
     gap: Spacing.two,
-    alignItems: 'center',
+    alignItems: "center",
   },
   createButton: {
     flex: 1,
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Spacing.three,
   },
   createLabel: {
-    color: '#ffffff',
-    fontWeight: '600',
+    color: "#ffffff",
+    fontWeight: "600",
   },
   refreshButton: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
   },
   errorText: {
-    color: '#dc2626',
+    color: "#dc2626",
   },
   listContent: {
     gap: Spacing.two,
@@ -395,9 +445,9 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.four,
   },
   row: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.three,
     borderRadius: 12,
     paddingVertical: Spacing.two,
@@ -408,23 +458,23 @@ const styles = StyleSheet.create({
     gap: Spacing.half,
   },
   rowAction: {
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
     borderRadius: 8,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.one,
   },
   rowActionLabel: {
-    color: '#ffffff',
+    color: "#ffffff",
   },
   terminalContainer: {
     flex: 1,
-    width: '100%',
+    width: "100%",
     gap: Spacing.two,
   },
   terminalHeader: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.two,
     borderRadius: 12,
     paddingHorizontal: Spacing.three,
@@ -438,8 +488,8 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.half,
   },
   closeLabel: {
-    color: '#dc2626',
-    fontWeight: '600',
+    color: "#dc2626",
+    fontWeight: "600",
   },
   outputScroll: {
     flex: 1,
@@ -455,14 +505,14 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   exitBanner: {
-    width: '100%',
+    width: "100%",
     borderRadius: 8,
     padding: Spacing.two,
   },
   inputRow: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.two,
     borderRadius: 12,
     paddingHorizontal: Spacing.three,
@@ -475,7 +525,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.mono,
   },
   sendButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
     borderRadius: 8,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.one,
@@ -484,8 +534,8 @@ const styles = StyleSheet.create({
     opacity: 0.35,
   },
   sendLabel: {
-    color: '#ffffff',
-    fontWeight: '600',
+    color: "#ffffff",
+    fontWeight: "600",
   },
   cardPressed: {
     opacity: 0.85,

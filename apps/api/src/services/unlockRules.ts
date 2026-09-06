@@ -1,4 +1,4 @@
-import type { UnlockLockedReason, UnlockRuleType } from '@ctf/shared';
+import type { UnlockLockedReason, UnlockRuleType } from "@ctf/shared";
 
 export interface UnlockRuleInput {
   type: UnlockRuleType;
@@ -13,7 +13,8 @@ export interface UnlockContext {
   eventScore: number;
 }
 
-export type UnlockOutcome = { locked: false } | { locked: true; reason: UnlockLockedReason };
+export type UnlockOutcome =
+  { locked: false } | { locked: true; reason: UnlockLockedReason };
 
 /**
  * Pure unlock-rule evaluator. `null`/missing rule means "always unlocked".
@@ -24,27 +25,29 @@ export function evaluateUnlockRule(
   rule: UnlockRuleInput | null,
   ctx: UnlockContext,
 ): UnlockOutcome {
-  if (!rule || rule.type === 'ALWAYS') {
+  if (!rule || rule.type === "ALWAYS") {
     return { locked: false };
   }
   switch (rule.type) {
-    case 'TIME': {
+    case "TIME": {
       if (rule.unlockAt === null) return { locked: false };
-      if (ctx.now < rule.unlockAt) return { locked: true, reason: 'time_lock' };
+      if (ctx.now < rule.unlockAt) return { locked: true, reason: "time_lock" };
       return { locked: false };
     }
-    case 'PREREQUISITE': {
+    case "PREREQUISITE": {
       if (rule.prerequisiteChallengeIds.length === 0) return { locked: false };
       const satisfied = rule.prerequisiteChallengeIds.every((id) =>
         ctx.solvedChallengeIds.has(id),
       );
-      return satisfied ? { locked: false } : { locked: true, reason: 'prerequisite' };
+      return satisfied
+        ? { locked: false }
+        : { locked: true, reason: "prerequisite" };
     }
-    case 'SCORE': {
+    case "SCORE": {
       const threshold = rule.minScore ?? 0;
       return ctx.eventScore >= threshold
         ? { locked: false }
-        : { locked: true, reason: 'score' };
+        : { locked: true, reason: "score" };
     }
   }
 }

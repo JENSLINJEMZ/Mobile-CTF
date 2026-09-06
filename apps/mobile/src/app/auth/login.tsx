@@ -1,5 +1,5 @@
-import { Link, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { Link, useRouter } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -7,21 +7,21 @@ import {
   Pressable,
   StyleSheet,
   TextInput,
-} from 'react-native';
+} from "react-native";
 
-import { ScreenShell } from '@/components/screen-shell';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
-import { useAuthStore } from '@/store/auth-store';
+import { ScreenShell } from "@/components/screen-shell";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { Spacing } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+import { useAuthStore } from "@/store/auth-store";
 
 export default function LoginScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { login, clearError, error, status } = useAuthStore();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const onLogin = async () => {
@@ -30,7 +30,7 @@ export default function LoginScreen() {
     clearError();
     try {
       await login(email, password);
-      router.replace('/');
+      router.replace("/");
     } catch {
       // error surfaced via store
     } finally {
@@ -45,7 +45,7 @@ export default function LoginScreen() {
       </ThemedText>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.form}
       >
         <ThemedView type="backgroundElement" style={styles.field}>
@@ -74,14 +74,17 @@ export default function LoginScreen() {
         </ThemedView>
 
         {error ? (
-          <ThemedText type="small" style={{ color: '#dc2626' }}>
+          <ThemedText type="small" style={{ color: "#dc2626" }}>
             {error}
           </ThemedText>
         ) : null}
 
         <Pressable
-          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-          disabled={submitting || status === 'loading'}
+          style={({ pressed }) => [
+            styles.button,
+            pressed && styles.buttonPressed,
+          ]}
+          disabled={submitting || status === "loading"}
           onPress={() => void onLogin()}
         >
           {submitting ? (
@@ -93,7 +96,9 @@ export default function LoginScreen() {
 
         <Link href="/auth/register" asChild>
           <Pressable style={styles.linkRow}>
-            <ThemedText type="linkPrimary">New here? Create an account</ThemedText>
+            <ThemedText type="linkPrimary">
+              New here? Create an account
+            </ThemedText>
           </Pressable>
         </Link>
       </KeyboardAvoidingView>
@@ -103,7 +108,7 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   form: {
-    width: '100%',
+    width: "100%",
     gap: Spacing.two,
   },
   field: {
@@ -116,10 +121,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
   },
   button: {
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: Spacing.three,
     marginTop: Spacing.two,
   },
@@ -127,11 +132,11 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   buttonLabel: {
-    color: '#ffffff',
-    fontWeight: '600',
+    color: "#ffffff",
+    fontWeight: "600",
   },
   linkRow: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Spacing.two,
   },
 });

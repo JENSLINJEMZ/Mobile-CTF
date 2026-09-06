@@ -1,4 +1,4 @@
-import { prisma } from '@ctf/database';
+import { prisma } from "@ctf/database";
 import type {
   AuthResponse,
   ForgotPasswordResponse,
@@ -7,26 +7,40 @@ import type {
   RegisterRequest,
   ResetPasswordResponse,
   UserDto,
-} from '@ctf/shared';
-import type { Role } from '@ctf/shared';
-import type { User } from '@prisma/client';
+} from "@ctf/shared";
+import type { Role } from "@ctf/shared";
+import type { User } from "@prisma/client";
 
-import { env } from '../config/env';
-import { ApiError } from '../middleware/errors';
-import { signAccessToken } from '../utils/jwt';
+import { env } from "../config/env";
+import { ApiError } from "../middleware/errors";
+import { signAccessToken } from "../utils/jwt";
 import {
   generateOpaqueToken,
   hashPassword,
   sha256,
   verifyPassword,
   verifyPasswordAgainstDummy,
-} from '../utils/password';
+} from "../utils/password";
 
-const INVALID_CREDENTIALS = new ApiError(401, 'UNAUTHORIZED', 'Invalid email or password');
-const INVALID_SESSION = new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired session');
-const INVALID_RESET_TOKEN = new ApiError(400, 'VALIDATION_ERROR', 'Invalid or expired reset token');
+const INVALID_CREDENTIALS = new ApiError(
+  401,
+  "UNAUTHORIZED",
+  "Invalid email or password",
+);
+const INVALID_SESSION = new ApiError(
+  401,
+  "UNAUTHORIZED",
+  "Invalid or expired session",
+);
+const INVALID_RESET_TOKEN = new ApiError(
+  400,
+  "VALIDATION_ERROR",
+  "Invalid or expired reset token",
+);
 
-export function toUserDto(user: Pick<User, 'id' | 'email' | 'username' | 'role' | 'createdAt'>): UserDto {
+export function toUserDto(
+  user: Pick<User, "id" | "email" | "username" | "role" | "createdAt">,
+): UserDto {
   return {
     id: user.id,
     email: user.email,
@@ -73,17 +87,23 @@ export class AuthService {
     if (existing) {
       throw new ApiError(
         409,
-        'CONFLICT',
-        existing.email === email ? 'Email is already registered' : 'Username is already taken',
+        "CONFLICT",
+        existing.email === email
+          ? "Email is already registered"
+          : "Username is already taken",
       );
     }
     const passwordHash = await hashPassword(input.password);
-    const user = await prisma.user.create({ data: { email, username: input.username, passwordHash } });
+    const user = await prisma.user.create({
+      data: { email, username: input.username, passwordHash },
+    });
     return this.createAuthenticatedSession(user);
   }
 
   async login(input: LoginRequest): Promise<AuthResponse> {
-    const user = await prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
+    const user = await prisma.user.findUnique({
+      where: { email: input.email.toLowerCase() },
+    });
     if (!user || !user.isActive) {
       await verifyPasswordAgainstDummy(input.password);
       throw INVALID_CREDENTIALS;
@@ -92,7 +112,10 @@ export class AuthService {
     if (!valid) {
       throw INVALID_CREDENTIALS;
     }
-    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
     return this.createAuthenticatedSession(user);
   }
 
@@ -106,12 +129,17 @@ export class AuthService {
     if (session.expiresAt.getTime() <= Date.now()) {
       throw INVALID_SESSION;
     }
-    const user = await prisma.user.findUnique({ where: { id: session.userId } });
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+    });
     if (!user || !user.isActive) {
       throw INVALID_SESSION;
     }
 
-    await prisma.session.update({ where: { id: session.id }, data: { revoked: true } });
+    await prisma.session.update({
+      where: { id: session.id },
+      data: { revoked: true },
+    });
     return this.createAuthenticatedSession(user);
   }
 
@@ -125,7 +153,10 @@ export class AuthService {
     if (session.expiresAt.getTime() <= Date.now()) {
       throw INVALID_SESSION;
     }
-    await prisma.session.update({ where: { id: session.id }, data: { revoked: true } });
+    await prisma.session.update({
+      where: { id: session.id },
+      data: { revoked: true },
+    });
     return { ok: true };
   }
 
@@ -146,7 +177,9 @@ export class AuthService {
   }
 
   async forgotPassword(email: string): Promise<ForgotPasswordResponse> {
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
     if (user) {
       const token = generateOpaqueToken();
       await prisma.passwordResetToken.create({
@@ -157,15 +190,25 @@ export class AuthService {
         },
       });
       if (!env.isProd) {
-        return { ok: true, devResetLink: `/api/auth/reset-password?token=${token}` };
+        return {
+          ok: true,
+          devResetLink: `/api/auth/reset-password?token=${token}`,
+        };
       }
     }
     return { ok: true };
   }
 
-  async resetPassword(token: string, newPassword: string): Promise<ResetPasswordResponse> {
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<ResetPasswordResponse> {
     const record = await prisma.passwordResetToken.findFirst({
-      where: { tokenHash: sha256(token), usedAt: null, expiresAt: { gt: new Date() } },
+      where: {
+        tokenHash: sha256(token),
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
       include: { user: true },
     });
     if (!record) {
@@ -173,12 +216,18 @@ export class AuthService {
     }
     const newHash = await hashPassword(newPassword);
     await prisma.$transaction([
-      prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+      prisma.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      }),
       prisma.user.update({
         where: { id: record.userId },
         data: { passwordHash: newHash, passwordChangedAt: new Date() },
       }),
-      prisma.session.updateMany({ where: { userId: record.userId }, data: { revoked: true } }),
+      prisma.session.updateMany({
+        where: { userId: record.userId },
+        data: { revoked: true },
+      }),
     ]);
     return { ok: true };
   }

@@ -1,14 +1,14 @@
-import { bytesToUtf8, utf8ToBytes } from './encoding';
+import { bytesToUtf8, utf8ToBytes } from "./encoding";
 
 export function caesar(input: string, shift: number, decrypt = false): string {
   const effective = decrypt ? -shift : shift;
   const normalized = ((effective % 26) + 26) % 26;
-  let out = '';
+  let out = "";
   for (const char of input) {
     const code = char.charCodeAt(0);
-    if (char >= 'A' && char <= 'Z') {
+    if (char >= "A" && char <= "Z") {
       out += String.fromCharCode(((code - 65 + normalized) % 26) + 65);
-    } else if (char >= 'a' && char <= 'z') {
+    } else if (char >= "a" && char <= "z") {
       out += String.fromCharCode(((code - 97 + normalized) % 26) + 97);
     } else {
       out += char;
@@ -18,21 +18,21 @@ export function caesar(input: string, shift: number, decrypt = false): string {
 }
 
 export function vigenere(input: string, key: string, decrypt = false): string {
-  const letters = key.replace(/[^A-Za-z]/g, '');
+  const letters = key.replace(/[^A-Za-z]/g, "");
   if (letters.length === 0) return input;
   const shifts = Array.from(letters).map((char) => {
     const code = char.charCodeAt(0);
     return code >= 97 ? code - 97 : code - 65;
   });
   let index = 0;
-  let out = '';
+  let out = "";
   for (const char of input) {
     const code = char.charCodeAt(0);
-    const shift = decrypt ? 26 - (shifts[index] ?? 0) : shifts[index] ?? 0;
-    if (char >= 'A' && char <= 'Z') {
+    const shift = decrypt ? 26 - (shifts[index] ?? 0) : (shifts[index] ?? 0);
+    if (char >= "A" && char <= "Z") {
       out += String.fromCharCode(((code - 65 + shift) % 26) + 65);
       index += 1;
-    } else if (char >= 'a' && char <= 'z') {
+    } else if (char >= "a" && char <= "z") {
       out += String.fromCharCode(((code - 97 + shift) % 26) + 97);
       index += 1;
     } else {
@@ -75,7 +75,7 @@ export function analyzeFrequency(input: string): {
   const counts = new Map<string, number>();
   let total = 0;
   for (const char of input.toLowerCase()) {
-    if (char >= 'a' && char <= 'z') {
+    if (char >= "a" && char <= "z") {
       counts.set(char, (counts.get(char) ?? 0) + 1);
       total += 1;
     }

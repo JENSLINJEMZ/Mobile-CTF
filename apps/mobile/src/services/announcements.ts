@@ -1,7 +1,7 @@
-import type { AnnouncementDto } from '@ctf/shared';
+import type { AnnouncementDto } from "@ctf/shared";
 
-import { api } from './http';
+import { api } from "./http";
 
 export async function listAnnouncements(): Promise<AnnouncementDto[]> {
-  return api.get<AnnouncementDto[]>('/announcements');
+  return api.get<AnnouncementDto[]>("/announcements");
 }

@@ -1,4 +1,4 @@
-import type { Role } from './enums';
+import type { Role } from "./enums";
 
 export interface UserDto {
   id: number;

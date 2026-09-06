@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const createAnnouncementSchema = z.object({
   title: z.string().trim().min(1).max(160),

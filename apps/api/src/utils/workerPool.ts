@@ -17,7 +17,11 @@ export class WorkerPool {
 
   run<T>(task: () => Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      this.queue.push({ run: task as () => Promise<unknown>, resolve: resolve as (v: unknown) => void, reject });
+      this.queue.push({
+        run: task as () => Promise<unknown>,
+        resolve: resolve as (v: unknown) => void,
+        reject,
+      });
       this.pump();
     });
   }
