@@ -6,16 +6,29 @@ import { useEffect } from "react";
 import { useColorScheme } from "react-native";
 
 import { useAuthStore } from "@/store/auth-store";
+import { useNotificationStore } from "@/store/notification-store";
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const status = useAuthStore((s) => s.status);
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const refreshBadge = useNotificationStore((s) => s.refreshBadge);
+  const setUnreadCount = useNotificationStore((s) => s.setUnreadCount);
 
   useEffect(() => {
     void useAuthStore.getState().hydrate();
     SplashScreen.hideAsync();
   }, []);
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      void refreshBadge();
+    } else if (status !== "loading") {
+      setUnreadCount(0);
+    }
+  }, [status, refreshBadge, setUnreadCount]);
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
@@ -71,6 +84,16 @@ export default function RootLayout() {
             title: "Toolkit",
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="construct" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="notifications"
+          options={{
+            title: "Notifications",
+            tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="notifications" size={size} color={color} />
             ),
           }}
         />
