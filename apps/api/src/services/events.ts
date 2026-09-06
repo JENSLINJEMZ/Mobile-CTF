@@ -14,6 +14,7 @@ import type { Prisma } from "@prisma/client";
 
 import { ApiError } from "../middleware/errors";
 import { evaluateAndGrantAchievements } from "./achievements";
+import { recordAudit } from "./auditLog";
 import { getRedis } from "./dependencies";
 import { evaluateUnlockRule, type UnlockRuleInput } from "./unlockRules";
 
@@ -721,6 +722,7 @@ export interface AdminCreateEvent {
 export async function createEvent(
   input: AdminCreateEvent,
   organizerId: number,
+  ipAddress?: string,
 ): Promise<EventSummaryDto> {
   const existing = await prisma.event.findUnique({
     where: { slug: input.slug },
@@ -744,6 +746,14 @@ export async function createEvent(
     },
     include: { _count: { select: { participants: true, teams: true } } },
   });
+  await recordAudit({
+    actorId: organizerId,
+    action: "event.create",
+    entityType: "event",
+    entityId: String(event.id),
+    details: { slug: event.slug, title: event.title },
+    ipAddress,
+  });
   return toSummaryDto(event as unknown as EventRow, new Date(), {
     joinedByMe: false,
     myTeamId: null,
@@ -755,6 +765,8 @@ export type AdminUpdateEvent = Partial<AdminCreateEvent>;
 export async function updateEvent(
   id: number,
   input: AdminUpdateEvent,
+  actorId?: number,
+  ipAddress?: string,
 ): Promise<EventSummaryDto> {
   const existing = await prisma.event.findUnique({ where: { id } });
   if (!existing)
@@ -772,20 +784,45 @@ export async function updateEvent(
     },
     include: { _count: { select: { participants: true, teams: true } } },
   });
-  return toSummaryDto(event as unknown as EventRow, new Date(), {
+  const dto = toSummaryDto(event as unknown as EventRow, new Date(), {
     joinedByMe: false,
     myTeamId: null,
   });
+  await recordAudit({
+    actorId,
+    action: "event.update",
+    entityType: "event",
+    entityId: String(id),
+    details: {
+      changed: Object.keys(input),
+      status: input.status,
+      title: input.title,
+    },
+    ipAddress,
+  });
+  return dto;
 }
 
-export async function deleteEvent(id: number): Promise<void> {
+export async function deleteEvent(
+  id: number,
+  actorId?: number,
+  ipAddress?: string,
+): Promise<void> {
   const existing = await prisma.event.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, slug: true },
   });
   if (!existing)
     throw new ApiError(404, ErrorCode.NOT_FOUND, "Event not found");
   await prisma.event.delete({ where: { id } });
+  await recordAudit({
+    actorId,
+    action: "event.delete",
+    entityType: "event",
+    entityId: String(id),
+    details: { slug: existing.slug },
+    ipAddress,
+  });
 }
 
 export interface AdminCreateEventChallenge {
@@ -797,6 +834,8 @@ export interface AdminCreateEventChallenge {
 export async function addEventChallenge(
   eventId: number,
   input: AdminCreateEventChallenge,
+  actorId?: number,
+  ipAddress?: string,
 ): Promise<EventChallengeDto> {
   const event = await prisma.event.findUnique({
     where: { id: eventId },
@@ -847,6 +886,14 @@ export async function addEventChallenge(
   });
   const { states } = await getEventChallengeStates(eventId, undefined);
   const gate = states.get(input.challengeId) ?? { locked: false, reason: null };
+  await recordAudit({
+    actorId,
+    action: "event.challenge.add",
+    entityType: "event",
+    entityId: String(eventId),
+    details: { challengeId: input.challengeId, sortOrder: row.sortOrder },
+    ipAddress,
+  });
   return {
     id: row.id,
     challengeId: row.challenge.id,
@@ -871,6 +918,8 @@ export interface AdminUpdateEventChallenge {
 export async function updateEventChallenge(
   id: number,
   input: AdminUpdateEventChallenge,
+  actorId?: number,
+  ipAddress?: string,
 ): Promise<EventChallengeDto> {
   const row = await prisma.eventChallenge.findUnique({
     where: { id },
@@ -915,6 +964,18 @@ export async function updateEventChallenge(
       },
     },
   });
+  await recordAudit({
+    actorId,
+    action: "event.challenge.update",
+    entityType: "event",
+    entityId: String(row.eventId),
+    details: {
+      eventChallengeId: id,
+      changed: Object.keys(input),
+      challengeId: updated.challengeId,
+    },
+    ipAddress,
+  });
   return listEventChallengeDto(updated as unknown as EventChallengeRow);
 }
 
@@ -953,12 +1014,24 @@ function listEventChallengeDto(row: EventChallengeRow): EventChallengeDto {
   };
 }
 
-export async function removeEventChallenge(id: number): Promise<void> {
+export async function removeEventChallenge(
+  id: number,
+  actorId?: number,
+  ipAddress?: string,
+): Promise<void> {
   const row = await prisma.eventChallenge.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, eventId: true, challengeId: true },
   });
   if (!row)
     throw new ApiError(404, ErrorCode.NOT_FOUND, "Event challenge not found");
   await prisma.eventChallenge.delete({ where: { id } });
+  await recordAudit({
+    actorId,
+    action: "event.challenge.remove",
+    entityType: "event",
+    entityId: String(row.eventId),
+    details: { challengeId: row.challengeId },
+    ipAddress,
+  });
 }

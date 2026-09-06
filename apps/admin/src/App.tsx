@@ -1,11 +1,18 @@
 import { APP_NAME, APP_VERSION } from "@ctf/shared";
-import type { AuthResponse, HealthResponse, UserDto } from "@ctf/shared";
+import type { AuthResponse, UserDto } from "@ctf/shared";
+import type { AnalyticsOverviewDto, AuditLogDto } from "@ctf/shared";
 import { Badge, Button, Card, Text } from "@ctf/ui";
 import { useEffect, useState } from "react";
 
 import type { Session } from "./adminApi";
+import * as adminApi from "./adminApi";
+import { AnalyticsView } from "./views/AnalyticsView";
 import { AnnouncementsView } from "./views/AnnouncementsView";
+import { AuditLogView } from "./views/AuditLogView";
+import { ChallengesView } from "./views/ChallengesView";
 import { EventsView } from "./views/EventsView";
+import { TeamsView } from "./views/TeamsView";
+import { UsersView } from "./views/UsersView";
 
 const NAV_ITEMS = [
   "Dashboard",
@@ -140,6 +147,106 @@ const inputStyle: React.CSSProperties = {
   fontSize: 14,
 };
 
+function DashboardOverview({ session }: { session: Session }) {
+  const [overview, setOverview] = useState<AnalyticsOverviewDto | null>(null);
+  const [recent, setRecent] = useState<AuditLogDto[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      adminApi.getAnalyticsOverview(session),
+      adminApi.listAuditLog(session, { limit: 8 }),
+    ])
+      .then(([o, a]) => {
+        setOverview(o);
+        setRecent(a.items);
+      })
+      .catch((err: unknown) =>
+        setError(err instanceof Error ? err.message : "Failed to load dashboard"),
+      );
+  }, [session]);
+
+  const stats: Array<[string, number]> = overview
+    ? [
+        ["Users", overview.totalUsers],
+        ["Challenges", overview.totalChallenges],
+        ["Solves", overview.totalSubmissions],
+        ["Points", overview.totalPointsAwarded],
+        ["Solves today", overview.solvesToday],
+      ]
+    : [];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {error ? <Text tone="danger">{error}</Text> : null}
+      <Card
+        title="Platform overview"
+        bodyStyle={{
+          display: "flex",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        {stats.length === 0 ? (
+          <Text tone="secondary">Loading…</Text>
+        ) : (
+          stats.map(([label, value]) => (
+            <div
+              key={label}
+              style={{
+                flex: 1,
+                minWidth: 120,
+                padding: 12,
+                borderRadius: 10,
+                border: "1px solid #e2e8f0",
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+              }}
+            >
+              <Text tone="secondary" size="xs">
+                {label}
+              </Text>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{value}</div>
+            </div>
+          ))
+        )}
+      </Card>
+
+      <Card
+        title="Recent activity"
+        bodyStyle={{ display: "flex", flexDirection: "column", gap: 6 }}
+      >
+        {recent.length === 0 ? (
+          <Text tone="secondary">No recent admin activity.</Text>
+        ) : (
+          recent.map((entry) => (
+            <div
+              key={entry.id}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 12,
+                fontSize: 14,
+              }}
+            >
+              <span>
+                <Badge tone="neutral">{entry.action}</Badge>{" "}
+                <span style={{ fontWeight: 600 }}>{entry.entityType}</span>
+                {entry.entityId ? <span> #{entry.entityId}</span> : null}
+              </span>
+              <Text tone="secondary" size="xs">
+                {entry.actorUsername ?? `#${entry.actorId ?? "?"}`} ·{" "}
+                {new Date(entry.createdAt).toLocaleString()}
+              </Text>
+            </div>
+          ))
+        )}
+      </Card>
+    </div>
+  );
+}
+
 function Dashboard({
   session,
   onLogout,
@@ -147,32 +254,7 @@ function Dashboard({
   session: Session;
   onLogout: () => void;
 }) {
-  const [apiStatus, setApiStatus] = useState<"checking" | "up" | "down">(
-    "checking",
-  );
   const [activeView, setActiveView] = useState<NavItem>("Dashboard");
-
-  useEffect(() => {
-    fetch("/api/health", {
-      headers: { Authorization: `Bearer ${session.accessToken}` },
-    })
-      .then((res) =>
-        res.ok ? res.json() : Promise.reject(new Error("bad status")),
-      )
-      .then((body: HealthResponse) =>
-        setApiStatus(body.status === "ok" ? "up" : "down"),
-      )
-      .catch(() => setApiStatus("down"));
-  }, [session.accessToken]);
-
-  const untouched = new Set<NavItem>([
-    "Dashboard",
-    "Challenges",
-    "Users",
-    "Teams",
-    "Analytics",
-    "Audit Log",
-  ]);
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
@@ -251,32 +333,20 @@ function Dashboard({
           <Button onClick={onLogout}>Sign out</Button>
         </div>
 
+        {activeView === "Dashboard" ? (
+          <DashboardOverview session={session} />
+        ) : null}
+        {activeView === "Challenges" ? (
+          <ChallengesView session={session} />
+        ) : null}
         {activeView === "Events" ? <EventsView session={session} /> : null}
         {activeView === "Announcements" ? (
           <AnnouncementsView session={session} />
         ) : null}
-
-        {untouched.has(activeView) ? (
-          <Card
-            title={`Stage 7 — ${activeView}`}
-            bodyStyle={{ display: "flex", flexDirection: "column", gap: 12 }}
-          >
-            <Text>
-              API status:{" "}
-              {apiStatus === "checking" ? (
-                <Badge tone="neutral">checking…</Badge>
-              ) : apiStatus === "up" ? (
-                <Badge tone="success">up</Badge>
-              ) : (
-                <Badge tone="danger">down</Badge>
-              )}
-            </Text>
-            <Text tone="secondary">
-              Signed in as <code>{session.user.username}</code>. This section is
-              a placeholder in this stage.
-            </Text>
-          </Card>
-        ) : null}
+        {activeView === "Users" ? <UsersView session={session} /> : null}
+        {activeView === "Teams" ? <TeamsView session={session} /> : null}
+        {activeView === "Analytics" ? <AnalyticsView session={session} /> : null}
+        {activeView === "Audit Log" ? <AuditLogView session={session} /> : null}
       </main>
     </div>
   );

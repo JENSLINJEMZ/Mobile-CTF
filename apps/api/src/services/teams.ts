@@ -1,9 +1,11 @@
 import type { TeamDetailDto, TeamDto, TeamMemberRole } from "@ctf/shared";
 import { ErrorCode, TEAM } from "@ctf/shared";
+import { NotificationType } from "@ctf/shared";
 import { prisma } from "@ctf/database";
 
 import { ApiError } from "../middleware/errors";
 import { evaluateAndGrantAchievements } from "./achievements";
+import { createNotification } from "./notifications";
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -269,6 +271,14 @@ export async function inviteTeamMember(
       invitedUserId: target.id,
       code,
     },
+  });
+
+  await createNotification({
+    userId: target.id,
+    type: NotificationType.TEAM_INVITE,
+    title: "You received a team invitation",
+    body: `Join a team with join code ${code} to play together.`,
+    data: { teamId, inviteCode: code },
   });
 
   return { inviteCode: code, teamId };

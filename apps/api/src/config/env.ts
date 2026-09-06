@@ -1,4 +1,4 @@
-import { AUTH, RATE_LIMITS, TERMINAL } from "@ctf/shared";
+import { AUTH, FILE, RATE_LIMITS, TERMINAL } from "@ctf/shared";
 import { config } from "dotenv";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -71,5 +71,14 @@ export const env = {
   ),
   terminalMaxOutput: Number(
     process.env.TERMINAL_MAX_OUTPUT_LENGTH ?? TERMINAL.MAX_OUTPUT_LENGTH,
+  ),
+  fileStorageDir:
+    process.env.FILE_STORAGE_DIR ?? resolve(process.cwd(), "storage/files"),
+  fileDownloadTtlSeconds: Number(
+    process.env.FILE_DOWNLOAD_TTL_SECONDS ?? FILE.DOWNLOAD_URL_TTL_SECONDS,
+  ),
+  fileMaxBytes: Number(process.env.FILE_MAX_BYTES ?? FILE.MAX_SIZE_BYTES),
+  rateLimitUpload: Number(
+    process.env.RATE_LIMIT_UPLOAD ?? RATE_LIMITS.UPLOAD_PER_MIN_PER_USER,
   ),
 };

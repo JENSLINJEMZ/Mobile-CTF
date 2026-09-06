@@ -1,4 +1,6 @@
+import type { Permission } from "@ctf/shared";
 import type { Role } from "@ctf/shared";
+import { roleHasPermission } from "@ctf/shared";
 import type { Request, RequestHandler } from "express";
 
 import { ApiError } from "./errors";
@@ -57,6 +59,27 @@ export function requireRole(...allowedRoles: Role[]): RequestHandler {
           403,
           "FORBIDDEN",
           `Requires role: ${allowedRoles.join(" | ")}`,
+        ),
+      );
+      return;
+    }
+    next();
+  };
+}
+
+export function requirePermission(permission: Permission): RequestHandler {
+  return (req, _res, next) => {
+    const user = req.user;
+    if (!user) {
+      next(new ApiError(401, "UNAUTHORIZED", "Authentication required"));
+      return;
+    }
+    if (!roleHasPermission(user.role, permission)) {
+      next(
+        new ApiError(
+          403,
+          "FORBIDDEN",
+          `Requires permission: ${permission}`,
         ),
       );
       return;

@@ -3,6 +3,7 @@ import {
   type ChallengeDetailDto,
   type ChallengeSummaryDto,
   type ChallengeTagDto,
+  type ChallengeVersionDto,
   type Difficulty as SharedDifficulty,
   type HintDto,
   type PaginatedResult,
@@ -18,6 +19,8 @@ import {
   lockedMessage,
   type EventChallengeGate,
 } from "./events";
+import { recordAudit } from "./auditLog";
+import { signDownloadUrl } from "./fileAssets";
 
 export type Viewer = { id: number; role: string } | undefined;
 
@@ -292,13 +295,18 @@ export async function getChallengeDetail(
     attachments: challenge.attachments.map((a) => ({
       id: a.id,
       title: a.title,
-      url: a.url,
+      url: toAttachmentUrl(a.url),
       mimeType: a.mimeType,
       sizeBytes: a.sizeBytes,
     })),
     createdAt: challenge.createdAt.toISOString(),
     updatedAt: challenge.updatedAt.toISOString(),
   };
+}
+
+function toAttachmentUrl(url: string): string {
+  // Locally-stored attachments are served behind short-lived signed URLs.
+  return url.startsWith("/api/files/") ? (signDownloadUrl(url.slice("/api/files/".length)).url ?? url) : url;
 }
 
 function assertPublishedForSolve(challenge: {
@@ -349,6 +357,7 @@ export interface AdminCreateChallenge {
 export async function createChallenge(
   input: AdminCreateChallenge,
   authorId: number,
+  ipAddress?: string,
 ): Promise<ChallengeDetailDto> {
   const category = await prisma.challengeCategory.findUnique({
     where: { id: input.categoryId },
@@ -404,6 +413,15 @@ export async function createChallenge(
     },
   });
 
+  await recordAudit({
+    actorId: authorId,
+    action: "challenge.create",
+    entityType: "challenge",
+    entityId: String(challenge.id),
+    details: { slug: challenge.slug, title: challenge.title },
+    ipAddress,
+  });
+
   return hydrateDetail(
     challenge as never,
     { solved: false, unlockedHintIds: new Set() },
@@ -423,6 +441,7 @@ export async function updateChallenge(
   id: number,
   input: AdminUpdateChallenge,
   editorId: number,
+  ipAddress?: string,
 ): Promise<ChallengeDetailDto> {
   const existing = await prisma.challenge.findUnique({
     where: { id },
@@ -430,6 +449,7 @@ export async function updateChallenge(
   });
   if (!existing) throw new ApiError(404, "NOT_FOUND", "Challenge not found");
 
+  const changedFields = Object.keys(input).filter((k) => k !== "flag");
   const newFlag =
     typeof input.flag === "string" && input.flag.length > 0
       ? input.flag
@@ -511,21 +531,47 @@ export async function updateChallenge(
   const solvedCount = await prisma.submission.count({
     where: { challengeId: id },
   });
-  return hydrateDetail(
+  const result = hydrateDetail(
     updated as never,
     { solved, unlockedHintIds },
     { manage: true },
     solvedCount,
   );
+
+  await recordAudit({
+    actorId: editorId,
+    action: "challenge.update",
+    entityType: "challenge",
+    entityId: String(id),
+    details: {
+      changed: changedFields,
+      published: input.published,
+      version: nextVersion,
+    },
+    ipAddress,
+  });
+  return result;
 }
 
-export async function deleteChallenge(id: number): Promise<void> {
+export async function deleteChallenge(
+  id: number,
+  actorId?: number,
+  ipAddress?: string,
+): Promise<void> {
   const existing = await prisma.challenge.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, slug: true },
   });
   if (!existing) throw new ApiError(404, "NOT_FOUND", "Challenge not found");
   await prisma.challenge.delete({ where: { id } });
+  await recordAudit({
+    actorId,
+    action: "challenge.delete",
+    entityType: "challenge",
+    entityId: String(id),
+    details: { slug: existing.slug },
+    ipAddress,
+  });
 }
 
 function hydrateDetail(
@@ -594,7 +640,7 @@ function hydrateDetail(
     attachments: (challenge.attachments ?? []).map((a) => ({
       id: a.id,
       title: a.title,
-      url: a.url,
+      url: toAttachmentUrl(a.url),
       mimeType: a.mimeType,
       sizeBytes: a.sizeBytes,
     })),
@@ -651,6 +697,8 @@ export async function createHint(
     penaltyPoints: number;
     sortOrder: number;
   },
+  actorId?: number,
+  ipAddress?: string,
 ): Promise<HintDto> {
   const challenge = await prisma.challenge.findUnique({
     where: { id: challengeId },
@@ -659,6 +707,14 @@ export async function createHint(
   if (!challenge) throw new ApiError(404, "NOT_FOUND", "Challenge not found");
   const hint = await prisma.hint.create({
     data: { ...input, challengeId },
+  });
+  await recordAudit({
+    actorId,
+    action: "hint.create",
+    entityType: "challenge.hint",
+    entityId: String(hint.id),
+    details: { challengeId },
+    ipAddress,
   });
   return {
     id: hint.id,
@@ -677,12 +733,22 @@ export async function updateHint(
     penaltyPoints: number;
     sortOrder: number;
   }>,
+  actorId?: number,
+  ipAddress?: string,
 ): Promise<HintDto> {
   const hint = await prisma.hint.findUnique({ where: { id: hintId } });
   if (!hint) throw new ApiError(404, "NOT_FOUND", "Hint not found");
   const updated = await prisma.hint.update({
     where: { id: hintId },
     data: input,
+  });
+  await recordAudit({
+    actorId,
+    action: "hint.update",
+    entityType: "challenge.hint",
+    entityId: String(hintId),
+    details: { challengeId: updated.challengeId },
+    ipAddress,
   });
   return {
     id: updated.id,
@@ -693,8 +759,106 @@ export async function updateHint(
   };
 }
 
-export async function deleteHint(hintId: number): Promise<void> {
+export async function deleteHint(
+  hintId: number,
+  actorId?: number,
+  ipAddress?: string,
+): Promise<void> {
   const hint = await prisma.hint.findUnique({ where: { id: hintId } });
   if (!hint) throw new ApiError(404, "NOT_FOUND", "Hint not found");
   await prisma.hint.delete({ where: { id: hintId } });
+  await recordAudit({
+    actorId,
+    action: "hint.delete",
+    entityType: "challenge.hint",
+    entityId: String(hintId),
+    details: { challengeId: hint.challengeId },
+    ipAddress,
+  });
+}
+
+export async function listChallengeVersions(
+  challengeId: number,
+): Promise<ChallengeVersionDto[]> {
+  const rows = await prisma.challengeVersion.findMany({
+    where: { challengeId },
+    orderBy: { version: "desc" },
+    include: { createdBy: { select: { username: true } } },
+  });
+  return rows.map((v) => ({
+    id: v.id,
+    version: v.version,
+    title: v.title,
+    description: v.description,
+    difficulty: v.difficulty,
+    basePoints: v.basePoints,
+    changeSummary: v.changeSummary,
+    createdAt: v.createdAt.toISOString(),
+    authorUsername: v.createdBy.username,
+  }));
+}
+
+export async function createAttachment(
+  challengeId: number,
+  input: { fileId: number; title: string },
+  actorId?: number,
+  ipAddress?: string,
+): Promise<ChallengeDetailDto["attachments"][number]> {
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: challengeId },
+    select: { id: true },
+  });
+  if (!challenge) throw new ApiError(404, "NOT_FOUND", "Challenge not found");
+
+  const file = await prisma.fileAsset.findUnique({
+    where: { id: input.fileId },
+    select: { id: true, storageName: true, mimeType: true, sizeBytes: true },
+  });
+  if (!file) throw new ApiError(404, "NOT_FOUND", "File not found");
+
+  const row = await prisma.attachment.create({
+    data: {
+      challengeId,
+      title: input.title,
+      url: `/api/files/${file.storageName}`,
+      mimeType: file.mimeType,
+      sizeBytes: file.sizeBytes,
+    },
+  });
+  await recordAudit({
+    actorId,
+    action: "attachment.create",
+    entityType: "challenge.attachment",
+    entityId: String(row.id),
+    details: { challengeId, fileId: input.fileId },
+    ipAddress,
+  });
+  return {
+    id: row.id,
+    title: row.title,
+    url: toAttachmentUrl(row.url),
+    mimeType: row.mimeType,
+    sizeBytes: row.sizeBytes,
+  };
+}
+
+export async function deleteAttachment(
+  attachmentId: number,
+  actorId?: number,
+  ipAddress?: string,
+): Promise<void> {
+  const existing = await prisma.attachment.findUnique({
+    where: { id: attachmentId },
+    select: { id: true, challengeId: true },
+  });
+  if (!existing) throw new ApiError(404, "NOT_FOUND", "Attachment not found");
+  await prisma.attachment.delete({ where: { id: attachmentId } });
+  await recordAudit({
+    actorId,
+    action: "attachment.delete",
+    entityType: "challenge.attachment",
+    entityId: String(attachmentId),
+    details: { challengeId: existing.challengeId },
+    ipAddress,
+  });
 }

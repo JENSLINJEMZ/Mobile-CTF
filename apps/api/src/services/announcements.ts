@@ -1,8 +1,10 @@
 import type { AnnouncementDto } from "@ctf/shared";
-import { ErrorCode } from "@ctf/shared";
+import { ErrorCode, NotificationType } from "@ctf/shared";
 import { prisma } from "@ctf/database";
 
 import { ApiError } from "../middleware/errors";
+import { recordAudit } from "./auditLog";
+import { createBroadcastNotification } from "./notifications";
 
 const MAX_LIST = 50;
 
@@ -43,8 +45,9 @@ export interface CreateAnnouncementInput {
 export async function createAnnouncement(
   input: CreateAnnouncementInput,
   authorId: number,
+  ipAddress?: string,
 ): Promise<AnnouncementDto> {
-  const row = await prisma.announcement.create({
+  const announcement = await prisma.announcement.create({
     data: {
       title: input.title,
       body: input.body,
@@ -52,7 +55,20 @@ export async function createAnnouncement(
       createdById: authorId,
     },
   });
-  return toDto(row);
+  await recordAudit({
+    actorId: authorId,
+    action: "announcement.create",
+    entityType: "announcement",
+    entityId: String(announcement.id),
+    details: { title: announcement.title, pinned: announcement.pinned },
+    ipAddress,
+  });
+  await createBroadcastNotification({
+    type: NotificationType.ANNOUNCEMENT,
+    title: announcement.title,
+    body: announcement.body.slice(0, 500),
+  });
+  return toDto(announcement);
 }
 
 export type UpdateAnnouncementInput = Partial<CreateAnnouncementInput>;
@@ -60,6 +76,8 @@ export type UpdateAnnouncementInput = Partial<CreateAnnouncementInput>;
 export async function updateAnnouncement(
   id: number,
   input: UpdateAnnouncementInput,
+  actorId?: number,
+  ipAddress?: string,
 ): Promise<AnnouncementDto> {
   const existing = await prisma.announcement.findUnique({ where: { id } });
   if (!existing)
@@ -72,15 +90,35 @@ export async function updateAnnouncement(
       pinned: input.pinned,
     },
   });
+  await recordAudit({
+    actorId,
+    action: "announcement.update",
+    entityType: "announcement",
+    entityId: String(id),
+    details: { changed: Object.keys(input) },
+    ipAddress,
+  });
   return toDto(row);
 }
 
-export async function deleteAnnouncement(id: number): Promise<void> {
+export async function deleteAnnouncement(
+  id: number,
+  actorId?: number,
+  ipAddress?: string,
+): Promise<void> {
   const existing = await prisma.announcement.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, title: true },
   });
   if (!existing)
     throw new ApiError(404, ErrorCode.NOT_FOUND, "Announcement not found");
   await prisma.announcement.delete({ where: { id } });
+  await recordAudit({
+    actorId,
+    action: "announcement.delete",
+    entityType: "announcement",
+    entityId: String(id),
+    details: { title: existing.title },
+    ipAddress,
+  });
 }

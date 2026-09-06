@@ -1,5 +1,8 @@
 import type { AchievementCode, AchievementDto } from "@ctf/shared";
+import { NotificationType } from "@ctf/shared";
 import { prisma } from "@ctf/database";
+
+import { createNotification } from "./notifications";
 
 interface AchievementDef {
   code: AchievementCode;
@@ -155,6 +158,13 @@ export async function evaluateAndGrantAchievements(
     if (achievementId === undefined || earnedIds.has(achievementId)) continue;
     await prisma.userAchievement.create({
       data: { userId, achievementId },
+    });
+    await createNotification({
+      userId,
+      type: NotificationType.ACHIEVEMENT,
+      title: `Achievement unlocked: ${def.title}`,
+      body: def.description,
+      data: { code: def.code },
     });
     newlyEarned.push(def.code);
   }

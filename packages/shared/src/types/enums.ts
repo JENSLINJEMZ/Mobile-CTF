@@ -19,6 +19,14 @@ export enum Environment {
   PRODUCTION = "production",
 }
 
+export enum NotificationType {
+  SYSTEM = "SYSTEM",
+  ANNOUNCEMENT = "ANNOUNCEMENT",
+  ACHIEVEMENT = "ACHIEVEMENT",
+  TEAM_INVITE = "TEAM_INVITE",
+  EVENT = "EVENT",
+}
+
 export enum ErrorCode {
   VALIDATION_ERROR = "VALIDATION_ERROR",
   NOT_FOUND = "NOT_FOUND",

@@ -10,3 +10,4 @@ export * from "./announcements";
 export * from "./note";
 export * from "./achievement";
 export * from "./bookmark";
+export * from "./admin";

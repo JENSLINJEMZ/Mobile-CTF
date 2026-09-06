@@ -9,6 +9,7 @@ export * from "./events";
 export * from "./teams";
 export * from "./announcements";
 export * from "./note";
+export * from "./admin";
 
 export const paginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),

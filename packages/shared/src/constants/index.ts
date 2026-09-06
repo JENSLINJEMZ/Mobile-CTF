@@ -1,3 +1,5 @@
+export * from "./permissions";
+
 export const APP_NAME = "CTF Platform";
 export const APP_VERSION = "0.1.0";
 export const API_VERSION = "v1";
@@ -22,6 +24,7 @@ export const RATE_LIMITS = {
   LOGIN_PER_MIN: 5,
   SUBMISSION_PER_MIN_PER_USER: 5,
   GENERAL_PER_MIN_PER_USER: 100,
+  UPLOAD_PER_MIN_PER_USER: 20,
 } as const;
 
 export const CHALLENGE = {
@@ -58,4 +61,35 @@ export const STORAGE_KEYS = {
   ACCESS_TOKEN: "ctf.accessToken",
   REFRESH_TOKEN: "ctf.refreshToken",
   OFFLINE_QUEUE: "ctf.offlineQueue",
+} as const;
+
+export const FILE = {
+  MAX_SIZE_BYTES: 25 * 1024 * 1024,
+  DOWNLOAD_URL_TTL_SECONDS: 300,
+  ALLOWED_MIME_TYPES: [
+    "text/plain",
+    "text/markdown",
+    "text/csv",
+    "application/json",
+    "application/pdf",
+    "application/zip",
+    "application/gzip",
+    "application/x-tar",
+    "application/octet-stream",
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+  ] as const,
+} as const;
+
+export const NOTIFICATION = {
+  DEFAULT_LIMIT: 20,
+  MAX_LIMIT: 100,
+  TYPES: ["SYSTEM", "ANNOUNCEMENT", "ACHIEVEMENT", "TEAM_INVITE", "EVENT"] as const,
+} as const;
+
+export const AUDIT = {
+  DEFAULT_LIMIT: 50,
+  MAX_LIMIT: 100,
 } as const;

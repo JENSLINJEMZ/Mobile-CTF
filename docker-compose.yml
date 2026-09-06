@@ -51,6 +51,7 @@ services:
     # into the sandbox containers themselves (see infrastructure/sandbox).
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - file_storage:/repo/apps/api/storage/files
     environment:
       NODE_ENV: production
       PORT: 4000
@@ -62,6 +63,10 @@ services:
       RATE_LIMIT_LOGIN: "5"
       RATE_LIMIT_GENERAL: "100"
       RATE_LIMIT_SUBMISSION: "5"
+      RATE_LIMIT_UPLOAD: "20"
+      FILE_STORAGE_DIR: /repo/apps/api/storage/files
+      FILE_DOWNLOAD_TTL_SECONDS: "300"
+      FILE_MAX_BYTES: "26214400"
       BCRYPT_ROUNDS: "12"
       SANDBOX_ENABLED: "true"
       SANDBOX_IMAGE: ctf-sandbox:latest
@@ -76,3 +81,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  file_storage:
