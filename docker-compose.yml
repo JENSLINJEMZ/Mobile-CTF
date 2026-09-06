@@ -67,6 +67,7 @@ services:
       FILE_STORAGE_DIR: /repo/apps/api/storage/files
       FILE_DOWNLOAD_TTL_SECONDS: "300"
       FILE_MAX_BYTES: "26214400"
+      EXPO_ACCESS_TOKEN: ""
       BCRYPT_ROUNDS: "12"
       SANDBOX_ENABLED: "true"
       SANDBOX_IMAGE: ctf-sandbox:latest

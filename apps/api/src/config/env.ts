@@ -81,4 +81,5 @@ export const env = {
   rateLimitUpload: Number(
     process.env.RATE_LIMIT_UPLOAD ?? RATE_LIMITS.UPLOAD_PER_MIN_PER_USER,
   ),
+  expoAccessToken: process.env.EXPO_ACCESS_TOKEN ?? "",
 };

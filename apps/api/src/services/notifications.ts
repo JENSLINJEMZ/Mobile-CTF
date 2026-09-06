@@ -4,6 +4,7 @@ import { prisma } from "@ctf/database";
 import type { Prisma } from "@prisma/client";
 
 import { ApiError } from "../middleware/errors";
+import { dispatchPush, dispatchPushToUsers } from "./push";
 
 type NotificationRow = {
   id: number;
@@ -48,6 +49,11 @@ export async function createNotification(input: {
       data: input.data as Prisma.InputJsonValue | undefined,
     },
   });
+  await dispatchPush(input.userId, {
+    title: input.title,
+    body: input.body,
+    data: input.data,
+  });
 }
 
 export async function createBroadcastNotification(input: {
@@ -72,6 +78,14 @@ export async function createBroadcastNotification(input: {
       data: input.data as Prisma.InputJsonValue | undefined,
     })),
   });
+  await dispatchPushToUsers(
+    activeUsers.map((u) => u.id),
+    {
+      title: input.title,
+      body: input.body,
+      data: input.data,
+    },
+  );
   return activeUsers.length;
 }
 

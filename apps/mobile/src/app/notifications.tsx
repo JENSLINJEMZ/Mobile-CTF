@@ -7,6 +7,7 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
+  Switch,
 } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
@@ -19,6 +20,13 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "@/services/notifications";
+import {
+  disableDevicePush,
+  enableDevicePush,
+  isPushSupported,
+  loadPushPref,
+  type PushPref,
+} from "@/services/push";
 import { useNotificationStore } from "@/store/notification-store";
 import { formatRelativeTime, notificationIcon } from "@/utils/notification";
 import type { NotificationsResponse } from "@ctf/shared";
@@ -34,6 +42,8 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [busyAll, setBusyAll] = useState(false);
+  const [pushPref, setPushPref] = useState<PushPref | null>(null);
+  const [pushBusy, setPushBusy] = useState(false);
 
   const loadPage = useCallback(
     async (page: number, onlyUnread: boolean) => {
@@ -75,7 +85,25 @@ export default function NotificationsScreen() {
   useFocusEffect(
     useCallback(() => {
       void load();
+      void loadPushPref().then(setPushPref);
     }, [load]),
+  );
+
+  const onTogglePush = useCallback(
+    async (value: boolean) => {
+      setPushBusy(true);
+      try {
+        if (value) {
+          await enableDevicePush();
+        } else {
+          await disableDevicePush();
+        }
+        setPushPref(await loadPushPref());
+      } finally {
+        setPushBusy(false);
+      }
+    },
+    [],
   );
 
   const onRefresh = useCallback(async () => {
@@ -154,6 +182,24 @@ export default function NotificationsScreen() {
 
   return (
     <ScreenShell title="Notifications">
+      {isPushSupported() ? (
+        <ThemedView style={styles.pushRow}>
+          <ThemedView style={styles.flex}>
+            <ThemedText type="smallBold">Push notifications</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              Receive announcements and achievements on this device
+            </ThemedText>
+          </ThemedView>
+          <Switch
+            value={pushPref?.enabled === true}
+            onValueChange={(value) => void onTogglePush(value)}
+            disabled={pushBusy}
+            trackColor={{ true: "#2563eb" }}
+            thumbColor="#ffffff"
+          />
+        </ThemedView>
+      ) : null}
+
       <ThemedView style={styles.toolbar}>
         <Pressable
           onPress={toggleUnreadOnly}
@@ -274,6 +320,15 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
+  pushRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Spacing.three,
+    borderRadius: 16,
+    padding: Spacing.three,
+    backgroundColor: "rgba(128,128,128,0.10)",
+  },
   toolbar: {
     flexDirection: "row",
     alignItems: "center",

@@ -7,6 +7,10 @@ import { useColorScheme } from "react-native";
 
 import { useAuthStore } from "@/store/auth-store";
 import { useNotificationStore } from "@/store/notification-store";
+import {
+  autoRegisterPushedToken,
+  subscribeToPushEvents,
+} from "@/services/push";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -25,10 +29,16 @@ export default function RootLayout() {
   useEffect(() => {
     if (status === "authenticated") {
       void refreshBadge();
+      void autoRegisterPushedToken();
     } else if (status !== "loading") {
       setUnreadCount(0);
     }
   }, [status, refreshBadge, setUnreadCount]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToPushEvents();
+    return unsubscribe;
+  }, []);
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
