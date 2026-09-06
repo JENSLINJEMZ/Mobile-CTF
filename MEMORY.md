@@ -8,7 +8,22 @@
 ## 1. Project TL;DR
 
 Mobile-first Capture The Flag (CTF) learning/competition product for iOS/Android (Expo/RN) + Express API + web Admin Dashboard.
-Turborepo + npm workspaces monorepo. Staged build — **Stage 9 (Admin Dashboard & File Service) is DONE. Next: Stage 10 (Notifications & Push).**
+Turborepo + npm workspaces monorepo. Staged build — **Stage 10 (Notifications, Polish & Deployment) in progress: push transport + notification center + runbooks done; remainder = dev/EAS device push validation, polish/accessibility spin, production deploy.**
+
+**Stage 10 progress (push core — DONE ✅):**
+
+| Task | Status |
+| --- | --- |
+| Backend: Prisma `PushSubscription` (unique userId+token, enabled), migration `20260906074610_add_push_subscriptions` on dev+test; `services/push.ts` (register/list/unregister + `dispatchPush`/`dispatchPushToUsers` via `expo-server-sdk` — `Expo.isExpoPushToken` filter, best-effort send never fails notification creation) | ✅ |
+| Backend hooks: `createNotification` + `createBroadcastNotification` dispatch pushes; routes `POST/GET/DELETE /api/notifications/push-token(s)`; env `EXPO_ACCESS_TOKEN` | ✅ |
+| Shared: `types/push.ts` (`PushTokenDto`, `PushPlatform`) + `validation/push.ts` schemas | ✅ |
+| Mobile: `services/push.ts` (SDK57 expo-notifications: handler, Android channel, permission+mint token, backend sync, AsyncStorage pref `push-pref`, token-change + received listeners → badge refresh); `expo-notifications` plugin in app.json; auto-register on login (`_layout.tsx`); push toggle (native-only) in Notifications screen; projectId from `EXPO_PUBLIC_EAS_PROJECT_ID`/`extra.eas.projectId` | ✅ |
+| Tests: `stage10.test.ts` (6) — auth gate, validation, register/upsert/list, unregister, expo dispatch on broadcast (mocked `expo-server-sdk` via `vi.hoisted`), invalid-token skip → **167/167 API tests** | ✅ |
+| Verification: turbo typecheck/lint/build 16/16, mobile 18 tests, expo web export incl. `/notifications`, container rebuild + live smoke (register → upsert → 400 → unregister → list; broadcast with fake token stays silent; full regression register→browse→solve→leaderboard→terminal→notifications) | ✅ |
+| Docs: `docs/DEPLOYMENT.md` (runbook, staging config, Nginx/TLS, migration runbook, release checklist), `docs/PUSH_NOTIFICATIONS.md` (EAS channels, device builds, prod notes) | ✅ |
+| Remaining: dev/EAS-built-device end-to-end push validation (needs device + credentials); polish spin (accessibility labels, empty/error state consistency, anims) | ⏳ |
+
+**Notes:** remote push needs a development/EAS build (Expo Go Android no push since SDK 53). In-app Notification center shipped earlier in Stage 10 (`app/notifications.tsx` + bell tab with unread badge).
 
 Product goals (priority): security > working end-to-end > mobile UX > clean architecture > performance > polish > extensibility > testing > docs.
 
@@ -352,6 +367,6 @@ npm install-scripts approve <pkg>             # allow blocked postinstall (npm 1
 
 ## 7. Next Steps
 
-- **Stage 10 — Notifications & Push** (see BUILD_STAGES.md): mobile notification center UI fed by `/api/notifications` (already backend-complete in Stage 9), push notification transport (APNs/FCM), unread badge. Per-session transcript recording and kernel-isolated sandbox runtime (gVisor/Firecracker) are documented follow-ups in `infrastructure/sandbox/SECURITY.md`.
+- **Stage 10 remainder** (see BUILD_STAGES.md): validate push end-to-end on a dev/EAS build with a real Expo project id (`EXPO_PUBLIC_EAS_PROJECT_ID`), polish/accessibility/performance pass, and execute the production deploy (Nginx/TLS + migrations) per `docs/DEPLOYMENT.md`. Per-session transcript recording and kernel-isolated sandbox runtime (gVisor/Firecracker) are documented follow-ups in `infrastructure/sandbox/SECURITY.md`.
 - Future-auth hardening backlog (nice-to-have): refresh-token reuse detection (revoke family on reuse); per-user session list in Profile; email worker for production password-reset links (currently dev-link only, gated by `NODE_ENV`).
 - Security-sign-off-required changes: auth, flag verification/scoring, RBAC, sandbox/terminal gateway (§14). `SubmissionAttempt.flagAttemptHash` stores only sha256 of guesses by design.
