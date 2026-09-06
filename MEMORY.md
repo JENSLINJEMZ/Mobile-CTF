@@ -242,7 +242,7 @@ ctf/                        # monorepo root (working dir, git repo initialized, 
 | Tests: `stage9.test.ts` (18 — RBAC matrix USER/AUTHOR/MODERATOR/ADMIN × permissions, user/team admin RBAC incl. self-change + level-skip + deactivation, file upload validation/oversize 413/rate-limit/signed-URL valid-tampered-expired/list-delete, challenge authoring E2E create-draft→attach→publish→solve→audit→analytics, notification broadcast/read/unread, announcement notification) → **161/161 API tests** (15 files)                                                                                                                                                                                                             | ✅     |
 | Verification: turbo typecheck 7/7, lint 7/7 (only pre-existing api warnings), build 2/2 (api tsup + admin vite), tests 161 API + 63 toolkit + 10 mobile, live smoke (local :4005 vs ctf_dev) — upload hostname.txt → signed URL download → audit log entry recorded                                                                                                                                                                                                                                             | ✅     |
 
-**Currently running:** `docker compose up -d` stack (ctf-postgres :5432, ctf-redis :6379, ctf-api :4000) with **Stage 8/9** — Stage 9 code merged but container image not yet rebuilt (rebuild: `docker compose build api && docker compose up -d api`).
+**Currently running:** `docker compose up -d` stack (ctf-postgres :5432, ctf-redis :6379, ctf-api :4000) with **Stage 9** — image rebuilt from `4eac860` (`docker compose build api`), admin console + file service + audit log + analytics live; `/api/ready` → all dependencies up.
 
 **🔵 Stage 7 — Events, Teams & Competition — DONE ✅**
 
@@ -352,6 +352,6 @@ npm install-scripts approve <pkg>             # allow blocked postinstall (npm 1
 
 ## 7. Next Steps
 
-- **Stage 10 — Notifications & Push** (see BUILD_STAGES.md): mobile notification center UI fed by `/api/notifications` (already backend-complete in Stage 9), push notification transport (APNs/FCM), unread badge. Rebuild + smoke the Stage 9 admin console container too (`docker compose build api`). Per-session transcript recording and kernel-isolated sandbox runtime (gVisor/Firecracker) are documented follow-ups in `infrastructure/sandbox/SECURITY.md`.
+- **Stage 10 — Notifications & Push** (see BUILD_STAGES.md): mobile notification center UI fed by `/api/notifications` (already backend-complete in Stage 9), push notification transport (APNs/FCM), unread badge. Per-session transcript recording and kernel-isolated sandbox runtime (gVisor/Firecracker) are documented follow-ups in `infrastructure/sandbox/SECURITY.md`.
 - Future-auth hardening backlog (nice-to-have): refresh-token reuse detection (revoke family on reuse); per-user session list in Profile; email worker for production password-reset links (currently dev-link only, gated by `NODE_ENV`).
 - Security-sign-off-required changes: auth, flag verification/scoring, RBAC, sandbox/terminal gateway (§14). `SubmissionAttempt.flagAttemptHash` stores only sha256 of guesses by design.
