@@ -18,7 +18,7 @@ import {
   getEventChallengeStates,
   lockedMessage,
   type EventChallengeGate,
-} from "./events";
+} from "./eventQueries";
 import { recordAudit } from "./auditLog";
 import { signDownloadUrl } from "./fileAssets";
 

@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { fetchMe, loginUser, logoutAll, registerUser } from "@/services/auth";
 import { ApiClientError } from "@/services/http";
 import { clearStoredTokens, storeTokens } from "@/services/token-storage";
+import { withHydrationGuard } from "./hydration-guard";
 
 export type AuthStatus = "loading" | "authenticated" | "anonymous";
 
@@ -38,13 +39,15 @@ export const useAuthStore = create<AuthState>((set) => ({
   error: null,
 
   hydrate: async () => {
-    try {
-      const user = await fetchMe();
-      set({ status: "authenticated", user, error: null });
-    } catch {
-      await clearStoredTokens();
-      set({ status: "anonymous", user: null, error: null });
-    }
+    return withHydrationGuard("auth", async () => {
+      try {
+        const user = await fetchMe();
+        set({ status: "authenticated", user, error: null });
+      } catch {
+        await clearStoredTokens();
+        set({ status: "anonymous", user: null, error: null });
+      }
+    });
   },
 
   login: async (email, password) => {

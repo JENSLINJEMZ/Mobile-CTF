@@ -21,7 +21,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import { listChallengeCategories, listChallenges } from "@/services/challenges";
-import { useAuthStore } from "@/store/auth-store";
+import { useAuthGate } from "@/hooks/use-auth-gate";
 
 const DIFFICULTY_COLORS: Record<string, string> = {
   EASY: "#16a34a",
@@ -36,7 +36,7 @@ function difficultyLabel(value: string): string {
 
 export default function ChallengesScreen() {
   const colorScheme = useColorScheme();
-  const authStatus = useAuthStore((s) => s.status);
+  const { status: authStatus } = useAuthGate();
   const [categories, setCategories] = useState<ChallengeCategoryDto[]>([]);
   const [data, setData] = useState<PaginatedResult<ChallengeSummaryDto> | null>(
     null,

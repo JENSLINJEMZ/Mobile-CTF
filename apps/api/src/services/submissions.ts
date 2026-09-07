@@ -4,7 +4,9 @@ import { sha256Hex, verifyFlag } from "@ctf/database";
 
 import { ApiError } from "../middleware/errors";
 import { evaluateAndGrantAchievements } from "./achievements";
-import { assertEventChallengeAccess, recordEventSolve } from "./events";
+import { assertEventChallengeAccess } from "./eventQueries";
+import { recordEventSolve } from "./eventLeaderboard";
+import { emitLeaderboardSolved } from "./leaderboardEvents";
 import { computeSolveResult } from "./scoring";
 import { applySolve, getGlobalRank, getUserTotalScore } from "./leaderboard";
 
@@ -35,6 +37,7 @@ export async function submitFlag(
   flag: string,
   eventId?: number,
   idempotencyKey?: string,
+  username?: string,
 ): Promise<SubmitFlagResponse> {
   const challenge = await prisma.challenge.findUnique({
     where: { id: challengeId },
@@ -154,6 +157,14 @@ export async function submitFlag(
   const { totalScore, rank } = await applySolve(userId, pointsAwarded);
   await recordEventSolve(userId, pointsAwarded);
   await evaluateAndGrantAchievements(userId);
+  emitLeaderboardSolved({
+    type: "solved",
+    userId,
+    username: username ?? "",
+    pointsAwarded,
+    scope: "global",
+    at: new Date().toISOString(),
+  });
   return {
     correct: true,
     message: isFirstBlood

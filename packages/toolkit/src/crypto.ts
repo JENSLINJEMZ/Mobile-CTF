@@ -1,20 +1,7 @@
-import { bytesToUtf8, utf8ToBytes } from "./encoding";
+import { bytesToUtf8, rotWithShift, utf8ToBytes } from "./encoding";
 
 export function caesar(input: string, shift: number, decrypt = false): string {
-  const effective = decrypt ? -shift : shift;
-  const normalized = ((effective % 26) + 26) % 26;
-  let out = "";
-  for (const char of input) {
-    const code = char.charCodeAt(0);
-    if (char >= "A" && char <= "Z") {
-      out += String.fromCharCode(((code - 65 + normalized) % 26) + 65);
-    } else if (char >= "a" && char <= "z") {
-      out += String.fromCharCode(((code - 97 + normalized) % 26) + 97);
-    } else {
-      out += char;
-    }
-  }
-  return out;
+  return rotWithShift(input, decrypt ? -shift : shift);
 }
 
 export function vigenere(input: string, key: string, decrypt = false): string {

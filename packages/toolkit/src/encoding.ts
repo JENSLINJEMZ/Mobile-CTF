@@ -63,6 +63,31 @@ export function decodeBase64(input: string): string {
   return bytesToUtf8(base64ToBytes(input));
 }
 
+// --- base64url: the same byte-level base64, URL-safe, delegating to the
+// encoder above so JWT and anything else shares one implementation. ---
+
+export function base64UrlToBytes(input: string): Uint8Array {
+  const migrated = input
+    .replace(/[-_]/g, (char) => (char === "-" ? "+" : "/"))
+    .replace(/[^A-Za-z0-9+/]/g, "");
+  return base64ToBytes(migrated);
+}
+
+export function bytesToBase64Url(bytes: Uint8Array): string {
+  return bytesToBase64(bytes)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+export function jsonToBase64Url(value: unknown): string {
+  return bytesToBase64Url(utf8ToBytes(JSON.stringify(value)));
+}
+
+export function decodeBase64UrlJson(input: string): unknown {
+  return JSON.parse(bytesToUtf8(base64UrlToBytes(input)));
+}
+
 const HEX_BYTES = "0123456789abcdef";
 
 export function bytesToHex(bytes: Uint8Array, uppercase = false): string {

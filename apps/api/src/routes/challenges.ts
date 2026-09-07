@@ -16,7 +16,6 @@ import {
   unlockHint,
 } from "../services/challenges";
 import { submitFlag } from "../services/submissions";
-import { emitLeaderboardSolved } from "../services/leaderboardEvents";
 
 export const challengesRouter = Router();
 
@@ -105,17 +104,8 @@ challengesRouter.post(
       req.body.flag,
       parseEventId(req.query.event),
       req.body.idempotencyKey,
+      req.user!.username,
     );
-    if (data.correct && data.pointsAwarded > 0 && req.user) {
-      emitLeaderboardSolved({
-        type: "solved",
-        userId: req.user.id,
-        username: req.user.username,
-        pointsAwarded: data.pointsAwarded,
-        scope: "global",
-        at: new Date().toISOString(),
-      });
-    }
     res.json({ success: true, data });
   }),
 );

@@ -16,7 +16,7 @@ import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import { listAnnouncements } from "@/services/announcements";
 import { joinEvent, leaveEvent, listEvents } from "@/services/events";
-import { useAuthStore } from "@/store/auth-store";
+import { useAuthGate } from "@/hooks/use-auth-gate";
 
 function statusColor(status: EventSummaryDto["status"]): string {
   switch (status) {
@@ -50,7 +50,7 @@ function remainingLabel(event: EventSummaryDto): string {
 }
 
 export default function EventsScreen() {
-  const authStatus = useAuthStore((s) => s.status);
+  const { isAuthenticated } = useAuthGate();
   const [events, setEvents] = useState<EventSummaryDto[] | null>(null);
   const [announcements, setAnnouncements] = useState<AnnouncementDto[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -102,8 +102,6 @@ export default function EventsScreen() {
     await load();
     setRefreshing(false);
   }, [load]);
-
-  const isAuthenticated = authStatus === "authenticated";
 
   return (
     <ScreenShell title="Events">

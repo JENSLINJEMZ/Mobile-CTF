@@ -1,8 +1,8 @@
 import type { TerminalExitEvent, TerminalOutputEvent } from "@ctf/shared";
-import { io, type Socket } from "socket.io-client";
+import type { Socket } from "socket.io-client";
 
 import { API_URL } from "./http";
-import { getStoredTokens } from "./token-storage";
+import { connectAuthenticatedSocket } from "./authenticated-socket";
 
 export function terminalEndpoint(): string {
   return `${API_URL}/terminal`;
@@ -41,25 +41,19 @@ function emitWithAck(event: string, payload: unknown): Promise<Ack> {
 }
 
 export async function connectTerminalSocket(sessionId: string): Promise<void> {
-  const { accessToken } = await getStoredTokens();
-  if (!accessToken) throw new Error("Not signed in");
-
   disconnectTerminalSocket();
   joinedSessionId = sessionId;
-  socket = io(terminalEndpoint(), {
-    transports: ["websocket"],
-    auth: { token: accessToken },
-  });
-
-  socket.on("terminal:output", (event: TerminalOutputEvent) => {
-    for (const handler of outputHandlers) handler(event);
-  });
-  socket.on("terminal:exit", (event: TerminalExitEvent) => {
-    for (const handler of exitHandlers) handler(event);
-  });
-  socket.on("terminal:error", (payload: { message?: string }) => {
-    const message = payload?.message ?? "Terminal error";
-    for (const handler of errorHandlers) handler(message);
+  socket = await connectAuthenticatedSocket(terminalEndpoint(), (s) => {
+    s.on("terminal:output", (event: TerminalOutputEvent) => {
+      for (const handler of outputHandlers) handler(event);
+    });
+    s.on("terminal:exit", (event: TerminalExitEvent) => {
+      for (const handler of exitHandlers) handler(event);
+    });
+    s.on("terminal:error", (payload: { message?: string }) => {
+      const message = payload?.message ?? "Terminal error";
+      for (const handler of errorHandlers) handler(message);
+    });
   });
 
   await new Promise<void>((resolve, reject) => {

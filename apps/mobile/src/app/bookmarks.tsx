@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -13,41 +13,32 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import type { BookmarkDto } from "@ctf/shared";
+import { useLoadable } from "@/hooks/use-loadable";
 import { listBookmarks } from "@/services/bookmarks";
 
 export default function BookmarksScreen() {
   const router = useRouter();
-  const [items, setItems] = useState<BookmarkDto[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data, error, reload } = useLoadable(
+    useCallback(async () => (await listBookmarks()).items, []),
+    null as BookmarkDto[] | null,
+  );
   const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async () => {
-    setError(null);
-    try {
-      const data = await listBookmarks();
-      setItems(data.items);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load bookmarks");
-    }
-  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await load();
+    await reload();
     setRefreshing(false);
-  }, [load]);
+  }, [reload]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const items = data ?? [];
 
   return (
     <ScreenShell title="Bookmarks">
-      {!items && !error ? (
+      {!data && !error ? (
         <LoadingState />
       ) : error ? (
-        <ErrorState message={error} onRetry={() => void load()} />
-      ) : items!.length === 0 ? (
+        <ErrorState message={error} onRetry={() => void reload()} />
+      ) : items.length === 0 ? (
         <EmptyState message="No bookmarks yet. Pin challenges you want to revisit from the challenge screen." />
       ) : (
         <FlatList

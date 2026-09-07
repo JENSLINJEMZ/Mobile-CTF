@@ -8,6 +8,7 @@ import {
   type LocalNote,
 } from "@/services/offline-queue";
 import { loadNoteStore, saveNoteStore } from "@/services/queue-storage";
+import { withHydrationGuard } from "./hydration-guard";
 
 export function buildClientKey(): string {
   return `note-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -28,23 +29,17 @@ interface NoteState {
   flush: () => Promise<void>;
 }
 
-let hydratePromise: Promise<void> | null = null;
-
 export const useNoteStore = create<NoteState>((set, get) => ({
   notes: [],
   hydrated: false,
   syncing: false,
   syncError: null,
 
-  hydrate: async () => {
+  hydrate: () => withHydrationGuard("notes", async () => {
     if (get().hydrated) return;
-    if (hydratePromise) return hydratePromise;
-    hydratePromise = (async () => {
-      const store = await loadNoteStore();
-      set({ notes: display(store), hydrated: true });
-    })();
-    return hydratePromise;
-  },
+    const store = await loadNoteStore();
+    set({ notes: display(store), hydrated: true });
+  }),
 
   updateLocal: async (note) => {
     const store = await loadNoteStore();

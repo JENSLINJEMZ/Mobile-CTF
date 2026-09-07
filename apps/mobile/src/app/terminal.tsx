@@ -21,7 +21,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Fonts, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
-import { useAuthStore } from "@/store/auth-store";
+import { useAuthGate } from "@/hooks/use-auth-gate";
 import {
   createTerminalSession,
   closeTerminalSession,
@@ -51,7 +51,7 @@ function isActive(status: TerminalSessionDto["status"]): boolean {
 }
 
 export default function TerminalScreen() {
-  const authStatus = useAuthStore((s) => s.status);
+  const { isAuthenticated } = useAuthGate();
   const theme = useTheme();
 
   const [sessions, setSessions] = useState<TerminalSessionDto[]>([]);
@@ -66,8 +66,6 @@ export default function TerminalScreen() {
 
   const scrollRef = useRef<ScrollView>(null);
   const mountedRef = useRef(true);
-
-  const isAuthenticated = authStatus === "authenticated";
 
   const load = useCallback(async () => {
     if (!isAuthenticated) return;

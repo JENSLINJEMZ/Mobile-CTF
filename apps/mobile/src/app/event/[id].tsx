@@ -29,7 +29,7 @@ import {
   joinEvent,
   leaveEvent,
 } from "@/services/events";
-import { useAuthStore } from "@/store/auth-store";
+import { useAuthGate } from "@/hooks/use-auth-gate";
 
 const LOCKED_LABELS: Record<string, string> = {
   not_started: "Starts soon",
@@ -68,7 +68,7 @@ export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const eventId = Number(id);
   const colorScheme = useColorScheme();
-  const authStatus = useAuthStore((s) => s.status);
+  const { isAuthenticated } = useAuthGate();
   const isDark = colorScheme === "dark";
 
   const markdownTheme = useMemo(
@@ -181,7 +181,6 @@ export default function EventDetailScreen() {
     void toggleJoin();
   }, [busy, event, toggleJoin]);
 
-  const isAuthenticated = authStatus === "authenticated";
   const solvedCount = challenges.filter((c) => c.solvedByMe).length;
 
   return (

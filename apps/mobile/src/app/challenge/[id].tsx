@@ -22,17 +22,13 @@ import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import { useNetwork } from "@/hooks/use-network";
 import { addBookmark, removeBookmark } from "@/services/bookmarks";
-import { getChallenge, submitFlag, unlockHint } from "@/services/challenges";
+import { getChallenge, unlockHint } from "@/services/challenges";
 import {
-  enqueueSubmission,
-  queueSize,
-  type PendingSubmission,
-} from "@/services/offline-queue";
-import {
-  loadSubmissionQueue,
-  saveSubmissionQueue,
-} from "@/services/queue-storage";
-import { useAuthStore } from "@/store/auth-store";
+  drainSubmissionQueue,
+  pendingSubmissionCount,
+  submitFlagViaGateway,
+} from "@/services/offline-submissions";
+import { useAuthGate } from "@/hooks/use-auth-gate";
 
 const DIFFICULTY_COLORS: Record<string, string> = {
   EASY: "#16a34a",
@@ -50,7 +46,7 @@ export default function ChallengeDetailScreen() {
   const challengeId = Number(id);
   const eventId = event ? Number(event) : undefined;
   const colorScheme = useColorScheme();
-  const authStatus = useAuthStore((s) => s.status);
+  const { needsAuth } = useAuthGate();
 
   const isDark = colorScheme === "dark";
   const surface = isDark ? "#1f2937" : "#f3f4f6";
@@ -136,24 +132,14 @@ export default function ChallengeDetailScreen() {
     setResult(null);
     setQueued(false);
     try {
-      if (!isOnline) {
-        const queuedItem: PendingSubmission = {
-          idempotencyKey: `sub-${challengeId}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-          challengeId,
-          flag: flag.trim(),
-          eventId,
-          queuedAt: new Date().toISOString(),
-        };
-        const queue = await loadSubmissionQueue();
-        const next = enqueueSubmission(queue, queuedItem);
-        await saveSubmissionQueue(next);
+      const outcome = await submitFlagViaGateway(challengeId, flag.trim(), eventId, isOnline);
+      if (outcome.status === "queued") {
         setQueued(true);
         if (challenge?.solvedByMe) setFlag("");
         return;
       }
-      const response = await submitFlag(challengeId, flag.trim(), eventId);
-      setResult(response);
-      if (response.correct) {
+      setResult(outcome.response);
+      if (outcome.response.correct) {
         setFlag("");
         void load();
       }
@@ -175,12 +161,10 @@ export default function ChallengeDetailScreen() {
   useEffect(() => {
     if (!isOnline) return;
     void (async () => {
-      const queue = await loadSubmissionQueue();
-      const stillPending = queueSize(queue);
-      if (stillPending > 0) {
-        setQueued(true);
-        void load();
-      }
+      await drainSubmissionQueue();
+      const stillPending = await pendingSubmissionCount();
+      setQueued(stillPending > 0);
+      void load();
     })();
   }, [isOnline, load]);
 
@@ -250,8 +234,6 @@ export default function ChallengeDetailScreen() {
       setIsBookmarking(false);
     }
   }, [challenge, isBookmarking]);
-
-  const needsAuth = authStatus !== "authenticated";
 
   return (
     <ScreenShell title="Challenge">

@@ -10,7 +10,6 @@ import type {
 
 import { api } from "./http";
 import { cacheGet, cacheRemove, cacheSet } from "./cache";
-import { buildIdempotencyKey } from "./offline-queue";
 
 export interface ChallengeListParams {
   page?: number;
@@ -77,18 +76,6 @@ export async function submitFlag(
     body,
     { auth: true },
   );
-}
-
-export async function submitFlagWithKey(
-  id: number,
-  flag: string,
-  eventId: number | undefined,
-): Promise<SubmitFlagResponse> {
-  const key = buildIdempotencyKey(
-    id,
-    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-  );
-  return submitFlag(id, flag, eventId, key);
 }
 
 export async function unlockHint(

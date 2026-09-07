@@ -22,6 +22,7 @@ import {
   subscribeLeaderboardUpdate,
 } from "@/services/socket";
 import { useAuthStore } from "@/store/auth-store";
+import { useAuthGate } from "@/hooks/use-auth-gate";
 
 const SCOPE_LABELS: Record<LeaderboardScope, string> = {
   global: "Global",
@@ -36,7 +37,7 @@ const MEDAL_COLORS: Record<number, string> = {
 };
 
 export default function LeaderboardScreen() {
-  const authStatus = useAuthStore((s) => s.status);
+  const { isAuthenticated } = useAuthGate();
   const currentUser = useAuthStore((s) => s.user);
 
   const [scope, setScope] = useState<LeaderboardScope>("global");
@@ -84,7 +85,6 @@ export default function LeaderboardScreen() {
     }, [scope, load]),
   );
 
-  const isAuthenticated = authStatus === "authenticated";
   const entries = data?.entries ?? [];
   const me = data?.me ?? null;
 

@@ -51,11 +51,11 @@ import {
   addEventChallenge,
   createEvent,
   deleteEvent,
-  listEvents,
   removeEventChallenge,
   updateEvent,
   updateEventChallenge,
 } from "../services/events";
+import { listEvents } from "../services/eventQueries";
 import { getAnalyticsOverview } from "../services/analytics";
 import { listAuditLog, recordAudit } from "../services/auditLog";
 import { listUsers, updateUser } from "../services/adminUsers";

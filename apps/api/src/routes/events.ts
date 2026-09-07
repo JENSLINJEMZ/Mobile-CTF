@@ -5,15 +5,14 @@ import { Router } from "express";
 import { authenticate } from "../middleware/auth";
 import { asyncHandler } from "../middleware/errors";
 import { optionalAuth } from "../middleware/optionalAuth";
+import { getEventLeaderboard } from "../services/eventLeaderboard";
 import {
   getEventDetail,
-  getEventLeaderboard,
-  joinEvent,
-  leaveEvent,
   listEventChallenges,
   listEvents,
   type EventListScope,
-} from "../services/events";
+} from "../services/eventQueries";
+import { joinEvent, leaveEvent } from "../services/events";
 
 export const eventsRouter = Router();
 

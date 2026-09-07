@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { bytesToBase64Url, decodeJwt, jsonToBase64Url } from "../src/jwt";
+import { bytesToBase64Url, jsonToBase64Url } from "../src/encoding";
+import { decodeJwt } from "../src/jwt";
 import { hexToBytes } from "../src/encoding";
 
 function makeToken(

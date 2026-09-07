@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet } from "react-native";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/state-views";
@@ -8,39 +8,27 @@ import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import { getAchievements } from "@/services/achievements";
 import type { AchievementListResponse } from "@ctf/shared";
+import { useLoadable } from "@/hooks/use-loadable";
 
 export default function AchievementsScreen() {
-  const [data, setData] = useState<AchievementListResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data, error, reload } = useLoadable(
+    getAchievements,
+    null as AchievementListResponse | null,
+  );
   const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async () => {
-    setError(null);
-    try {
-      setData(await getAchievements());
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Could not load achievements",
-      );
-    }
-  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await load();
+    await reload();
     setRefreshing(false);
-  }, [load]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  }, [reload]);
 
   return (
     <ScreenShell title="Achievements">
       {!data && !error ? (
         <LoadingState />
       ) : error ? (
-        <ErrorState message={error} onRetry={() => void load()} />
+        <ErrorState message={error} onRetry={() => void reload()} />
       ) : data ? (
         <>
           <ThemedText type="small" themeColor="textSecondary">

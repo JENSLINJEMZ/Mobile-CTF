@@ -11,6 +11,7 @@ import {
   autoRegisterPushedToken,
   subscribeToPushEvents,
 } from "@/services/push";
+import { startSubmissionGateway } from "@/services/offline-submissions";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -37,6 +38,11 @@ export default function RootLayout() {
 
   useEffect(() => {
     const unsubscribe = subscribeToPushEvents();
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = startSubmissionGateway();
     return unsubscribe;
   }, []);
 
