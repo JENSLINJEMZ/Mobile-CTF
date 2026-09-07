@@ -58,6 +58,9 @@ function SectionChips({
           <Pressable
             key={value}
             onPress={() => onChange(value)}
+            accessibilityRole="button"
+            accessibilityLabel={`${value} tools`}
+            accessibilityState={{ selected: isActive }}
             style={({ pressed }) => [
               styles.chip,
               isActive && styles.chipActive,
@@ -91,11 +94,13 @@ function TextArea({
   onChangeText,
   placeholder,
   multiline = false,
+  accessibilityLabel,
 }: {
   value: string;
   onChangeText: (text: string) => void;
   placeholder: string;
   multiline?: boolean;
+  accessibilityLabel?: string;
 }) {
   const theme = useTheme();
   return (
@@ -107,6 +112,7 @@ function TextArea({
       multiline={multiline}
       autoCapitalize="none"
       autoCorrect={false}
+      accessibilityLabel={accessibilityLabel ?? placeholder}
       style={[
         styles.input,
         multiline && styles.inputMultiline,
@@ -118,7 +124,11 @@ function TextArea({
 
 function OutputBlock({ value, error }: { value: string; error?: string }) {
   if (error) {
-    return <ThemedText style={{ color: ERROR_COLOR }}>{error}</ThemedText>;
+    return (
+      <ThemedText style={{ color: ERROR_COLOR }} accessibilityRole="alert">
+        {error}
+      </ThemedText>
+    );
   }
   if (!value) return null;
   return (
@@ -147,6 +157,9 @@ function ModeSwitch({
           <Pressable
             key={option.value}
             onPress={() => onChange(option.value)}
+            accessibilityRole="button"
+            accessibilityLabel={option.label}
+            accessibilityState={{ selected: isActive }}
             style={({ pressed }) => [
               styles.modeChip,
               isActive && styles.modeChipActive,
@@ -242,6 +255,8 @@ function EncodingTool() {
       />
       <Pressable
         onPress={run}
+        accessibilityRole="button"
+        accessibilityLabel={direction === "encode" || mode === "rot13" ? "Run transformation" : "Decode input"}
         style={({ pressed }) => [
           styles.actionButton,
           pressed && styles.pressed,
@@ -339,6 +354,12 @@ function CipherTool() {
       {cipher !== "frequency" ? (
         <Pressable
           onPress={run}
+          accessibilityRole="button"
+          accessibilityLabel={
+            cipher === "caesar" || cipher === "vigenere"
+              ? `${mode === "encrypt" ? "Encrypt" : "Decrypt"} with ${cipher}`
+              : "Run XOR transformation"
+          }
           style={({ pressed }) => [
             styles.actionButton,
             pressed && styles.pressed,
@@ -407,7 +428,7 @@ function HashIdentifyTool() {
         multiline
       />
       {result.candidates.length === 0 && input.trim() ? (
-        <ThemedText style={{ color: ERROR_COLOR }}>
+        <ThemedText style={{ color: ERROR_COLOR }} accessibilityRole="alert">
           No known hash format matches.
         </ThemedText>
       ) : null}
@@ -448,7 +469,7 @@ function JwtDecodeTool() {
         multiline
       />
       {hasInput && !decoded.validStructure ? (
-        <ThemedText style={{ color: ERROR_COLOR }}>
+        <ThemedText style={{ color: ERROR_COLOR }} accessibilityRole="alert">
           {decoded.errors.join(" ")}
         </ThemedText>
       ) : null}
@@ -540,7 +561,9 @@ function FileAnalyzeTool() {
         multiline
       />
       {analysis?.error ? (
-        <ThemedText style={{ color: ERROR_COLOR }}>{analysis.error}</ThemedText>
+        <ThemedText style={{ color: ERROR_COLOR }} accessibilityRole="alert">
+          {analysis.error}
+        </ThemedText>
       ) : null}
       {analysis?.dump ? (
         <OutputBlock value={analysis.dump} error={undefined} />

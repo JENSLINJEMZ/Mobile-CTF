@@ -15,8 +15,10 @@ export function ScreenShell({
 }) {
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedText type="subtitle">{title}</ThemedText>
+      <SafeAreaView style={styles.safeArea} accessibilityRole="header">
+        <ThemedText type="subtitle" accessibilityRole="header">
+          {title}
+        </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           CTF Platform
         </ThemedText>

@@ -7,6 +7,7 @@ import { Link } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +16,7 @@ import {
 } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
+import { EmptyState, ErrorState } from "@/components/state-views";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Fonts, Spacing } from "@/constants/theme";
@@ -140,9 +142,7 @@ export default function TerminalScreen() {
     }
   }, [busy, openSession]);
 
-  const closeActive = useCallback(async () => {
-    if (!activeId) return;
-    const id = activeId;
+  const closeSession = useCallback(async (id: string) => {
     setBusy(true);
     setError(null);
     try {
@@ -159,7 +159,19 @@ export default function TerminalScreen() {
       setOutput("");
       if (mountedRef.current) setBusy(false);
     }
-  }, [activeId]);
+  }, []);
+
+  const closeActive = useCallback(async () => {
+    if (!activeId) return;
+    Alert.alert(
+      "Close terminal session?",
+      "The sandbox will stop and terminal history will be cleared.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Close", style: "destructive", onPress: () => void closeSession(activeId) },
+      ],
+    );
+  }, [activeId, closeSession]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -217,7 +229,11 @@ export default function TerminalScreen() {
             Run commands in an isolated, auto-expiring Linux container.
           </ThemedText>
           <Link href="/auth/login" asChild>
-            <Pressable style={styles.signInButton}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Sign in to open a terminal"
+              style={styles.signInButton}
+            >
               <ThemedText style={styles.signInLabel}>
                 Sign in to open a terminal
               </ThemedText>
@@ -232,6 +248,9 @@ export default function TerminalScreen() {
             <Pressable
               onPress={() => void createNew()}
               disabled={busy || loading}
+              accessibilityRole="button"
+              accessibilityLabel="Open a new terminal session"
+              accessibilityState={{ disabled: busy || loading }}
               style={({ pressed }) => [
                 styles.createButton,
                 pressed && styles.cardPressed,
@@ -248,6 +267,9 @@ export default function TerminalScreen() {
             <Pressable
               onPress={() => void load()}
               disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel="Refresh terminal sessions"
+              accessibilityState={{ disabled: busy }}
               style={({ pressed }) => [
                 styles.refreshButton,
                 pressed && styles.cardPressed,
@@ -260,19 +282,13 @@ export default function TerminalScreen() {
           </ThemedView>
 
           {error ? (
-            <ThemedText type="small" style={styles.errorText}>
-              {error} — tap to retry
-            </ThemedText>
+            <ErrorState message={error} onRetry={() => void load()} />
           ) : null}
 
           {loading ? (
             <ActivityIndicator style={{ marginTop: Spacing.four }} />
           ) : sessions.length === 0 ? (
-            <ThemedView type="backgroundElement" style={styles.promptCard}>
-              <ThemedText type="small" themeColor="textSecondary">
-                No terminal sessions yet. Sessions auto-expire after 30 minutes.
-              </ThemedText>
-            </ThemedView>
+            <EmptyState message="No terminal sessions yet. Sessions auto-expire after 30 minutes." />
           ) : (
             <ScrollView contentContainerStyle={styles.listContent}>
               {sessions.map((session) => {
@@ -295,6 +311,8 @@ export default function TerminalScreen() {
                     {active ? (
                       <Pressable
                         onPress={() => void openSession(session.id)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Open terminal session ${session.id.slice(0, 16)}`}
                         style={({ pressed }) => [
                           styles.rowAction,
                           pressed && styles.cardPressed,
@@ -333,6 +351,9 @@ export default function TerminalScreen() {
             <Pressable
               onPress={() => void closeActive()}
               disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel="Close terminal session"
+              accessibilityState={{ disabled: busy }}
               style={({ pressed }) => [
                 styles.closeButton,
                 pressed && styles.cardPressed,
@@ -355,13 +376,21 @@ export default function TerminalScreen() {
           </ScrollView>
 
           {error ? (
-            <ThemedText type="small" style={styles.errorText}>
+            <ThemedText
+              type="small"
+              style={styles.errorText}
+              accessibilityRole="alert"
+            >
               {error}
             </ThemedText>
           ) : null}
 
           {exitNote ? (
-            <ThemedView type="backgroundElement" style={styles.exitBanner}>
+            <ThemedView
+              type="backgroundElement"
+              style={styles.exitBanner}
+              accessibilityRole="alert"
+            >
               <ThemedText type="smallBold">{exitNote}</ThemedText>
             </ThemedView>
           ) : null}
@@ -378,10 +407,16 @@ export default function TerminalScreen() {
               autoCorrect={false}
               returnKeyType="send"
               onSubmitEditing={() => submitInput()}
+              accessibilityLabel="Terminal command input"
             />
             <Pressable
               onPress={submitInput}
               disabled={!connected || input.trim().length === 0}
+              accessibilityRole="button"
+              accessibilityLabel="Send command"
+              accessibilityState={{
+                disabled: !connected || input.trim().length === 0,
+              }}
               style={({ pressed }) => [
                 styles.sendButton,
                 (!connected || input.trim().length === 0) &&

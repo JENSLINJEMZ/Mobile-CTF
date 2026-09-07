@@ -63,6 +63,7 @@ export default function RegisterScreen() {
             autoCapitalize="none"
             keyboardType="email-address"
             autoComplete="email"
+            accessibilityLabel="Email"
             value={email}
             onChangeText={setEmail}
           />
@@ -75,6 +76,7 @@ export default function RegisterScreen() {
             placeholderTextColor="#8e8e93"
             autoCapitalize="none"
             autoComplete="username"
+            accessibilityLabel="Username"
             value={username}
             onChangeText={setUsername}
           />
@@ -87,13 +89,24 @@ export default function RegisterScreen() {
             placeholderTextColor="#8e8e93"
             secureTextEntry
             autoComplete="new-password"
+            accessibilityLabel="Password"
             value={password}
             onChangeText={setPassword}
           />
         </ThemedView>
 
+        {password.length > 0 && password.length < 8 ? (
+          <ThemedText type="small" style={{ color: "#d97706" }}>
+            Password must be at least 8 characters.
+          </ThemedText>
+        ) : null}
+
         {error ? (
-          <ThemedText type="small" style={{ color: "#dc2626" }}>
+          <ThemedText
+            type="small"
+            style={{ color: "#dc2626" }}
+            accessibilityRole="alert"
+          >
             {error}
           </ThemedText>
         ) : null}
@@ -106,6 +119,10 @@ export default function RegisterScreen() {
           ]}
           disabled={submitting || !canSubmit}
           onPress={() => void onRegister()}
+          accessibilityRole="button"
+          accessibilityLabel="Create account"
+          accessibilityState={{ disabled: submitting || !canSubmit }}
+          accessibilityHint="Registers a new CTF Platform account"
         >
           {submitting ? (
             <ActivityIndicator color="#ffffff" />
@@ -115,7 +132,11 @@ export default function RegisterScreen() {
         </Pressable>
 
         <Link href="/auth/login" asChild>
-          <Pressable style={styles.linkRow}>
+          <Pressable
+            style={styles.linkRow}
+            accessibilityRole="link"
+            accessibilityLabel="Sign in to existing account"
+          >
             <ThemedText type="linkPrimary">
               Already registered? Sign in
             </ThemedText>

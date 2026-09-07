@@ -5,9 +5,11 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
 } from "react-native";
 
+import { EmptyState, ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -53,6 +55,7 @@ export default function EventsScreen() {
   const [announcements, setAnnouncements] = useState<AnnouncementDto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -94,6 +97,12 @@ export default function EventsScreen() {
     [busyId, load],
   );
 
+  const onPullRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
   const isAuthenticated = authStatus === "authenticated";
 
   return (
@@ -133,24 +142,29 @@ export default function EventsScreen() {
       ) : null}
 
       {error ? (
-        <Pressable onPress={() => void load()}>
-          <ThemedText type="small" style={{ color: "#dc2626" }}>
-            {error} — tap to retry
-          </ThemedText>
-        </Pressable>
+        <ErrorState message={error} onRetry={() => void load()} />
       ) : null}
 
       {!events ? (
-        <ActivityIndicator style={{ marginTop: Spacing.five }} />
+        <LoadingState />
       ) : (
         <FlatList
           data={events}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onPullRefresh}
+              tintColor="#2563eb"
+            />
+          }
           renderItem={({ item }) => (
             <ThemedView type="backgroundElement" style={styles.card}>
               <Link href={`/event/${item.id}`} asChild>
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open event ${item.title}`}
                   style={({ pressed }) => [
                     styles.cardHeader,
                     pressed && styles.pressed,
@@ -187,6 +201,13 @@ export default function EventsScreen() {
                 <Pressable
                   disabled={busyId !== null || item.status === "DRAFT"}
                   onPress={() => void onAction(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    item.joinedByMe ? `Leave event ${item.title}` : `Join event ${item.title}`
+                  }
+                  accessibilityState={{
+                    disabled: busyId !== null || item.status === "DRAFT",
+                  }}
                   style={({ pressed }) => [
                     styles.actionButton,
                     item.joinedByMe ? styles.actionJoined : styles.actionJoin,
@@ -214,13 +235,7 @@ export default function EventsScreen() {
             </ThemedView>
           )}
           ListEmptyComponent={
-            <ThemedText
-              type="small"
-              themeColor="textSecondary"
-              style={styles.empty}
-            >
-              No events right now. Check back soon!
-            </ThemedText>
+            <EmptyState message="No events right now. Check back soon!" />
           }
         />
       )}
@@ -276,10 +291,6 @@ const styles = StyleSheet.create({
   },
   actionJoined: {
     backgroundColor: "#dc2626",
-  },
-  empty: {
-    marginTop: Spacing.five,
-    textAlign: "center",
   },
   pressed: {
     opacity: 0.6,

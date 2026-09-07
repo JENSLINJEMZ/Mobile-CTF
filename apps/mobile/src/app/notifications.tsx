@@ -238,7 +238,11 @@ export default function NotificationsScreen() {
 
       {error ? (
         <Pressable onPress={() => void load()}>
-          <ThemedText type="small" style={{ color: "#dc2626" }}>
+          <ThemedText
+            type="small"
+            style={{ color: "#dc2626" }}
+            accessibilityRole="alert"
+          >
             {error} — tap to retry
           </ThemedText>
         </Pressable>
@@ -252,7 +256,11 @@ export default function NotificationsScreen() {
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => void onRefresh()}
+              tintColor="#2563eb"
+            />
           }
           onEndReachedThreshold={0.4}
           onEndReached={() => void loadMore()}

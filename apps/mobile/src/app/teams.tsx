@@ -4,6 +4,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +12,7 @@ import {
   useColorScheme,
 } from "react-native";
 
+import { ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -96,11 +98,48 @@ export default function TeamsScreen() {
 
   const onDissolve = useCallback(() => {
     if (!team) return;
-    void run(async () => {
-      await deleteTeam(team.id);
-      setTeam(null);
-    });
+    Alert.alert(
+      "Dissolve team?",
+      `This permanently dissolves "${team.name}". This cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Dissolve",
+          style: "destructive",
+          onPress: () =>
+            void run(async () => {
+              await deleteTeam(team.id);
+              setTeam(null);
+            }),
+        },
+      ],
+    );
   }, [team, run]);
+
+  const onRemoveMember = useCallback(
+    (memberId: number, username: string) => {
+      Alert.alert(
+        "Remove member?",
+        `${username} will be removed from the team and can rejoin with the join code.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Remove",
+            style: "destructive",
+            onPress: () => {
+              if (!team) return;
+              setActionUserId(memberId);
+              void run(async () => {
+                await removeMember(team.id, memberId);
+                void load();
+              }).finally(() => setActionUserId(null));
+            },
+          },
+        ],
+      );
+    },
+    [team, run, load],
+  );
 
   const myRole = team?.myRole ?? null;
   const isLeader = myRole === "LEADER";
@@ -108,13 +147,9 @@ export default function TeamsScreen() {
   return (
     <ScreenShell title="My Team">
       {team === undefined ? (
-        <ActivityIndicator style={{ marginTop: Spacing.five }} />
+        <LoadingState />
       ) : error ? (
-        <Pressable onPress={() => void load()}>
-          <ThemedText type="small" style={{ color: "#dc2626" }}>
-            {error} — tap to retry
-          </ThemedText>
-        </Pressable>
+        <ErrorState message={error} onRetry={() => void load()} />
       ) : team ? (
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -171,6 +206,8 @@ export default function TeamsScreen() {
                               await load();
                             }).finally(() => setActionUserId(null));
                           }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${member.role === "LEADER" ? "Demote" : "Promote"} ${member.username}`}
                           style={({ pressed }) => [
                             styles.secondaryButton,
                             pressed && styles.pressed,
@@ -189,13 +226,10 @@ export default function TeamsScreen() {
                         </Pressable>
                         <Pressable
                           disabled={busy || member.role === "LEADER"}
-                          onPress={() => {
-                            setActionUserId(member.userId);
-                            void run(async () => {
-                              await removeMember(team.id, member.userId);
-                              void load();
-                            }).finally(() => setActionUserId(null));
-                          }}
+                          onPress={() => onRemoveMember(member.userId, member.username)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove ${member.username} from team`}
+                          accessibilityHint="Prompts for confirmation first"
                           style={({ pressed }) => [
                             styles.removeButton,
                             (busy || member.role === "LEADER") &&
@@ -221,6 +255,9 @@ export default function TeamsScreen() {
               <Pressable
                 disabled={busy}
                 onPress={() => void onDissolve()}
+                accessibilityRole="button"
+                accessibilityLabel="Dissolve team"
+                accessibilityHint="Prompts for confirmation first"
                 style={({ pressed }) => [
                   styles.dissolveButton,
                   busy && styles.pressed,
@@ -254,6 +291,7 @@ export default function TeamsScreen() {
               placeholder="Team name"
               placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
               style={[styles.input, { backgroundColor: surface }]}
+              accessibilityLabel="Team name"
             />
             <TextInput
               value={tagline}
@@ -261,10 +299,14 @@ export default function TeamsScreen() {
               placeholder="Tagline (optional)"
               placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
               style={[styles.input, { backgroundColor: surface }]}
+              accessibilityLabel="Team tagline"
             />
             <Pressable
               disabled={busy || name.trim().length === 0}
               onPress={() => void onCreate()}
+              accessibilityRole="button"
+              accessibilityLabel="Create team"
+              accessibilityState={{ disabled: busy || name.trim().length === 0 }}
               style={({ pressed }) => [
                 styles.primaryButton,
                 (busy || name.trim().length === 0) && styles.pressed,
@@ -291,10 +333,14 @@ export default function TeamsScreen() {
               style={[styles.input, { backgroundColor: surface }]}
               autoCapitalize="characters"
               autoCorrect={false}
+              accessibilityLabel="Join code"
             />
             <Pressable
               disabled={busy || joinCode.trim().length === 0}
               onPress={() => void onJoin()}
+              accessibilityRole="button"
+              accessibilityLabel="Join team with code"
+              accessibilityState={{ disabled: busy || joinCode.trim().length === 0 }}
               style={({ pressed }) => [
                 styles.secondaryFullButton,
                 (busy || joinCode.trim().length === 0) && styles.pressed,

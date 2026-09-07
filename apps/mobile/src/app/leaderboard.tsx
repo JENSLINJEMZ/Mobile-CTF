@@ -5,10 +5,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
 } from "react-native";
 
+import { EmptyState, ErrorState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -95,6 +97,8 @@ export default function LeaderboardScreen() {
           </ThemedText>
           <Link href="/auth/login" asChild>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Sign in for live updates"
               style={({ pressed }) => [
                 styles.signInButton,
                 pressed && styles.cardPressed,
@@ -120,6 +124,9 @@ export default function LeaderboardScreen() {
                   void load(value);
                 }
               }}
+              accessibilityRole="button"
+              accessibilityLabel={`Show ${SCOPE_LABELS[value]} leaderboard`}
+              accessibilityState={{ selected: active }}
               style={({ pressed }) => [
                 styles.chip,
                 active && styles.chipActive,
@@ -160,20 +167,23 @@ export default function LeaderboardScreen() {
       ) : null}
 
       {error ? (
-        <Pressable onPress={() => void load(scope)}>
-          <ThemedText type="small" style={{ color: "#dc2626" }}>
-            {error} — tap to retry
-          </ThemedText>
-        </Pressable>
+        <ErrorState message={error} onRetry={() => void load(scope)} />
       ) : null}
 
       {!loading && data && entries.length === 0 ? (
-        <ThemedText type="small" themeColor="textSecondary">
-          No scores yet. Be the first to solve a challenge!
-        </ThemedText>
+        <EmptyState message="No scores yet. Be the first to solve a challenge!" />
       ) : null}
 
-      <ScrollView contentContainerStyle={styles.listContent}>
+      <ScrollView
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading && !!data}
+            onRefresh={() => void load(scope)}
+            tintColor="#2563eb"
+          />
+        }
+      >
         {entries.map((entry) => {
           const medal = MEDAL_COLORS[entry.rank];
           const isMe = entry.userId === currentUser?.id;
@@ -202,6 +212,8 @@ export default function LeaderboardScreen() {
 
       <Pressable
         onPress={() => void load(scope)}
+        accessibilityRole="button"
+        accessibilityLabel="Refresh leaderboard"
         style={({ pressed }) => [styles.refresh, pressed && styles.cardPressed]}
       >
         <ThemedText type="small" themeColor="textSecondary">

@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Link, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet } from "react-native";
+import { ActivityIndicator, Alert, Pressable, StyleSheet } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
@@ -30,6 +30,21 @@ export default function ProfileScreen() {
     }
   }, [status]);
 
+  const confirmLogout = useCallback(() => {
+    Alert.alert(
+      "Sign out all devices?",
+      "This revokes your session on every device.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign out",
+          style: "destructive",
+          onPress: () => void logout(),
+        },
+      ],
+    );
+  }, [logout]);
+
   useFocusEffect(
     useCallback(() => {
       void loadStats();
@@ -49,12 +64,20 @@ export default function ProfileScreen() {
       <ScreenShell title="Profile">
         <ThemedText>Sign in to see your stats, badges, and team.</ThemedText>
         <Link href="/auth/login" asChild>
-          <Pressable style={styles.button}>
+          <Pressable
+            style={styles.button}
+            accessibilityRole="button"
+            accessibilityLabel="Sign in"
+          >
             <ThemedText style={styles.buttonLabel}>Sign in</ThemedText>
           </Pressable>
         </Link>
         <Link href="/auth/register" asChild>
-          <Pressable style={styles.ghostButton}>
+          <Pressable
+            style={styles.ghostButton}
+            accessibilityRole="link"
+            accessibilityLabel="Create an account"
+          >
             <ThemedText type="linkPrimary">Create an account</ThemedText>
           </Pressable>
         </Link>
@@ -78,6 +101,8 @@ export default function ProfileScreen() {
         <Link href="/achievements" asChild>
           <Pressable
             style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
+            accessibilityRole="link"
+            accessibilityLabel={`Achievements, ${earned ?? 0} badges earned`}
           >
             <Ionicons name="trophy" size={20} color="#2563eb" />
             <ThemedText type="smallBold" style={styles.linkLabel}>
@@ -91,6 +116,8 @@ export default function ProfileScreen() {
         <Link href="/bookmarks" asChild>
           <Pressable
             style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
+            accessibilityRole="link"
+            accessibilityLabel={`Bookmarks, ${bookmarkCount ?? 0} saved`}
           >
             <Ionicons name="bookmark" size={20} color="#2563eb" />
             <ThemedText type="smallBold" style={styles.linkLabel}>
@@ -104,6 +131,8 @@ export default function ProfileScreen() {
         <Link href="/notes" asChild>
           <Pressable
             style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
+            accessibilityRole="link"
+            accessibilityLabel="Private notes"
           >
             <Ionicons name="document-text" size={20} color="#2563eb" />
             <ThemedText type="smallBold" style={styles.linkLabel}>
@@ -114,6 +143,8 @@ export default function ProfileScreen() {
         <Link href="/teams" asChild>
           <Pressable
             style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
+            accessibilityRole="link"
+            accessibilityLabel="My team"
           >
             <Ionicons name="people" size={20} color="#2563eb" />
             <ThemedText type="smallBold" style={styles.linkLabel}>
@@ -131,13 +162,16 @@ export default function ProfileScreen() {
 
       <Pressable
         style={({ pressed }) => [styles.button, pressed && styles.pressed]}
-        onPress={() => void logout()}
+        onPress={confirmLogout}
+        accessibilityRole="button"
+        accessibilityLabel="Sign out all devices"
+        accessibilityHint="Revokes your session on every device"
       >
         <ThemedText style={styles.buttonLabel}>Sign out all devices</ThemedText>
       </Pressable>
 
       {error ? (
-        <Pressable onPress={clearError}>
+        <Pressable onPress={clearError} accessibilityRole="button">
           <ThemedText type="small" style={{ color: "#dc2626" }}>
             {error}
           </ThemedText>

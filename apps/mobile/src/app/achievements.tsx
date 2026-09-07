@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet } from "react-native";
+import { FlatList, RefreshControl, StyleSheet } from "react-native";
 
+import { EmptyState, ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -11,6 +12,7 @@ import type { AchievementListResponse } from "@ctf/shared";
 export default function AchievementsScreen() {
   const [data, setData] = useState<AchievementListResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -23,6 +25,12 @@ export default function AchievementsScreen() {
     }
   }, []);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -30,11 +38,9 @@ export default function AchievementsScreen() {
   return (
     <ScreenShell title="Achievements">
       {!data && !error ? (
-        <ActivityIndicator style={{ marginTop: Spacing.five }} />
+        <LoadingState />
       ) : error ? (
-        <ThemedText type="small" style={{ color: "#dc2626" }}>
-          {error}
-        </ThemedText>
+        <ErrorState message={error} onRetry={() => void load()} />
       ) : data ? (
         <>
           <ThemedText type="small" themeColor="textSecondary">
@@ -44,6 +50,16 @@ export default function AchievementsScreen() {
             data={data.items}
             keyExtractor={(item) => item.code}
             contentContainerStyle={styles.list}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#2563eb"
+              />
+            }
+            ListEmptyComponent={
+              <EmptyState message="No achievements available yet." />
+            }
             renderItem={({ item }) => {
               const earnedAt = item.earnedAt ?? null;
               const earned = earnedAt !== null;
@@ -51,6 +67,7 @@ export default function AchievementsScreen() {
                 <ThemedView
                   type="backgroundElement"
                   style={[styles.badge, !earned && styles.locked]}
+                  accessibilityLabel={`${item.title}: ${item.description}, ${earned ? "earned" : "locked"}`}
                 >
                   <ThemedText type="subtitle" style={styles.icon}>
                     {item.icon ?? "🏅"}

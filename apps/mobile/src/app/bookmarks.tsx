@@ -1,12 +1,13 @@
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
 } from "react-native";
 
+import { EmptyState, ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -18,6 +19,7 @@ export default function BookmarksScreen() {
   const router = useRouter();
   const [items, setItems] = useState<BookmarkDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -29,6 +31,12 @@ export default function BookmarksScreen() {
     }
   }, []);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -36,24 +44,28 @@ export default function BookmarksScreen() {
   return (
     <ScreenShell title="Bookmarks">
       {!items && !error ? (
-        <ActivityIndicator style={{ marginTop: Spacing.five }} />
+        <LoadingState />
       ) : error ? (
-        <ThemedText type="small" style={{ color: "#dc2626" }}>
-          {error}
-        </ThemedText>
+        <ErrorState message={error} onRetry={() => void load()} />
       ) : items!.length === 0 ? (
-        <ThemedText type="small" themeColor="textSecondary">
-          No bookmarks yet. Pin challenges you want to revisit from the
-          challenge screen.
-        </ThemedText>
+        <EmptyState message="No bookmarks yet. Pin challenges you want to revisit from the challenge screen." />
       ) : (
         <FlatList
           data={items}
           keyExtractor={(item) => String(item.challengeId)}
           contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#2563eb"
+            />
+          }
           renderItem={({ item }) => (
             <ThemedView type="backgroundElement" style={styles.row}>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Open bookmarked challenge ${item.title}`}
                 style={styles.rowMain}
                 onPress={() => router.push(`/challenge/${item.challengeId}`)}
               >

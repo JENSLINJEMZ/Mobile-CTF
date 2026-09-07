@@ -21,7 +21,10 @@ Turborepo + npm workspaces monorepo. Staged build — **Stage 10 (Notifications,
 | Tests: `stage10.test.ts` (6) — auth gate, validation, register/upsert/list, unregister, expo dispatch on broadcast (mocked `expo-server-sdk` via `vi.hoisted`), invalid-token skip → **167/167 API tests** | ✅ |
 | Verification: turbo typecheck/lint/build 16/16, mobile 18 tests, expo web export incl. `/notifications`, container rebuild + live smoke (register → upsert → 400 → unregister → list; broadcast with fake token stays silent; full regression register→browse→solve→leaderboard→terminal→notifications) | ✅ |
 | Docs: `docs/DEPLOYMENT.md` (runbook, staging config, Nginx/TLS, migration runbook, release checklist), `docs/PUSH_NOTIFICATIONS.md` (EAS channels, device builds, prod notes) | ✅ |
-| Remaining: dev/EAS-built-device end-to-end push validation (needs device + credentials); polish spin (accessibility labels, empty/error state consistency, anims) | ⏳ |
+| Polish/accessibility pass: shared `components/state-views.tsx` (Loading/Error/Empty w/ retry); screen-shell + offline banner live-region a11y; index/leaderboard/events/bookmarks/achievements updated (refresh control, selected state, labels); auth login+register, profile (sign-out Alert), challenge/[id] (hint-unlock confirm), event/[id] (leave confirm), notes + note/[key] (delete confirm + sync-error banner), teams (dissolve/remove-member confirm), terminal (close confirm), toolkit (chip/input/action labels), notifications verified | ✅ |
+| Production: `infrastructure/nginx/nginx.conf` (TLS + admin/mobile-web static + `/api/` WS-upgrade proxy); `apps/mobile/eas.json` (development/preview/production profiles + submit); DEPLOYMENT.md Nginx + EAS pipeline | ✅ |
+| Remaining: dev/EAS-built-device end-to-end push validation (needs device + credentials) | ⏳ |
+| Verify polish edits: `scripts/verify.sh` (prisma generate → typecheck → lint → build) green on real machine — typecheck 7/7, lint 7/7 (only 2 pre-existing API test warnings), build 2/2 | ✅ |
 
 **Notes:** remote push needs a development/EAS build (Expo Go Android no push since SDK 53). In-app Notification center shipped earlier in Stage 10 (`app/notifications.tsx` + bell tab with unread badge).
 

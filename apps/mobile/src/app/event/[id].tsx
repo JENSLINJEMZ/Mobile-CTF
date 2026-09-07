@@ -8,6 +8,7 @@ import { Link, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +18,7 @@ import {
 import Markdown from "react-native-markdown-display";
 
 import { ScreenShell } from "@/components/screen-shell";
+import { ErrorState, LoadingState } from "@/components/state-views";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
@@ -146,7 +148,7 @@ export default function EventDetailScreen() {
     }, [load]),
   );
 
-  const onToggleJoin = useCallback(async () => {
+  const toggleJoin = useCallback(async () => {
     if (busy || !event) return;
     setBusy(true);
     try {
@@ -163,19 +165,31 @@ export default function EventDetailScreen() {
     }
   }, [busy, event, load]);
 
+  const onToggleJoin = useCallback(() => {
+    if (busy || !event) return;
+    if (event.joinedByMe) {
+      Alert.alert(
+        "Leave event?",
+        `You'll stop participating in "${event.title}". You can rejoin anytime if it's still running.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Leave", style: "destructive", onPress: () => void toggleJoin() },
+        ],
+      );
+      return;
+    }
+    void toggleJoin();
+  }, [busy, event, toggleJoin]);
+
   const isAuthenticated = authStatus === "authenticated";
   const solvedCount = challenges.filter((c) => c.solvedByMe).length;
 
   return (
     <ScreenShell title="Event">
       {loading && !event ? (
-        <ActivityIndicator style={{ marginTop: Spacing.five }} />
+        <LoadingState />
       ) : error && !event ? (
-        <Pressable onPress={() => void load()}>
-          <ThemedText type="small" style={{ color: "#dc2626" }}>
-            {error} — tap to retry
-          </ThemedText>
-        </Pressable>
+        <ErrorState message={error} onRetry={() => void load()} />
       ) : event ? (
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <ThemedText type="subtitle">{event.title}</ThemedText>
@@ -200,6 +214,18 @@ export default function EventDetailScreen() {
             <Pressable
               disabled={busy || event.status === "DRAFT"}
               onPress={() => void onToggleJoin()}
+              accessibilityRole="button"
+              accessibilityLabel={
+                event.joinedByMe ? "Leave event" : "Join event"
+              }
+              accessibilityHint={
+                event.joinedByMe
+                  ? "Prompts for confirmation first"
+                  : undefined
+              }
+              accessibilityState={{
+                disabled: busy || event.status === "DRAFT",
+              }}
               style={({ pressed }) => [
                 styles.joinButton,
                 event.joinedByMe ? styles.joinJoined : styles.joinFab,
@@ -227,6 +253,8 @@ export default function EventDetailScreen() {
               </ThemedView>
               <Link href="/teams" asChild>
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Open team management"
                   style={({ pressed }) => [
                     styles.teamLink,
                     pressed && styles.pressed,
@@ -258,6 +286,8 @@ export default function EventDetailScreen() {
                     key={item.id}
                     type="backgroundElement"
                     style={[styles.challengeRow, styles.lockedRow]}
+                    accessible
+                    accessibilityLabel={`${item.title}, locked, ${LOCKED_LABELS[item.lockedReason ?? ""] ?? "Locked"}, ${item.basePoints} points`}
                   >
                     <ThemedView style={styles.challengeBody}>
                       <ThemedText
@@ -282,6 +312,11 @@ export default function EventDetailScreen() {
                     asChild
                   >
                     <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Solve challenge ${item.title}, ${item.basePoints} points`}
+                      accessibilityState={{
+                        selected: item.solvedByMe ? true : undefined,
+                      }}
                       style={({ pressed }) => [
                         styles.challengeRow,
                         pressed && styles.pressed,
@@ -337,6 +372,13 @@ export default function EventDetailScreen() {
                       <Pressable
                         key={scope}
                         onPress={() => void loadLeaderboard(event.id, scope)}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          scope === "participants"
+                            ? "Leaderboard by participants"
+                            : "Leaderboard by teams"
+                        }
+                        accessibilityState={{ selected: active }}
                         style={[styles.chip, active && styles.chipActive]}
                       >
                         <ThemedText

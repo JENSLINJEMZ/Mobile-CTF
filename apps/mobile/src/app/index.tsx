@@ -9,11 +9,13 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   TextInput,
   useColorScheme,
 } from "react-native";
 
+import { EmptyState, ErrorState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -119,6 +121,9 @@ export default function ChallengesScreen() {
         onChangeText={setSearch}
         placeholder="Search challenges…"
         placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
+        accessibilityLabel="Search challenges"
+        accessibilityRole="search"
+        autoCorrect={false}
         style={[
           styles.search,
           { backgroundColor: isDark ? "#1f2937" : "#f3f4f6" },
@@ -144,6 +149,9 @@ export default function ChallengesScreen() {
               onPress={() =>
                 setSelectedCategory(active ? undefined : item.slug)
               }
+              accessibilityRole="button"
+              accessibilityLabel={`Filter by category ${item.name}`}
+              accessibilityState={{ selected: active }}
               style={[
                 styles.categoryChip,
                 {
@@ -171,11 +179,10 @@ export default function ChallengesScreen() {
       />
 
       {error ? (
-        <Pressable onPress={() => void load(selectedCategory, search)}>
-          <ThemedText type="small" style={{ color: "#dc2626" }}>
-            {error} — tap to retry
-          </ThemedText>
-        </Pressable>
+        <ErrorState
+          message={error}
+          onRetry={() => void load(selectedCategory, search)}
+        />
       ) : null}
 
       {!data || (loading && !data) ? (
@@ -189,9 +196,27 @@ export default function ChallengesScreen() {
               void load(selectedCategory, search, true);
           }}
           onEndReachedThreshold={0.4}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading && !!data}
+              onRefresh={async () => {
+                try {
+                  await Promise.all([
+                    load(selectedCategory, search, false),
+                    listChallengeCategories().then(setCategories),
+                  ]);
+                } catch {
+                  // error surfaced via load()
+                }
+              }}
+              tintColor="#2563eb"
+            />
+          }
           renderItem={({ item }) => (
             <Link href={`/challenge/${item.id}`} asChild>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Challenge ${item.title}, ${item.basePoints} points, ${difficultyLabel(item.difficulty)}`}
                 style={({ pressed }) => [
                   styles.card,
                   pressed && styles.cardPressed,
@@ -232,13 +257,7 @@ export default function ChallengesScreen() {
             </Link>
           )}
           ListEmptyComponent={
-            <ThemedText
-              type="small"
-              themeColor="textSecondary"
-              style={styles.empty}
-            >
-              No challenges match your filters.
-            </ThemedText>
+            <EmptyState message="No challenges match your filters." />
           }
         />
       )}
@@ -289,9 +308,5 @@ const styles = StyleSheet.create({
   },
   pointsBox: {
     alignItems: "flex-end",
-  },
-  empty: {
-    marginTop: Spacing.five,
-    textAlign: "center",
   },
 });

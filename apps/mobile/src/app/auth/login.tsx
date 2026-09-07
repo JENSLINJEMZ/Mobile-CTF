@@ -56,6 +56,8 @@ export default function LoginScreen() {
             autoCapitalize="none"
             keyboardType="email-address"
             autoComplete="email"
+            accessibilityLabel="Email"
+            accessibilityRole="text"
             value={email}
             onChangeText={setEmail}
           />
@@ -68,13 +70,20 @@ export default function LoginScreen() {
             placeholderTextColor="#8e8e93"
             secureTextEntry
             autoComplete="current-password"
+            accessibilityLabel="Password"
+            accessibilityRole="text"
             value={password}
             onChangeText={setPassword}
           />
         </ThemedView>
 
         {error ? (
-          <ThemedText type="small" style={{ color: "#dc2626" }}>
+          <ThemedText
+            type="small"
+            style={{ color: "#dc2626" }}
+            accessibilityRole="alert"
+            accessibilityLabel={`Login failed: ${error}`}
+          >
             {error}
           </ThemedText>
         ) : null}
@@ -86,6 +95,10 @@ export default function LoginScreen() {
           ]}
           disabled={submitting || status === "loading"}
           onPress={() => void onLogin()}
+          accessibilityRole="button"
+          accessibilityLabel="Sign in"
+          accessibilityState={{ disabled: submitting || status === "loading" }}
+          accessibilityHint="Logs you into your CTF Platform account"
         >
           {submitting ? (
             <ActivityIndicator color="#ffffff" />
@@ -95,7 +108,11 @@ export default function LoginScreen() {
         </Pressable>
 
         <Link href="/auth/register" asChild>
-          <Pressable style={styles.linkRow}>
+          <Pressable
+            style={styles.linkRow}
+            accessibilityRole="link"
+            accessibilityLabel="Create an account"
+          >
             <ThemedText type="linkPrimary">
               New here? Create an account
             </ThemedText>

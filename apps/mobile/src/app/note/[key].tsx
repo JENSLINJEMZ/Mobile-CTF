@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   StyleSheet,
   TextInput,
@@ -80,10 +81,25 @@ export default function NoteEditorScreen() {
     return () => clearTimeout(timer);
   }, [title, body, existing, persist]);
 
-  const onDelete = useCallback(async () => {
-    await useNoteStore.getState().deleteLocal(clientKey);
-    if (isOnline) void flush();
-    router.back();
+  const onDelete = useCallback(() => {
+    Alert.alert(
+      "Delete this note?",
+      "This permanently deletes the note from all your devices.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              await useNoteStore.getState().deleteLocal(clientKey);
+              if (isOnline) void flush();
+              router.back();
+            })();
+          },
+        },
+      ],
+    );
   }, [clientKey, isOnline, flush, router]);
 
   return (
@@ -96,6 +112,9 @@ export default function NoteEditorScreen() {
         {saving ? <ActivityIndicator size="small" /> : null}
         <Pressable
           onPress={onDelete}
+          accessibilityRole="button"
+          accessibilityLabel="Delete note"
+          accessibilityHint="Permanently deletes this note"
           style={({ pressed }) => [
             styles.deleteButton,
             pressed && styles.pressed,
@@ -108,7 +127,11 @@ export default function NoteEditorScreen() {
       </ThemedView>
 
       {syncError ? (
-        <ThemedText type="small" style={{ color: "#dc2626" }}>
+        <ThemedText
+          type="small"
+          style={{ color: "#dc2626" }}
+          accessibilityRole="alert"
+        >
           {syncError}
         </ThemedText>
       ) : null}
@@ -122,6 +145,7 @@ export default function NoteEditorScreen() {
           styles.titleInput,
           { backgroundColor: surface, color: isDark ? "#f9fafb" : "#111827" },
         ]}
+        accessibilityLabel="Note title"
       />
       <TextInput
         value={body}
@@ -134,6 +158,7 @@ export default function NoteEditorScreen() {
         ]}
         multiline
         textAlignVertical="top"
+        accessibilityLabel="Note body"
       />
     </ScreenShell>
   );

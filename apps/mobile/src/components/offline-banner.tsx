@@ -1,12 +1,13 @@
 import { StyleSheet, View } from "react-native";
+
+import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { useNetwork } from "@/hooks/use-network";
 import { queueSize } from "@/services/offline-queue";
 import { loadSubmissionQueue } from "@/services/queue-storage";
-import { useCallback, useEffect, useState } from "react";
-import { useFocusEffect } from "expo-router";
 
 export function OfflineBanner() {
   const isOnline = useNetwork();
@@ -31,7 +32,16 @@ export function OfflineBanner() {
   if (isOnline && pending === 0) return null;
 
   return (
-    <View style={[styles.banner, { top: insets.top }]}>
+    <View
+      style={[styles.banner, { top: insets.top }]}
+      accessibilityLiveRegion="polite"
+      accessibilityRole="alert"
+      accessibilityLabel={
+        isOnline
+          ? `${pending} pending submission${pending === 1 ? "" : "s"} in offline queue`
+          : "Offline mode. Changes will sync when you reconnect"
+      }
+    >
       <ThemedText type="small" style={styles.text}>
         {isOnline
           ? `Offline queue: ${pending} pending submission${pending === 1 ? "" : "s"}`

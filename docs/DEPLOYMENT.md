@@ -88,39 +88,48 @@ Run with `docker compose -f docker-compose.yml -f docker-compose.staging.yml up 
 
 ## Nginx / TLS
 
-Example server block (admin web build + API reverse proxy). Point `root` at the admin
-`dist/` (or mobile web export) and proxy `/api` to the API container:
+Production server config lives in `infrastructure/nginx/nginx.conf` (TLS termination,
+HTTP→HTTPS redirect with a certbot webroot hook, admin + mobile-web static hosting,
+and a reverse proxy of `/api/` with Socket.IO websocket upgrades to the `api` compose
+service). Mount it as `/etc/nginx/nginx.conf` on the host (or in an `nginx` service on
+the compose network so `api` resolves). Edit the `server_name`, cert paths and static
+roots for your domain:
 
-```nginx
-server {
-  listen 443 ssl http2;
-  server_name ctf.example.com;
+- Static mobile web export → `/srv/ctf/web` (`npx expo export --platform web` output)
+- Admin Vite build → `/srv/ctf/admin`
+- `client_max_body_size 30m` ≥ `FILE_MAX_BYTES` + upload overhead
+- `/api/` proxies to the API container with `Upgrade`/`Connection` headers so
+  Socket.IO (`/api/socket.io`) upgrade requests flow through
 
-  ssl_certificate     /etc/letsencrypt/live/ctf.example.com/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/ctf.example.com/privkey.pem;
+TLS via certbot: `certbot certonly --webroot -w /var/www/certbot -d ctf.example.com`
+(renew via a nightly `certbot renew` + `nginx -s reload`). Note: the mobile app talks to
+the API over HTTPS too — point `EXPO_PUBLIC_API_URL=https://ctf.example.com/api` at build time.
 
-  client_max_body_size 30m;                 # >= FILE_MAX_BYTES + upload overhead
+## Mobile release (EAS)
 
-  location /api/ {
-    proxy_pass http://127.0.0.1:4000;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header Upgrade $http_upgrade;   # Socket.IO /api/socket.io
-    proxy_set_header Connection "upgrade";
-    proxy_read_timeout 60s;
-  }
+The app ships as a native build through EAS (`apps/mobile/eas.json`). Three profiles:
 
-  location / {
-    root /srv/ctf/admin/dist;
-    try_files $uri /index.html;
-  }
-}
-```
+| Profile       | Distribution | Notes                                      |
+| ------------- | ------------ | ------------------------------------------ |
+| development   | internal     | dev client; `developmentClient: true`      |
+| preview       | internal     | ad-hoc/TestFlight-style test build         |
+| production    | store        | `autoIncrement: true` store versioning     |
 
-TLS via certbot: `certbot --nginx -d ctf.example.com`. Note: the mobile app talks to the
-API over HTTPS too — point `EXPO_PUBLIC_API_URL=https://ctf.example.com/api` at build time.
+Workflow:
+
+1. One-time: `cd apps/mobile && npx eas init` to create the project and record its
+   `projectId`. Run `npx eas set-project-id` (or add
+   `"extra": { "eas": { "projectId": "<id>" } }` to `app.json`) so the client can tag
+   push tokens with the project; KEEP `EXPO_PUBLIC_EAS_PROJECT_ID` empty otherwise.
+2. Set the store URL: replace every `ctf.example.com/api` in `eas.json` `env` (and the
+   equivalent `EXPO_PUBLIC_API_URL` value wherever the app is built).
+3. Fill the `submit.production` credentials (Apple `appleId`/`ascAppId`/`appleTeamId`,
+   Android service-account JSON path) before first store submission.
+4. Build + submit: `npx eas build --profile production` then
+   `npx eas submit --profile production`.
+5. Push notifications: enable `FCM_V2`/production push in `eas credentials`, store the
+   Expo access token as `EXPO_ACCESS_TOKEN` for the API, and verify on a device
+   (see `PUSH_NOTIFICATIONS.md`).
 
 ## Migration runbook
 
@@ -145,6 +154,9 @@ API over HTTPS too — point `EXPO_PUBLIC_API_URL=https://ctf.example.com/api` a
 - [ ] Migrations applied to the target DB, `_prisma_migrations` recorded
 - [ ] `docker compose build api` clean; `docker compose config` validates
 - [ ] `/api/ready` shows postgres/redis/sandbox up
+- [ ] Nginx serving admin + mobile web over TLS; `/api/socket.io` upgrade verified via ws client
+- [ ] `expo export --platform web` export tested under `/srv/ctf/web`
+- [ ] EAS `development`/`preview`/`production` profiles build; `eas.json` env points at the prod API
 - [ ] Demo flow regression: register → browse → submit correct flag → leaderboard → terminal open/close → notifications + push registration
 - [ ] Security sign-off (BLOCKING): auth, flag verification/scoring, RBAC, sandbox/terminal gateway changes reviewed (see `infrastructure/sandbox/SECURITY.md`)
 - [ ] Push: device on a dev/EAS build receives an announcement push (see PUSH_NOTIFICATIONS.md)

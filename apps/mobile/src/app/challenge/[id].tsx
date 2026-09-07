@@ -3,6 +3,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Markdown from "react-native-markdown-display";
 
 import { OfflineBanner } from "@/components/offline-banner";
+import { ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -185,30 +187,47 @@ export default function ChallengeDetailScreen() {
   const onUnlockHint = useCallback(
     async (hintId: number) => {
       if (unlockingId !== null) return;
-      setUnlockingId(hintId);
-      try {
-        const { hint } = await unlockHint(challengeId, hintId);
-        setChallenge((prev) =>
-          prev
-            ? {
-                ...prev,
-                hints: prev.hints.map((h) =>
-                  h.id === hintId
-                    ? { ...h, unlocked: true, body: hint.body }
-                    : h,
-                ),
-              }
-            : prev,
+      const hint = challenge?.hints.find((h) => h.id === hintId);
+      const confirm = () => {
+        void (async () => {
+          setUnlockingId(hintId);
+          try {
+            const { hint: unlocked } = await unlockHint(challengeId, hintId);
+            setChallenge((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    hints: prev.hints.map((h) =>
+                      h.id === hintId
+                        ? { ...h, unlocked: true, body: unlocked.body }
+                        : h,
+                    ),
+                  }
+                : prev,
+            );
+          } catch (err) {
+            setSubmitError(
+              err instanceof Error ? err.message : "Could not unlock hint",
+            );
+          } finally {
+            setUnlockingId(null);
+          }
+        })();
+      };
+      if (hint && hint.penaltyPoints > 0) {
+        Alert.alert(
+          "Unlock this hint?",
+          `This costs ${hint.penaltyPoints} points and can't be undone.`,
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Unlock", style: "destructive", onPress: confirm },
+          ],
         );
-      } catch (err) {
-        setSubmitError(
-          err instanceof Error ? err.message : "Could not unlock hint",
-        );
-      } finally {
-        setUnlockingId(null);
+      } else {
+        confirm();
       }
     },
-    [challengeId, unlockingId],
+    [challengeId, unlockingId, challenge?.hints],
   );
 
   const onToggleBookmark = useCallback(async () => {
@@ -237,13 +256,9 @@ export default function ChallengeDetailScreen() {
   return (
     <ScreenShell title="Challenge">
       {loading && !challenge ? (
-        <ActivityIndicator style={{ marginTop: Spacing.five }} />
+        <LoadingState />
       ) : loadError ? (
-        <Pressable onPress={() => void load()}>
-          <ThemedText type="small" style={{ color: "#dc2626" }}>
-            {loadError} — tap to retry
-          </ThemedText>
-        </Pressable>
+        <ErrorState message={loadError} onRetry={() => void load()} />
       ) : challenge ? (
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -258,6 +273,13 @@ export default function ChallengeDetailScreen() {
               <Pressable
                 disabled={isBookmarking}
                 onPress={() => void onToggleBookmark()}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  challenge.bookmarkedByMe
+                    ? "Remove bookmark"
+                    : "Bookmark challenge"
+                }
+                accessibilityState={{ disabled: isBookmarking }}
                 style={({ pressed }) => [
                   styles.bookmarkButton,
                   pressed && styles.cardPressed,
@@ -350,6 +372,11 @@ export default function ChallengeDetailScreen() {
                     <Pressable
                       disabled={needsAuth || unlockingId !== null}
                       onPress={() => void onUnlockHint(hint.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Unlock hint ${hint.title}${hint.penaltyPoints > 0 ? ` for ${hint.penaltyPoints} points` : ""}`}
+                      accessibilityState={{
+                        disabled: needsAuth || unlockingId !== null,
+                      }}
                       style={({ pressed }) => [
                         styles.unlockButton,
                         (needsAuth || unlockingId !== null) &&
@@ -390,10 +417,17 @@ export default function ChallengeDetailScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               editable={!needsAuth}
+              accessibilityLabel="Flag"
+              accessibilityHint="Enter the flag for this challenge"
             />
             <Pressable
               disabled={needsAuth || submitting || flag.trim().length === 0}
               onPress={() => void onSubmit()}
+              accessibilityRole="button"
+              accessibilityLabel="Submit flag"
+              accessibilityState={{
+                disabled: needsAuth || submitting || flag.trim().length === 0,
+              }}
               style={({ pressed }) => [
                 styles.submitButton,
                 (needsAuth || submitting || flag.trim().length === 0) &&
@@ -411,7 +445,11 @@ export default function ChallengeDetailScreen() {
             </Pressable>
 
             {queued ? (
-              <ThemedText type="smallBold" style={{ color: "#b45309" }}>
+              <ThemedText
+                type="smallBold"
+                style={{ color: "#b45309" }}
+                accessibilityRole="alert"
+              >
                 Flag queued — it will be submitted automatically when
                 you&apos;re back online.
               </ThemedText>
@@ -423,6 +461,8 @@ export default function ChallengeDetailScreen() {
                   styles.resultBox,
                   { backgroundColor: result.correct ? "#dcfce7" : "#fee2e2" },
                 ]}
+                accessibilityRole="alert"
+                accessibilityLabel={`Flag ${result.correct ? "correct" : "incorrect"}. ${result.message}`}
               >
                 <ThemedText
                   type="smallBold"
