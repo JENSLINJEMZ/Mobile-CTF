@@ -24,20 +24,18 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
 } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
+import { GlassInput } from "@/components/glass-input";
+import { GlassSurface } from "@/components/glass-surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Fonts, Spacing } from "@/constants/theme";
+import { Fonts, Radius, Spacing, TouchTarget } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 
 const SECTIONS = ["Encoding", "Ciphers", "Hash ID", "JWT", "Files"] as const;
 type Section = (typeof SECTIONS)[number];
-
-const ERROR_COLOR = "#dc2626";
-const PRIMARY_COLOR = "#2563eb";
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : "Invalid input";
@@ -50,6 +48,7 @@ function SectionChips({
   active: Section;
   onChange: (section: Section) => void;
 }) {
+  const theme = useTheme();
   return (
     <ThemedView style={styles.chips}>
       {SECTIONS.map((value) => {
@@ -63,13 +62,17 @@ function SectionChips({
             accessibilityState={{ selected: isActive }}
             style={({ pressed }) => [
               styles.chip,
-              isActive && styles.chipActive,
+              isActive && [styles.chipActive, { backgroundColor: theme.accent }],
+              !isActive && [
+                styles.chipIdle,
+                { backgroundColor: theme.glassSubtle, borderColor: theme.glassBorder },
+              ],
               pressed && styles.pressed,
             ]}
           >
             <ThemedText
               type="smallBold"
-              style={{ color: isActive ? "#ffffff" : undefined }}
+              style={{ color: isActive ? theme.onAccent : theme.text }}
             >
               {value}
             </ThemedText>
@@ -82,10 +85,10 @@ function SectionChips({
 
 function ToolCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <ThemedView type="backgroundElement" style={styles.card}>
+    <GlassSurface radius={Radius.md} style={styles.card}>
       <ThemedText type="smallBold">{title}</ThemedText>
       {children}
-    </ThemedView>
+    </GlassSurface>
   );
 }
 
@@ -102,41 +105,35 @@ function TextArea({
   multiline?: boolean;
   accessibilityLabel?: string;
 }) {
-  const theme = useTheme();
   return (
-    <TextInput
+    <GlassInput
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
-      placeholderTextColor={theme.textSecondary}
       multiline={multiline}
       autoCapitalize="none"
       autoCorrect={false}
       accessibilityLabel={accessibilityLabel ?? placeholder}
-      style={[
-        styles.input,
-        multiline && styles.inputMultiline,
-        { color: theme.text },
-      ]}
     />
   );
 }
 
 function OutputBlock({ value, error }: { value: string; error?: string }) {
+  const theme = useTheme();
   if (error) {
     return (
-      <ThemedText style={{ color: ERROR_COLOR }} accessibilityRole="alert">
+      <ThemedText style={{ color: theme.danger }} accessibilityRole="alert">
         {error}
       </ThemedText>
     );
   }
   if (!value) return null;
   return (
-    <ThemedView style={styles.outputBox}>
+    <GlassSurface variant="subtle" radius={Radius.sm} style={styles.outputBox}>
       <ThemedText selectable style={styles.output}>
         {value}
       </ThemedText>
-    </ThemedView>
+    </GlassSurface>
   );
 }
 
@@ -149,6 +146,7 @@ function ModeSwitch({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const theme = useTheme();
   return (
     <ThemedView style={styles.modeRow}>
       {options.map((option) => {
@@ -162,13 +160,16 @@ function ModeSwitch({
             accessibilityState={{ selected: isActive }}
             style={({ pressed }) => [
               styles.modeChip,
-              isActive && styles.modeChipActive,
+              {
+                borderColor: isActive ? theme.accent : theme.borderStrong,
+                backgroundColor: isActive ? theme.accent : "transparent",
+              },
               pressed && styles.pressed,
             ]}
           >
             <ThemedText
               type="small"
-              style={{ color: isActive ? "#ffffff" : undefined }}
+              style={{ color: isActive ? theme.onAccent : theme.text }}
             >
               {option.label}
             </ThemedText>
@@ -180,6 +181,7 @@ function ModeSwitch({
 }
 
 function EncodingTool() {
+  const theme = useTheme();
   const [mode, setMode] = useState("base64");
   const [direction, setDirection] = useState<"encode" | "decode">("encode");
   const [input, setInput] = useState("");
@@ -259,6 +261,7 @@ function EncodingTool() {
         accessibilityLabel={direction === "encode" || mode === "rot13" ? "Run transformation" : "Decode input"}
         style={({ pressed }) => [
           styles.actionButton,
+          { backgroundColor: theme.accent },
           pressed && styles.pressed,
         ]}
       >
@@ -272,6 +275,7 @@ function EncodingTool() {
 }
 
 function CipherTool() {
+  const theme = useTheme();
   const [cipher, setCipher] = useState("caesar");
   const [mode, setMode] = useState<"encrypt" | "decrypt">("encrypt");
   const [text, setText] = useState("");
@@ -362,6 +366,7 @@ function CipherTool() {
           }
           style={({ pressed }) => [
             styles.actionButton,
+            { backgroundColor: theme.accent },
             pressed && styles.pressed,
           ]}
         >
@@ -386,7 +391,7 @@ function CipherTool() {
                   <ThemedView
                     style={[
                       styles.freqBar,
-                      { width: `${width}%`, backgroundColor: PRIMARY_COLOR },
+                      { width: `${width}%`, backgroundColor: theme.accent },
                     ]}
                   />
                 </ThemedView>
@@ -413,6 +418,7 @@ function CipherTool() {
 }
 
 function HashIdentifyTool() {
+  const theme = useTheme();
   const [input, setInput] = useState("");
   const result = identifyHash(input);
 
@@ -428,12 +434,12 @@ function HashIdentifyTool() {
         multiline
       />
       {result.candidates.length === 0 && input.trim() ? (
-        <ThemedText style={{ color: ERROR_COLOR }} accessibilityRole="alert">
+        <ThemedText style={{ color: theme.danger }} accessibilityRole="alert">
           No known hash format matches.
         </ThemedText>
       ) : null}
       {result.candidates.map((candidate) => (
-        <ThemedView key={candidate.name} style={styles.hashRow}>
+        <GlassSurface key={candidate.name} variant="subtle" radius={Radius.sm} style={styles.hashRow}>
           <ThemedText type="smallBold">{candidate.name}</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             {candidate.hexLength != null
@@ -441,7 +447,7 @@ function HashIdentifyTool() {
               : "prefixed format"}{" "}
             · {candidate.description}
           </ThemedText>
-        </ThemedView>
+        </GlassSurface>
       ))}
       {input.trim() ? (
         <ThemedText type="small" themeColor="textSecondary">
@@ -453,6 +459,7 @@ function HashIdentifyTool() {
 }
 
 function JwtDecodeTool() {
+  const theme = useTheme();
   const [input, setInput] = useState("");
   const decoded = decodeJwt(input);
   const hasInput = input.trim().length > 0;
@@ -469,12 +476,12 @@ function JwtDecodeTool() {
         multiline
       />
       {hasInput && !decoded.validStructure ? (
-        <ThemedText style={{ color: ERROR_COLOR }} accessibilityRole="alert">
+        <ThemedText style={{ color: theme.danger }} accessibilityRole="alert">
           {decoded.errors.join(" ")}
         </ThemedText>
       ) : null}
       {hasInput && decoded.validStructure ? (
-        <ThemedView style={styles.jwtBlock}>
+        <GlassSurface variant="subtle" radius={Radius.sm} style={styles.jwtBlock}>
           <ThemedText type="smallBold" themeColor="textSecondary">
             Header
           </ThemedText>
@@ -502,13 +509,14 @@ function JwtDecodeTool() {
                 : ""}
             </ThemedText>
           ) : null}
-        </ThemedView>
+        </GlassSurface>
       ) : null}
     </ToolCard>
   );
 }
 
 function FileAnalyzeTool() {
+  const theme = useTheme();
   const [input, setInput] = useState("");
   const analysis = useMemo(() => {
     if (!input.trim()) return null;
@@ -561,7 +569,7 @@ function FileAnalyzeTool() {
         multiline
       />
       {analysis?.error ? (
-        <ThemedText style={{ color: ERROR_COLOR }} accessibilityRole="alert">
+        <ThemedText style={{ color: theme.danger }} accessibilityRole="alert">
           {analysis.error}
         </ThemedText>
       ) : null}
@@ -611,33 +619,20 @@ const styles = StyleSheet.create({
   },
   chip: {
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingVertical: Spacing.one + Spacing.half,
     borderRadius: 999,
   },
-  chipActive: {
-    backgroundColor: PRIMARY_COLOR,
+  chipActive: {},
+  chipIdle: {
+    borderWidth: StyleSheet.hairlineWidth,
   },
   pressed: {
     opacity: 0.85,
   },
   card: {
     width: "100%",
-    borderRadius: 12,
     padding: Spacing.three,
     gap: Spacing.two,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "rgba(128,128,128,0.35)",
-    borderRadius: 8,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.two,
-    fontSize: 14,
-    minHeight: 44,
-  },
-  inputMultiline: {
-    minHeight: 96,
-    textAlignVertical: "top",
   },
   modeRow: {
     flexDirection: "row",
@@ -647,18 +642,16 @@ const styles = StyleSheet.create({
   modeChip: {
     paddingHorizontal: Spacing.two + Spacing.half * 3,
     paddingVertical: Spacing.one,
-    borderRadius: 8,
+    borderRadius: Radius.sm,
     borderWidth: 1,
-    borderColor: "rgba(128,128,128,0.4)",
-  },
-  modeChipActive: {
-    backgroundColor: PRIMARY_COLOR,
-    borderColor: PRIMARY_COLOR,
+    minHeight: TouchTarget.Android,
+    justifyContent: "center",
   },
   actionButton: {
-    backgroundColor: PRIMARY_COLOR,
     borderRadius: 10,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: TouchTarget.Android,
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
     alignSelf: "flex-start",
@@ -668,7 +661,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   outputBox: {
-    borderRadius: 8,
     padding: Spacing.two,
     width: "100%",
   },
@@ -711,9 +703,11 @@ const styles = StyleSheet.create({
   },
   hashRow: {
     gap: Spacing.half,
+    padding: Spacing.two,
   },
   jwtBlock: {
     gap: Spacing.half,
     width: "100%",
+    padding: Spacing.two,
   },
 });

@@ -11,31 +11,27 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
-  TextInput,
-  useColorScheme,
 } from "react-native";
 
 import { EmptyState, ErrorState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
+import { GlassInput } from "@/components/glass-input";
+import { GlassSurface } from "@/components/glass-surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import { difficultyColor, Radius, Spacing } from "@/constants/theme";
 import { listChallengeCategories, listChallenges } from "@/services/challenges";
 import { useAuthGate } from "@/hooks/use-auth-gate";
-
-const DIFFICULTY_COLORS: Record<string, string> = {
-  EASY: "#16a34a",
-  MEDIUM: "#d97706",
-  HARD: "#dc2626",
-  EXPERT: "#7c3aed",
-};
+import { useReduceMotion } from "@/hooks/use-reduce-motion";
+import { useTheme } from "@/hooks/use-theme";
 
 function difficultyLabel(value: string): string {
   return value.charAt(0) + value.slice(1).toLowerCase();
 }
 
 export default function ChallengesScreen() {
-  const colorScheme = useColorScheme();
+  const theme = useTheme();
+  const reduceMotion = useReduceMotion();
   const { status: authStatus } = useAuthGate();
   const [categories, setCategories] = useState<ChallengeCategoryDto[]>([]);
   const [data, setData] = useState<PaginatedResult<ChallengeSummaryDto> | null>(
@@ -51,7 +47,6 @@ export default function ChallengesScreen() {
     undefined,
   );
   const dataRef = useRef<PaginatedResult<ChallengeSummaryDto> | null>(null);
-  const isDark = colorScheme === "dark";
 
   const load = useCallback(
     async (category?: string, query?: string, append = false) => {
@@ -116,18 +111,14 @@ export default function ChallengesScreen() {
 
   return (
     <ScreenShell title="Challenges">
-      <TextInput
+      <GlassInput
         value={search}
         onChangeText={setSearch}
         placeholder="Search challenges…"
-        placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
         accessibilityLabel="Search challenges"
         accessibilityRole="search"
         autoCorrect={false}
-        style={[
-          styles.search,
-          { backgroundColor: isDark ? "#1f2937" : "#f3f4f6" },
-        ]}
+        containerStyle={styles.search}
       />
 
       <FlatList
@@ -152,22 +143,20 @@ export default function ChallengesScreen() {
               accessibilityRole="button"
               accessibilityLabel={`Filter by category ${item.name}`}
               accessibilityState={{ selected: active }}
-              style={[
+              style={({ pressed }) => [
                 styles.categoryChip,
                 {
-                  backgroundColor: active
-                    ? "#2563eb"
-                    : isDark
-                      ? "#1f2937"
-                      : "#eef2ff",
+                  backgroundColor: active ? theme.accent : theme.glassSubtle,
+                  borderColor: active ? theme.accent : theme.glassBorder,
                 },
+                pressed && !reduceMotion && styles.chipPressed,
               ]}
             >
               <ThemedText
                 style={[
                   styles.categoryChipLabel,
                   {
-                    color: active ? "#ffffff" : isDark ? "#c7d2fe" : "#1e3a8a",
+                    color: active ? theme.onAccent : theme.textSecondary,
                   },
                 ]}
               >
@@ -209,7 +198,7 @@ export default function ChallengesScreen() {
                   // error surfaced via load()
                 }
               }}
-              tintColor="#2563eb"
+              tintColor={theme.accent}
             />
           }
           renderItem={({ item }) => (
@@ -219,14 +208,18 @@ export default function ChallengesScreen() {
                 accessibilityLabel={`Challenge ${item.title}, ${item.basePoints} points, ${difficultyLabel(item.difficulty)}`}
                 style={({ pressed }) => [
                   styles.card,
-                  pressed && styles.cardPressed,
+                  pressed && !reduceMotion && styles.cardPressed,
                 ]}
               >
-                <ThemedView type="backgroundElement" style={styles.cardInner}>
+                <GlassSurface
+                  style={styles.cardInner}
+                  radius={Radius.lg}
+                  variant={item.solvedByMe ? "strong" : "glass"}
+                >
                   <ThemedView
                     style={[
                       styles.difficultyDot,
-                      { backgroundColor: DIFFICULTY_COLORS[item.difficulty] },
+                      { backgroundColor: difficultyColor(item.difficulty, theme) },
                     ]}
                   />
                   <ThemedView style={styles.cardBody}>
@@ -242,17 +235,17 @@ export default function ChallengesScreen() {
                       {difficultyLabel(item.difficulty)}
                     </ThemedText>
                     {item.solvedByMe ? (
-                      <ThemedText type="small" style={{ color: "#16a34a" }}>
+                      <ThemedText type="small" style={{ color: theme.success }}>
                         Solved ✓
                       </ThemedText>
                     ) : null}
                   </ThemedView>
                   <ThemedView style={styles.pointsBox}>
-                    <ThemedText type="smallBold">
+                    <ThemedText type="metric">
                       {item.basePoints} pts
                     </ThemedText>
                   </ThemedView>
-                </ThemedView>
+                </GlassSurface>
               </Pressable>
             </Link>
           )}
@@ -268,32 +261,29 @@ export default function ChallengesScreen() {
 const styles = StyleSheet.create({
   search: {
     width: "100%",
-    borderRadius: 12,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + Spacing.half,
-    fontSize: 15,
-    color: "#111827",
   },
   categoryChip: {
-    borderRadius: 999,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
   },
   categoryChipLabel: {
     fontWeight: "600",
   },
+  chipPressed: {
+    transform: [{ scale: 0.96 }],
+  },
   card: {
     width: "100%",
-    borderRadius: 16,
     marginBottom: Spacing.two,
   },
   cardPressed: {
-    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
   },
   cardInner: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 16,
     padding: Spacing.three,
     gap: Spacing.three,
   },

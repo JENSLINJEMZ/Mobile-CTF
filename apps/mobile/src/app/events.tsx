@@ -11,23 +11,25 @@ import {
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
+import { GlassSurface } from "@/components/glass-surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import { Radius, Spacing, TouchTarget } from "@/constants/theme";
 import { listAnnouncements } from "@/services/announcements";
 import { joinEvent, leaveEvent, listEvents } from "@/services/events";
 import { useAuthGate } from "@/hooks/use-auth-gate";
+import { useTheme } from "@/hooks/use-theme";
 
-function statusColor(status: EventSummaryDto["status"]): string {
+function statusColor(status: EventSummaryDto["status"], theme: ReturnType<typeof useTheme>): string {
   switch (status) {
     case "DRAFT":
-      return "#6b7280";
+      return theme.textSecondary;
     case "SCHEDULED":
-      return "#2563eb";
+      return theme.accent;
     case "RUNNING":
-      return "#16a34a";
+      return theme.success;
     case "ENDED":
-      return "#dc2626";
+      return theme.danger;
   }
 }
 
@@ -50,6 +52,7 @@ function remainingLabel(event: EventSummaryDto): string {
 }
 
 export default function EventsScreen() {
+  const theme = useTheme();
   const { isAuthenticated } = useAuthGate();
   const [events, setEvents] = useState<EventSummaryDto[] | null>(null);
   const [announcements, setAnnouncements] = useState<AnnouncementDto[]>([]);
@@ -116,11 +119,15 @@ export default function EventsScreen() {
             paddingBottom: Spacing.two,
           }}
           renderItem={({ item }) => (
-            <ThemedView
-              type="backgroundElement"
+            <GlassSurface
+              variant={item.pinned ? "strong" : "glass"}
+              radius={Radius.md}
               style={[
                 styles.announcement,
-                item.pinned && styles.announcementPinned,
+                item.pinned && [
+                  styles.announcementPinned,
+                  { borderColor: theme.warning },
+                ],
               ]}
             >
               <ThemedText type="smallBold" numberOfLines={1}>
@@ -134,7 +141,7 @@ export default function EventsScreen() {
               >
                 {item.body}
               </ThemedText>
-            </ThemedView>
+            </GlassSurface>
           )}
         />
       ) : null}
@@ -154,11 +161,11 @@ export default function EventsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onPullRefresh}
-              tintColor="#2563eb"
+              tintColor={theme.accent}
             />
           }
           renderItem={({ item }) => (
-            <ThemedView type="backgroundElement" style={styles.card}>
+            <GlassSurface radius={Radius.lg} style={styles.card}>
               <Link href={`/event/${item.id}`} asChild>
                 <Pressable
                   accessibilityRole="button"
@@ -176,13 +183,13 @@ export default function EventsScreen() {
                       <ThemedView
                         style={[
                           styles.statusDot,
-                          { backgroundColor: statusColor(item.status) },
+                          { backgroundColor: statusColor(item.status, theme) },
                         ]}
                       />
                     </ThemedView>
                     <ThemedText
                       type="small"
-                      style={{ color: statusColor(item.status) }}
+                      style={{ color: statusColor(item.status, theme) }}
                     >
                       {remainingLabel(item)}
                     </ThemedText>
@@ -208,10 +215,17 @@ export default function EventsScreen() {
                   }}
                   style={({ pressed }) => [
                     styles.actionButton,
-                    item.joinedByMe ? styles.actionJoined : styles.actionJoin,
+                    {
+                      backgroundColor: item.joinedByMe
+                        ? theme.danger
+                        : item.status === "DRAFT"
+                          ? theme.backgroundSelected
+                          : theme.accent,
+                    },
                     (busyId !== null || item.status === "DRAFT") &&
+                      styles.disabled,
+                    pressed && busyId === null && item.status !== "DRAFT" &&
                       styles.pressed,
-                    pressed && styles.pressed,
                   ]}
                 >
                   {busyId === item.id ? (
@@ -230,7 +244,7 @@ export default function EventsScreen() {
                   )}
                 </Pressable>
               ) : null}
-            </ThemedView>
+            </GlassSurface>
           )}
           ListEmptyComponent={
             <EmptyState message="No events right now. Check back soon!" />
@@ -250,7 +264,6 @@ const styles = StyleSheet.create({
   },
   announcementPinned: {
     borderWidth: 1,
-    borderColor: "#f59e0b",
   },
   listContent: {
     gap: Spacing.two,
@@ -282,15 +295,14 @@ const styles = StyleSheet.create({
   actionButton: {
     borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: TouchTarget.Android,
     paddingVertical: Spacing.two + Spacing.half,
   },
-  actionJoin: {
-    backgroundColor: "#2563eb",
-  },
-  actionJoined: {
-    backgroundColor: "#dc2626",
+  disabled: {
+    opacity: 0.5,
   },
   pressed: {
-    opacity: 0.6,
+    opacity: 0.85,
   },
 });

@@ -12,16 +12,21 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  useColorScheme,
   type TextStyle,
 } from "react-native";
 import Markdown from "react-native-markdown-display";
 
 import { ScreenShell } from "@/components/screen-shell";
 import { ErrorState, LoadingState } from "@/components/state-views";
+import { GlassSurface } from "@/components/glass-surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import {
+  difficultyColor,
+  Radius,
+  Spacing,
+  TouchTarget,
+} from "@/constants/theme";
 import {
   getEvent,
   getEventChallenges,
@@ -30,6 +35,7 @@ import {
   leaveEvent,
 } from "@/services/events";
 import { useAuthGate } from "@/hooks/use-auth-gate";
+import { useTheme } from "@/hooks/use-theme";
 
 const LOCKED_LABELS: Record<string, string> = {
   not_started: "Starts soon",
@@ -39,19 +45,6 @@ const LOCKED_LABELS: Record<string, string> = {
   ended: "Event ended",
   join_required: "Join to access",
 };
-
-function difficultyColor(value: string): string {
-  switch (value) {
-    case "EASY":
-      return "#16a34a";
-    case "MEDIUM":
-      return "#d97706";
-    case "HARD":
-      return "#dc2626";
-    default:
-      return "#7c3aed";
-  }
-}
 
 function statusText(event: EventSummaryDto): string {
   if (event.status === "RUNNING") {
@@ -67,19 +60,18 @@ function statusText(event: EventSummaryDto): string {
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const eventId = Number(id);
-  const colorScheme = useColorScheme();
+  const theme = useTheme();
   const { isAuthenticated } = useAuthGate();
-  const isDark = colorScheme === "dark";
 
   const markdownTheme = useMemo(
     () => ({
       body: {
-        color: isDark ? "#f9fafb" : "#111827",
+        color: theme.text,
         fontSize: 15,
         lineHeight: 22,
       },
       heading1: {
-        color: isDark ? "#ffffff" : "#111827",
+        color: theme.text,
         fontSize: 20,
         fontWeight: "700" as TextStyle["fontWeight"],
         marginTop: Spacing.two,
@@ -87,7 +79,7 @@ export default function EventDetailScreen() {
       paragraph: { marginVertical: Spacing.one },
       strong: { fontWeight: "700" as TextStyle["fontWeight"] },
     }),
-    [isDark],
+    [theme],
   );
 
   const [event, setEvent] = useState<EventSummaryDto | null>(null);
@@ -198,15 +190,9 @@ export default function EventDetailScreen() {
           </ThemedText>
 
           {event.description ? (
-            <ThemedView
-              type="backgroundElement"
-              style={[
-                styles.markdownBox,
-                { backgroundColor: isDark ? "#1f2937" : "#f3f4f6" },
-              ]}
-            >
+            <GlassSurface radius={Radius.md} style={styles.markdownBox}>
               <Markdown style={markdownTheme}>{event.description}</Markdown>
-            </ThemedView>
+            </GlassSurface>
           ) : null}
 
           {isAuthenticated && event.status !== "ENDED" ? (
@@ -227,9 +213,13 @@ export default function EventDetailScreen() {
               }}
               style={({ pressed }) => [
                 styles.joinButton,
-                event.joinedByMe ? styles.joinJoined : styles.joinFab,
-                busy && styles.pressed,
-                pressed && styles.pressed,
+                {
+                  backgroundColor: event.joinedByMe
+                    ? theme.danger
+                    : theme.accent,
+                },
+                busy && styles.disabled,
+                pressed && !busy && styles.pressed,
               ]}
             >
               {busy ? (
@@ -243,7 +233,7 @@ export default function EventDetailScreen() {
           ) : null}
 
           {event.joinedByMe ? (
-            <ThemedView type="backgroundElement" style={styles.sectionCard}>
+            <GlassSurface radius={Radius.md} style={styles.sectionCard}>
               <ThemedView style={styles.sectionHeader}>
                 <ThemedText type="smallBold">My Team</ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
@@ -261,13 +251,13 @@ export default function EventDetailScreen() {
                 >
                   <ThemedText
                     type="small"
-                    style={{ color: "#2563eb", fontWeight: "600" }}
+                    style={{ color: theme.accent, fontWeight: "600" }}
                   >
                     Manage team →
                   </ThemedText>
                 </Pressable>
               </Link>
-            </ThemedView>
+            </GlassSurface>
           ) : null}
 
           <ThemedView style={styles.section}>
@@ -281,9 +271,10 @@ export default function EventDetailScreen() {
             ) : (
               challenges.map((item) =>
                 item.locked ? (
-                  <ThemedView
+                  <GlassSurface
                     key={item.id}
-                    type="backgroundElement"
+                    radius={Radius.md}
+                    variant="subtle"
                     style={[styles.challengeRow, styles.lockedRow]}
                     accessible
                     accessibilityLabel={`${item.title}, locked, ${LOCKED_LABELS[item.lockedReason ?? ""] ?? "Locked"}, ${item.basePoints} points`}
@@ -296,14 +287,14 @@ export default function EventDetailScreen() {
                       >
                         {item.title}
                       </ThemedText>
-                      <ThemedText type="small" style={{ color: "#9ca3af" }}>
+                      <ThemedText type="small" style={{ color: theme.textSecondary }}>
                         🔒 {LOCKED_LABELS[item.lockedReason ?? ""] ?? "Locked"}
                       </ThemedText>
                     </ThemedView>
-                    <ThemedText type="smallBold" themeColor="textSecondary">
+                    <ThemedText type="metric" themeColor="textSecondary">
                       {item.basePoints} pts
                     </ThemedText>
-                  </ThemedView>
+                  </GlassSurface>
                 ) : (
                   <Link
                     key={item.id}
@@ -317,42 +308,48 @@ export default function EventDetailScreen() {
                         selected: item.solvedByMe ? true : undefined,
                       }}
                       style={({ pressed }) => [
-                        styles.challengeRow,
                         pressed && styles.pressed,
                       ]}
                     >
-                      <ThemedView style={styles.challengeBody}>
-                        <ThemedText type="smallBold" numberOfLines={1}>
-                          {item.title}
-                        </ThemedText>
-                        <ThemedView style={styles.challengeMeta}>
-                          <ThemedView
-                            style={[
-                              styles.dot,
-                              {
-                                backgroundColor: difficultyColor(
-                                  item.difficulty,
-                                ),
-                              },
-                            ]}
-                          />
-                          {item.solvedByMe ? (
-                            <ThemedText
-                              type="small"
-                              style={{ color: "#16a34a" }}
-                            >
-                              Solved ✓
-                            </ThemedText>
-                          ) : (
-                            <ThemedText type="small" themeColor="textSecondary">
-                              {item.solvedCount} solves
-                            </ThemedText>
-                          )}
+                      <GlassSurface
+                        style={styles.challengeSurface}
+                        radius={Radius.md}
+                        variant={item.solvedByMe ? "strong" : "glass"}
+                      >
+                        <ThemedView style={styles.challengeBody}>
+                          <ThemedText type="smallBold" numberOfLines={1}>
+                            {item.title}
+                          </ThemedText>
+                          <ThemedView style={styles.challengeMeta}>
+                            <ThemedView
+                              style={[
+                                styles.dot,
+                                {
+                                  backgroundColor: difficultyColor(
+                                    item.difficulty,
+                                    theme,
+                                  ),
+                                },
+                              ]}
+                            />
+                            {item.solvedByMe ? (
+                              <ThemedText
+                                type="small"
+                                style={{ color: theme.success }}
+                              >
+                                Solved ✓
+                              </ThemedText>
+                            ) : (
+                              <ThemedText type="small" themeColor="textSecondary">
+                                {item.solvedCount} solves
+                              </ThemedText>
+                            )}
+                          </ThemedView>
                         </ThemedView>
-                      </ThemedView>
-                      <ThemedText type="smallBold">
-                        {item.basePoints} pts
-                      </ThemedText>
+                        <ThemedText type="metric">
+                          {item.basePoints} pts
+                        </ThemedText>
+                      </GlassSurface>
                     </Pressable>
                   </Link>
                 ),
@@ -378,12 +375,15 @@ export default function EventDetailScreen() {
                             : "Leaderboard by teams"
                         }
                         accessibilityState={{ selected: active }}
-                        style={[styles.chip, active && styles.chipActive]}
+                        style={[
+                          styles.chip,
+                          active && [styles.chipActive, { backgroundColor: theme.accent }],
+                        ]}
                       >
                         <ThemedText
                           type="small"
                           style={{
-                            color: active ? "#ffffff" : undefined,
+                            color: active ? theme.onAccent : theme.text,
                             fontWeight: "600",
                           }}
                         >
@@ -401,22 +401,25 @@ export default function EventDetailScreen() {
                 </ThemedText>
               ) : (
                 leaderboard.entries.map((entry) => (
-                  <ThemedView
+                  <GlassSurface
                     key={`${leaderboard.scope}-${entry.id}`}
-                    type="backgroundElement"
+                    radius={Radius.md}
+                    variant={
+                      leaderboard.me?.rank === entry.rank ? "strong" : "glass"
+                    }
                     style={[
                       styles.leaderboardRow,
-                      leaderboard.me?.rank === entry.rank && styles.entryMe,
+                      leaderboard.me?.rank === entry.rank && [styles.entryMe, { borderColor: theme.accent }],
                     ]}
                   >
-                    <ThemedText style={styles.rankCell}>
+                    <ThemedText type="metric" style={styles.rankCell}>
                       {entry.rank}
                     </ThemedText>
                     <ThemedText numberOfLines={1} style={styles.nameCell}>
                       {entry.name}
                     </ThemedText>
-                    <ThemedText type="smallBold">{entry.score}</ThemedText>
-                  </ThemedView>
+                    <ThemedText type="metric">{entry.score}</ThemedText>
+                  </GlassSurface>
                 ))
               )}
             </ThemedView>
@@ -433,23 +436,19 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.four,
   },
   markdownBox: {
-    borderRadius: 12,
+    borderRadius: Radius.md,
     padding: Spacing.three,
     overflow: "hidden",
   },
   joinButton: {
-    borderRadius: 12,
+    borderRadius: Radius.md,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: TouchTarget.Android,
     paddingVertical: Spacing.three,
   },
-  joinFab: {
-    backgroundColor: "#2563eb",
-  },
-  joinJoined: {
-    backgroundColor: "#dc2626",
-  },
   sectionCard: {
-    borderRadius: 12,
+    borderRadius: Radius.md,
     padding: Spacing.three,
     gap: Spacing.two,
   },
@@ -461,6 +460,8 @@ const styles = StyleSheet.create({
   },
   teamLink: {
     alignSelf: "flex-start",
+    minHeight: TouchTarget.Android,
+    justifyContent: "center",
   },
   section: {
     gap: Spacing.two,
@@ -468,9 +469,16 @@ const styles = StyleSheet.create({
   challengeRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 12,
     padding: Spacing.three,
     gap: Spacing.two,
+    minHeight: TouchTarget.Android,
+  },
+  challengeSurface: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.three,
+    gap: Spacing.two,
+    minHeight: TouchTarget.Android,
   },
   lockedRow: {
     opacity: 0.8,
@@ -497,21 +505,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,
     borderRadius: 999,
+    minHeight: TouchTarget.Android,
+    justifyContent: "center",
   },
-  chipActive: {
-    backgroundColor: "#2563eb",
-  },
+  chipActive: {},
   leaderboardRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.three,
-    borderRadius: 12,
+    borderRadius: Radius.md,
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
+    minHeight: TouchTarget.Android,
   },
   entryMe: {
     borderWidth: 1,
-    borderColor: "#2563eb",
   },
   rankCell: {
     minWidth: 28,
@@ -520,7 +528,10 @@ const styles = StyleSheet.create({
   nameCell: {
     flex: 1,
   },
+  disabled: {
+    opacity: 0.5,
+  },
   pressed: {
-    opacity: 0.6,
+    opacity: 0.85,
   },
 });

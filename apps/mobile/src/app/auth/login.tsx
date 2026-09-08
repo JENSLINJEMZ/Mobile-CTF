@@ -6,13 +6,12 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  TextInput,
 } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
+import { GlassInput } from "@/components/glass-input";
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import { Radius, Spacing, TouchTarget } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -48,39 +47,31 @@ export default function LoginScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.form}
       >
-        <ThemedView type="backgroundElement" style={styles.field}>
-          <TextInput
-            style={[styles.input, { color: theme.text }]}
+        <GlassInput
+            value={email}
+            onChangeText={setEmail}
             placeholder="Email"
-            placeholderTextColor="#8e8e93"
             autoCapitalize="none"
             keyboardType="email-address"
             autoComplete="email"
             accessibilityLabel="Email"
             accessibilityRole="text"
-            value={email}
-            onChangeText={setEmail}
           />
-        </ThemedView>
 
-        <ThemedView type="backgroundElement" style={styles.field}>
-          <TextInput
-            style={[styles.input, { color: theme.text }]}
+          <GlassInput
+            value={password}
+            onChangeText={setPassword}
             placeholder="Password"
-            placeholderTextColor="#8e8e93"
             secureTextEntry
             autoComplete="current-password"
             accessibilityLabel="Password"
             accessibilityRole="text"
-            value={password}
-            onChangeText={setPassword}
           />
-        </ThemedView>
 
         {error ? (
           <ThemedText
             type="small"
-            style={{ color: "#dc2626" }}
+            style={{ color: theme.danger }}
             accessibilityRole="alert"
             accessibilityLabel={`Login failed: ${error}`}
           >
@@ -91,6 +82,7 @@ export default function LoginScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.button,
+            { backgroundColor: theme.accent },
             pressed && styles.buttonPressed,
           ]}
           disabled={submitting || status === "loading"}
@@ -128,20 +120,11 @@ const styles = StyleSheet.create({
     width: "100%",
     gap: Spacing.two,
   },
-  field: {
-    borderRadius: 12,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-  input: {
-    fontSize: 16,
-    paddingVertical: Spacing.one,
-  },
   button: {
-    backgroundColor: "#2563eb",
-    borderRadius: 12,
+    borderRadius: Radius.md,
     alignItems: "center",
     justifyContent: "center",
+    minHeight: TouchTarget.Android,
     paddingVertical: Spacing.three,
     marginTop: Spacing.two,
   },
@@ -154,6 +137,8 @@ const styles = StyleSheet.create({
   },
   linkRow: {
     alignItems: "center",
+    minHeight: TouchTarget.Android,
+    justifyContent: "center",
     paddingVertical: Spacing.two,
   },
 });

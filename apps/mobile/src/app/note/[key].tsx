@@ -6,15 +6,15 @@ import {
   Alert,
   Pressable,
   StyleSheet,
-  TextInput,
 } from "react-native";
-import { useColorScheme } from "react-native";
 
 import { OfflineBanner } from "@/components/offline-banner";
 import { ScreenShell } from "@/components/screen-shell";
+import { GlassInput } from "@/components/glass-input";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import { Spacing, TouchTarget } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
 import { useNetwork } from "@/hooks/use-network";
 import { useNoteStore } from "@/store/note-store";
 
@@ -24,9 +24,7 @@ export default function NoteEditorScreen() {
   const router = useRouter();
   const { key } = useLocalSearchParams<{ key: string }>();
   const clientKey = key ?? "";
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const surface = isDark ? "#1f2937" : "#f3f4f6";
+  const theme = useTheme();
   const isOnline = useNetwork();
 
   const { notes, syncError, flush } = useNoteStore();
@@ -117,10 +115,11 @@ export default function NoteEditorScreen() {
           accessibilityHint="Permanently deletes this note"
           style={({ pressed }) => [
             styles.deleteButton,
+            { minHeight: TouchTarget.Android, justifyContent: "center" },
             pressed && styles.pressed,
           ]}
         >
-          <ThemedText type="small" style={{ color: "#dc2626" }}>
+          <ThemedText type="small" style={{ color: theme.danger }}>
             Delete
           </ThemedText>
         </Pressable>
@@ -129,33 +128,26 @@ export default function NoteEditorScreen() {
       {syncError ? (
         <ThemedText
           type="small"
-          style={{ color: "#dc2626" }}
+          style={{ color: theme.danger }}
           accessibilityRole="alert"
         >
           {syncError}
         </ThemedText>
       ) : null}
 
-      <TextInput
+      <GlassInput
         value={title}
         onChangeText={onTitle}
         placeholder="Note title"
-        placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
-        style={[
-          styles.titleInput,
-          { backgroundColor: surface, color: isDark ? "#f9fafb" : "#111827" },
-        ]}
+        style={styles.titleInput}
         accessibilityLabel="Note title"
       />
-      <TextInput
+      <GlassInput
         value={body}
         onChangeText={onBody}
         placeholder="Write your notes… markdown supported"
-        placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
-        style={[
-          styles.bodyInput,
-          { backgroundColor: surface, color: isDark ? "#f9fafb" : "#111827" },
-        ]}
+        style={styles.bodyInput}
+        containerStyle={styles.bodyField}
         multiline
         textAlignVertical="top"
         accessibilityLabel="Note body"
@@ -176,20 +168,13 @@ const styles = StyleSheet.create({
     padding: Spacing.one,
   },
   titleInput: {
-    width: "100%",
-    borderRadius: 12,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + Spacing.one,
     fontSize: 18,
     fontWeight: "600",
   },
-  bodyInput: {
-    width: "100%",
+  bodyField: {
     flex: 1,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    fontSize: 15,
+  },
+  bodyInput: {
     lineHeight: 22,
   },
   pressed: {

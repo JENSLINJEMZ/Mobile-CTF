@@ -11,9 +11,10 @@ import {
 } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
+import { GlassSurface } from "@/components/glass-surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import { Radius, Spacing, TouchTarget } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import {
   getNotifications,
@@ -183,7 +184,7 @@ export default function NotificationsScreen() {
   return (
     <ScreenShell title="Notifications">
       {isPushSupported() ? (
-        <ThemedView style={styles.pushRow}>
+        <GlassSurface radius={Radius.lg} style={styles.pushRow}>
           <ThemedView style={styles.flex}>
             <ThemedText type="smallBold">Push notifications</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
@@ -194,11 +195,11 @@ export default function NotificationsScreen() {
             value={pushPref?.enabled === true}
             onValueChange={(value) => void onTogglePush(value)}
             disabled={pushBusy}
-            trackColor={{ true: "#2563eb" }}
-            thumbColor="#ffffff"
+            trackColor={{ true: theme.accent }}
+            thumbColor={theme.textInverse}
             accessibilityLabel="Push notifications"
           />
-        </ThemedView>
+        </GlassSurface>
       ) : null}
 
       <ThemedView style={styles.toolbar}>
@@ -208,13 +209,13 @@ export default function NotificationsScreen() {
           accessibilityState={{ selected: unreadOnly }}
           style={({ pressed }) => [
             styles.chip,
-            unreadOnly && styles.chipActive,
+            { backgroundColor: unreadOnly ? theme.accentSubtle : theme.backgroundElement },
             pressed && styles.pressed,
           ]}
         >
           <ThemedText
             type="small"
-            style={unreadOnly ? styles.chipTextActive : undefined}
+            style={{ color: unreadOnly ? theme.accent : theme.text }}
           >
             Unread only ({unreadCount})
           </ThemedText>
@@ -225,7 +226,7 @@ export default function NotificationsScreen() {
             onPress={() => void onMarkAllRead()}
             accessibilityRole="button"
             accessibilityHint="Marks every notification as read"
-            style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.chip, { backgroundColor: theme.backgroundElement }, pressed && styles.pressed]}
           >
             {busyAll ? (
               <ActivityIndicator size="small" />
@@ -237,10 +238,10 @@ export default function NotificationsScreen() {
       </ThemedView>
 
       {error ? (
-        <Pressable onPress={() => void load()}>
+        <Pressable onPress={() => void load()} accessibilityRole="button">
           <ThemedText
             type="small"
-            style={{ color: "#dc2626" }}
+            style={{ color: theme.danger }}
             accessibilityRole="alert"
           >
             {error} — tap to retry
@@ -249,7 +250,7 @@ export default function NotificationsScreen() {
       ) : null}
 
       {!data ? (
-        <ActivityIndicator style={{ marginTop: Spacing.five }} />
+        <ActivityIndicator style={{ marginTop: Spacing.five }} color={theme.accent} />
       ) : (
         <FlatList
           data={data.items}
@@ -259,7 +260,7 @@ export default function NotificationsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => void onRefresh()}
-              tintColor="#2563eb"
+              tintColor={theme.accent}
             />
           }
           onEndReachedThreshold={0.4}
@@ -274,40 +275,48 @@ export default function NotificationsScreen() {
                   unread ? `${item.title}, unread` : item.title
                 }
                 style={({ pressed }) => [
-                  styles.row,
                   pressed && styles.pressed,
                 ]}
               >
-                <ThemedView
-                  type="backgroundElement"
-                  style={[styles.iconBadge, unread && styles.iconBadgeUnread]}
+                <GlassSurface
+                  radius={Radius.lg}
+                  variant={unread ? "strong" : "glass"}
+                  style={styles.row}
                 >
-                  <Ionicons
-                    name={notificationIcon(item.type)}
-                    size={18}
-                    color={unread ? "#2563eb" : theme.textSecondary}
-                  />
-                </ThemedView>
-                <ThemedView style={styles.rowBody}>
-                  <ThemedView style={styles.rowHeader}>
-                    <ThemedText type="smallBold" numberOfLines={1} style={styles.flex}>
-                      {item.title}
-                    </ThemedText>
-                    {unread ? <ThemedView style={styles.unreadDot} /> : null}
+                  <ThemedView
+                    style={[styles.iconBadge, unread && [styles.iconBadgeUnread, { backgroundColor: theme.accentSubtle }]]}
+                  >
+                    <Ionicons
+                      name={notificationIcon(item.type)}
+                      size={18}
+                      color={unread ? theme.accent : theme.textSecondary}
+                    />
                   </ThemedView>
-                  {item.body ? (
-                    <ThemedText
-                      type="small"
-                      themeColor="textSecondary"
-                      numberOfLines={3}
-                    >
-                      {item.body}
+                  <ThemedView style={styles.rowBody}>
+                    <ThemedView style={styles.rowHeader}>
+                      <ThemedText type="smallBold" numberOfLines={1} style={styles.flex}>
+                        {item.title}
+                      </ThemedText>
+                      {unread ? (
+                        <ThemedView
+                          style={[styles.unreadDot, { backgroundColor: theme.accent }]}
+                        />
+                      ) : null}
+                    </ThemedView>
+                    {item.body ? (
+                      <ThemedText
+                        type="small"
+                        themeColor="textSecondary"
+                        numberOfLines={3}
+                      >
+                        {item.body}
+                      </ThemedText>
+                    ) : null}
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {formatRelativeTime(item.createdAt)}
                     </ThemedText>
-                  ) : null}
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {formatRelativeTime(item.createdAt)}
-                  </ThemedText>
-                </ThemedView>
+                  </ThemedView>
+                </GlassSurface>
               </Pressable>
             );
           }}
@@ -342,28 +351,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: Spacing.three,
-    borderRadius: 16,
     padding: Spacing.three,
-    backgroundColor: "rgba(128,128,128,0.10)",
   },
   toolbar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: Spacing.two,
+    minHeight: TouchTarget.Android,
   },
   chip: {
     borderRadius: 999,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
-    backgroundColor: "rgba(128,128,128,0.15)",
+    minHeight: TouchTarget.Android,
+    justifyContent: "center",
     alignItems: "center",
-  },
-  chipActive: {
-    backgroundColor: "rgba(37,99,235,0.18)",
-  },
-  chipTextActive: {
-    color: "#2563eb",
   },
   listContent: {
     gap: Spacing.two,
@@ -374,9 +377,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: Spacing.three,
     alignItems: "flex-start",
-    borderRadius: 16,
     padding: Spacing.three,
-    backgroundColor: "rgba(128,128,128,0.10)",
+    minHeight: TouchTarget.Android,
   },
   iconBadge: {
     width: 36,
@@ -385,9 +387,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  iconBadgeUnread: {
-    backgroundColor: "rgba(37,99,235,0.18)",
-  },
+  iconBadgeUnread: {},
   rowBody: {
     flex: 1,
     gap: Spacing.half,
@@ -404,13 +404,12 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     borderRadius: 5,
-    backgroundColor: "#2563eb",
   },
   empty: {
     marginTop: Spacing.five,
     textAlign: "center",
   },
   pressed: {
-    opacity: 0.6,
+    opacity: 0.85,
   },
 });

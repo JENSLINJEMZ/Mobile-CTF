@@ -3,8 +3,9 @@ import { Tabs } from "expo-router";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
-import { useColorScheme } from "react-native";
+import { StyleSheet, useColorScheme } from "react-native";
 
+import { GlassTabBar } from "@/components/glass-tab-bar";
 import { useAuthStore } from "@/store/auth-store";
 import { useNotificationStore } from "@/store/notification-store";
 import {
@@ -12,11 +13,13 @@ import {
   subscribeToPushEvents,
 } from "@/services/push";
 import { startSubmissionGateway } from "@/services/offline-submissions";
+import { useTheme } from "@/hooks/use-theme";
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const theme = useTheme();
   const status = useAuthStore((s) => s.status);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const refreshBadge = useNotificationStore((s) => s.refreshBadge);
@@ -48,7 +51,15 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Tabs screenOptions={{ tabBarActiveTintColor: "#2563eb" }}>
+      <Tabs
+        screenOptions={{
+          tabBarActiveTintColor: theme.accent,
+          tabBarInactiveTintColor: theme.textSecondary,
+          tabBarStyle: styles.tabBar,
+          tabBarBackground: () => <GlassTabBar />,
+          sceneStyle: styles.scene,
+        }}
+      >
         <Tabs.Screen
           name="index"
           options={{
@@ -155,3 +166,15 @@ export default function RootLayout() {
     </ThemeProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  scene: {
+    backgroundColor: "transparent",
+  },
+  tabBar: {
+    position: "absolute",
+    backgroundColor: "transparent",
+    borderTopWidth: 0,
+    elevation: 0,
+  },
+});

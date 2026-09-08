@@ -4,14 +4,17 @@ import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
+import { GlassSurface } from "@/components/glass-surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import { Radius, Spacing, TouchTarget } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
 import { getAchievements } from "@/services/achievements";
 import { listBookmarks } from "@/services/bookmarks";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function ProfileScreen() {
+  const theme = useTheme();
   const { status, user, logout, error, clearError } = useAuthStore();
   const [earned, setEarned] = useState<number | null>(null);
   const [bookmarkCount, setBookmarkCount] = useState<number | null>(null);
@@ -54,7 +57,7 @@ export default function ProfileScreen() {
   if (status === "loading") {
     return (
       <ScreenShell title="Profile">
-        <ActivityIndicator />
+        <ActivityIndicator color={theme.accent} />
       </ScreenShell>
     );
   }
@@ -65,7 +68,7 @@ export default function ProfileScreen() {
         <ThemedText>Sign in to see your stats, badges, and team.</ThemedText>
         <Link href="/auth/login" asChild>
           <Pressable
-            style={styles.button}
+            style={({ pressed }) => [styles.button, { backgroundColor: theme.accent }, pressed && styles.pressed]}
             accessibilityRole="button"
             accessibilityLabel="Sign in"
           >
@@ -87,7 +90,7 @@ export default function ProfileScreen() {
 
   return (
     <ScreenShell title="Profile">
-      <ThemedView type="backgroundElement" style={styles.card}>
+      <GlassSurface radius={Radius.lg} style={styles.card}>
         <ThemedText type="subtitle">{user.username}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           {user.email}
@@ -95,7 +98,7 @@ export default function ProfileScreen() {
         <ThemedText type="smallBold" style={{ marginTop: Spacing.one }}>
           Role: {user.role}
         </ThemedText>
-      </ThemedView>
+      </GlassSurface>
 
       <ThemedView style={styles.links}>
         <Link href="/achievements" asChild>
@@ -104,7 +107,7 @@ export default function ProfileScreen() {
             accessibilityRole="link"
             accessibilityLabel={`Achievements, ${earned ?? 0} badges earned`}
           >
-            <Ionicons name="trophy" size={20} color="#2563eb" />
+            <Ionicons name="trophy" size={20} color={theme.accent} />
             <ThemedText type="smallBold" style={styles.linkLabel}>
               Achievements
             </ThemedText>
@@ -119,7 +122,7 @@ export default function ProfileScreen() {
             accessibilityRole="link"
             accessibilityLabel={`Bookmarks, ${bookmarkCount ?? 0} saved`}
           >
-            <Ionicons name="bookmark" size={20} color="#2563eb" />
+            <Ionicons name="bookmark" size={20} color={theme.accent} />
             <ThemedText type="smallBold" style={styles.linkLabel}>
               Bookmarks
             </ThemedText>
@@ -134,7 +137,7 @@ export default function ProfileScreen() {
             accessibilityRole="link"
             accessibilityLabel="Private notes"
           >
-            <Ionicons name="document-text" size={20} color="#2563eb" />
+            <Ionicons name="document-text" size={20} color={theme.accent} />
             <ThemedText type="smallBold" style={styles.linkLabel}>
               Private notes
             </ThemedText>
@@ -146,7 +149,7 @@ export default function ProfileScreen() {
             accessibilityRole="link"
             accessibilityLabel="My team"
           >
-            <Ionicons name="people" size={20} color="#2563eb" />
+            <Ionicons name="people" size={20} color={theme.accent} />
             <ThemedText type="smallBold" style={styles.linkLabel}>
               My team
             </ThemedText>
@@ -154,14 +157,14 @@ export default function ProfileScreen() {
         </Link>
       </ThemedView>
 
-      <ThemedView type="backgroundElement" style={styles.card}>
+      <GlassSurface radius={Radius.lg} style={styles.card}>
         <ThemedText type="small" themeColor="textSecondary">
           Member since {new Date(user.createdAt).toLocaleDateString()}
         </ThemedText>
-      </ThemedView>
+      </GlassSurface>
 
       <Pressable
-        style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.button, { backgroundColor: theme.danger }, pressed && styles.pressed]}
         onPress={confirmLogout}
         accessibilityRole="button"
         accessibilityLabel="Sign out all devices"
@@ -172,7 +175,7 @@ export default function ProfileScreen() {
 
       {error ? (
         <Pressable onPress={clearError} accessibilityRole="button">
-          <ThemedText type="small" style={{ color: "#dc2626" }}>
+          <ThemedText type="small" style={{ color: theme.danger }}>
             {error}
           </ThemedText>
         </Pressable>
@@ -184,7 +187,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   card: {
     width: "100%",
-    borderRadius: 16,
+    borderRadius: Radius.lg,
     padding: Spacing.three,
     gap: Spacing.one,
   },
@@ -197,15 +200,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.two,
     paddingVertical: Spacing.two,
+    minHeight: TouchTarget.Android,
   },
   linkLabel: {
     flex: 1,
   },
   button: {
-    backgroundColor: "#2563eb",
-    borderRadius: 12,
+    borderRadius: Radius.md,
     alignItems: "center",
     justifyContent: "center",
+    minHeight: TouchTarget.Android,
     paddingVertical: Spacing.three,
     marginTop: Spacing.two,
   },
@@ -218,6 +222,8 @@ const styles = StyleSheet.create({
   },
   ghostButton: {
     alignItems: "center",
+    minHeight: TouchTarget.Android,
+    justifyContent: "center",
     paddingVertical: Spacing.three,
   },
 });

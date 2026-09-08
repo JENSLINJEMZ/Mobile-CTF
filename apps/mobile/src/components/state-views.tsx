@@ -1,14 +1,17 @@
 import { ActivityIndicator, Pressable, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
+import { GlassSurface } from "@/components/glass-surface";
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import { Radius, Spacing, TouchTarget } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
 
 export function LoadingState() {
+  const theme = useTheme();
   return (
-    <ThemedView style={styles.container} accessibilityLabel="Loading">
-      <ActivityIndicator size="large" />
-    </ThemedView>
+    <GlassSurface style={styles.container} radius={Radius.lg} accessibilityLabel="Loading">
+      <ActivityIndicator size="large" color={theme.accent} />
+    </GlassSurface>
   );
 }
 
@@ -19,13 +22,16 @@ export function ErrorState({
   message: string;
   onRetry?: () => void;
 }) {
+  const theme = useTheme();
   return (
-    <ThemedView
+    <GlassSurface
       style={styles.container}
+      radius={Radius.lg}
       accessibilityRole="alert"
       accessibilityLabel={`Error: ${message}`}
     >
-      <ThemedText type="small" style={styles.errorText}>
+      <Ionicons name="cloud-offline-outline" size={30} color={theme.danger} />
+      <ThemedText type="small" style={{ color: theme.danger, textAlign: "center" }}>
         {message}
       </ThemedText>
       {onRetry ? (
@@ -33,20 +39,36 @@ export function ErrorState({
           onPress={onRetry}
           accessibilityRole="button"
           accessibilityLabel="Retry"
-          style={({ pressed }) => [styles.retry, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.retry,
+            { backgroundColor: theme.accent },
+            pressed && styles.pressed,
+          ]}
         >
-          <ThemedText type="smallBold" style={styles.retryLabel}>
+          <ThemedText type="smallBold" style={{ color: "#ffffff" }}>
             Try again
           </ThemedText>
         </Pressable>
       ) : null}
-    </ThemedView>
+    </GlassSurface>
   );
 }
 
-export function EmptyState({ message }: { message: string }) {
+export function EmptyState({
+  message,
+  icon = "book-outline",
+}: {
+  message: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+}) {
+  const theme = useTheme();
   return (
-    <ThemedView style={styles.container}>
+    <GlassSurface
+      style={styles.container}
+      radius={Radius.lg}
+      variant="subtle"
+    >
+      <Ionicons name={icon} size={32} color={theme.textSecondary} />
       <ThemedText
         type="default"
         themeColor="textSecondary"
@@ -54,7 +76,7 @@ export function EmptyState({ message }: { message: string }) {
       >
         {message}
       </ThemedText>
-    </ThemedView>
+    </GlassSurface>
   );
 }
 
@@ -66,20 +88,12 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.five,
     paddingHorizontal: Spacing.four,
   },
-  errorText: {
-    color: "#dc2626",
-    textAlign: "center",
-  },
   retry: {
-    backgroundColor: "#dc2626",
-    borderRadius: 10,
+    borderRadius: Radius.md,
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.two,
-    minHeight: 44,
+    minHeight: TouchTarget.Android,
     justifyContent: "center",
-  },
-  retryLabel: {
-    color: "#ffffff",
   },
   pressed: {
     opacity: 0.85,

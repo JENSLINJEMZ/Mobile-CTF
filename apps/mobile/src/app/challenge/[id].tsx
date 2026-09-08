@@ -7,8 +7,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
-  useColorScheme,
   type TextStyle,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,9 +15,12 @@ import Markdown from "react-native-markdown-display";
 import { OfflineBanner } from "@/components/offline-banner";
 import { ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
+import { GlassInput } from "@/components/glass-input";
+import { GlassSurface } from "@/components/glass-surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import { difficultyColor, Radius, Spacing, TouchTarget } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
 import { useNetwork } from "@/hooks/use-network";
 import { addBookmark, removeBookmark } from "@/services/bookmarks";
 import { getChallenge, unlockHint } from "@/services/challenges";
@@ -30,13 +31,6 @@ import {
 } from "@/services/offline-submissions";
 import { useAuthGate } from "@/hooks/use-auth-gate";
 
-const DIFFICULTY_COLORS: Record<string, string> = {
-  EASY: "#16a34a",
-  MEDIUM: "#d97706",
-  HARD: "#dc2626",
-  EXPERT: "#7c3aed",
-};
-
 function difficultyLabel(value: string): string {
   return value.charAt(0) + value.slice(1).toLowerCase();
 }
@@ -45,52 +39,48 @@ export default function ChallengeDetailScreen() {
   const { id, event } = useLocalSearchParams<{ id: string; event?: string }>();
   const challengeId = Number(id);
   const eventId = event ? Number(event) : undefined;
-  const colorScheme = useColorScheme();
+  const theme = useTheme();
   const { needsAuth } = useAuthGate();
 
-  const isDark = colorScheme === "dark";
-  const surface = isDark ? "#1f2937" : "#f3f4f6";
   const markdownTheme = useMemo(
     () => ({
       body: {
-        color: isDark ? "#f9fafb" : "#111827",
+        color: theme.text,
         fontSize: 16,
         lineHeight: 24,
       },
       heading1: {
-        color: isDark ? "#ffffff" : "#111827",
+        color: theme.text,
         fontSize: 24,
         fontWeight: "700" as TextStyle["fontWeight"],
         marginBottom: Spacing.two,
-        flexDirection: "row" as TextStyle["flexDirection"],
-        justifyContent: "center" as TextStyle["justifyContent"],
       },
       heading2: {
-        color: isDark ? "#ffffff" : "#111827",
+        color: theme.text,
         fontSize: 20,
         fontWeight: "700" as TextStyle["fontWeight"],
         marginTop: Spacing.three,
       },
       paragraph: { marginVertical: Spacing.one },
       code_inline: {
-        backgroundColor: isDark ? "#111827" : "#e5e7eb",
-        color: isDark ? "#a5f3fc" : "#1e3a8a",
+        backgroundColor: theme.surface,
+        color: theme.accent,
         fontFamily: "monospace",
         fontSize: 14,
       },
       fence: {
-        backgroundColor: isDark ? "#111827" : "#e5e7eb",
+        backgroundColor: theme.surface,
         padding: Spacing.three,
         borderRadius: 8,
       },
       code_block: {
-        color: isDark ? "#a5f3fc" : "#1e3a8a",
+        color: theme.accent,
         fontFamily: "monospace",
         fontSize: 13,
       },
       strong: { fontWeight: "700" as TextStyle["fontWeight"] },
     }),
-    [isDark],
+    [theme],
   );
 
   const [challenge, setChallenge] = useState<ChallengeDetailDto | null>(null);
@@ -268,14 +258,14 @@ export default function ChallengeDetailScreen() {
                 ]}
               >
                 {isBookmarking ? (
-                  <ActivityIndicator size="small" />
+                  <ActivityIndicator size="small" color={theme.accent} />
                 ) : (
                   <Ionicons
                     name={
                       challenge.bookmarkedByMe ? "bookmark" : "bookmark-outline"
                     }
                     size={24}
-                    color="#2563eb"
+                    color={theme.accent}
                   />
                 )}
               </Pressable>
@@ -283,28 +273,28 @@ export default function ChallengeDetailScreen() {
           </ThemedView>
           <ThemedView style={styles.metaRow}>
             <ThemedText type="small" themeColor="textSecondary">
-              {challenge.category.name} ·{" "}
-              {difficultyLabel(challenge.difficulty)} · {challenge.basePoints}{" "}
-              pts
-            </ThemedText>
+                {challenge.category.name} ·{" "}
+                {difficultyLabel(challenge.difficulty)}
+              </ThemedText>
+              <ThemedText type="metric">
+                {challenge.basePoints} pts
+              </ThemedText>
             <ThemedView
               style={[
                 styles.difficultyDot,
-                { backgroundColor: DIFFICULTY_COLORS[challenge.difficulty] },
+                { backgroundColor: difficultyColor(challenge.difficulty, theme) },
               ]}
             />
           </ThemedView>
           {challenge.solvedByMe ? (
-            <ThemedText type="small" style={{ color: "#16a34a" }}>
+            <ThemedText type="small" style={{ color: theme.success }}>
               Solved ✓ · {challenge.solvedCount} total solves
             </ThemedText>
           ) : null}
 
-          <ThemedView
-            style={[styles.markdownBox, { backgroundColor: surface }]}
-          >
+          <GlassSurface style={styles.markdownBox} radius={Radius.md}>
             <Markdown style={markdownTheme}>{challenge.description}</Markdown>
-          </ThemedView>
+          </GlassSurface>
 
           {challenge.attachments.length > 0 ? (
             <ThemedView style={styles.section}>
@@ -331,9 +321,9 @@ export default function ChallengeDetailScreen() {
               </ThemedText>
             ) : null}
             {challenge.hints.map((hint) => (
-              <ThemedView
+              <GlassSurface
                 key={hint.id}
-                type="backgroundElement"
+                radius={Radius.md}
                 style={styles.hintCard}
               >
                 {hint.unlocked ? (
@@ -361,6 +351,7 @@ export default function ChallengeDetailScreen() {
                       }}
                       style={({ pressed }) => [
                         styles.unlockButton,
+                        { backgroundColor: theme.accent },
                         (needsAuth || unlockingId !== null) &&
                           styles.unlockDisabled,
                         pressed && styles.cardPressed,
@@ -379,7 +370,7 @@ export default function ChallengeDetailScreen() {
                     </Pressable>
                   </ThemedView>
                 )}
-              </ThemedView>
+              </GlassSurface>
             ))}
             {needsAuth ? (
               <ThemedText type="small" themeColor="textSecondary">
@@ -390,17 +381,17 @@ export default function ChallengeDetailScreen() {
 
           <ThemedView style={styles.section}>
             <ThemedText type="smallBold">Submit flag</ThemedText>
-            <TextInput
+            <GlassInput
               value={flag}
               onChangeText={setFlag}
               placeholder="ctf{...}"
-              placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
-              style={[styles.flagInput, { backgroundColor: surface }]}
               autoCapitalize="none"
               autoCorrect={false}
               editable={!needsAuth}
               accessibilityLabel="Flag"
               accessibilityHint="Enter the flag for this challenge"
+              spellCheck={false}
+              style={styles.flagInput}
             />
             <Pressable
               disabled={needsAuth || submitting || flag.trim().length === 0}
@@ -412,11 +403,16 @@ export default function ChallengeDetailScreen() {
               }}
               style={({ pressed }) => [
                 styles.submitButton,
+                { backgroundColor: theme.accent },
                 (needsAuth || submitting || flag.trim().length === 0) &&
                   styles.unlockDisabled,
                 pressed && styles.cardPressed,
               ]}
             >
+              <ThemedView
+                pointerEvents="none"
+                style={[styles.buttonSpecular, { backgroundColor: theme.specular }]}
+              />
               {submitting ? (
                 <ActivityIndicator color="#ffffff" size="small" />
               ) : (
@@ -429,7 +425,7 @@ export default function ChallengeDetailScreen() {
             {queued ? (
               <ThemedText
                 type="smallBold"
-                style={{ color: "#b45309" }}
+                style={{ color: theme.warningStrong }}
                 accessibilityRole="alert"
               >
                 Flag queued — it will be submitted automatically when
@@ -441,25 +437,33 @@ export default function ChallengeDetailScreen() {
               <ThemedView
                 style={[
                   styles.resultBox,
-                  { backgroundColor: result.correct ? "#dcfce7" : "#fee2e2" },
+                  {
+                    backgroundColor: result.correct
+                      ? theme.successSubtle
+                      : theme.dangerSubtle,
+                  },
                 ]}
                 accessibilityRole="alert"
                 accessibilityLabel={`Flag ${result.correct ? "correct" : "incorrect"}. ${result.message}`}
               >
                 <ThemedText
                   type="smallBold"
-                  style={{ color: result.correct ? "#15803d" : "#b91c1c" }}
+                  style={{
+                    color: result.correct ? theme.successStrong : theme.dangerStrong,
+                  }}
                 >
                   {result.message}
                 </ThemedText>
                 <ThemedText
-                  type="small"
-                  style={{ color: result.correct ? "#166534" : "#991b1b" }}
+                  type="metric"
+                  style={{
+                    color: result.correct ? theme.successStrong : theme.dangerStrong,
+                  }}
                 >
                   Total score: {result.totalScore}
                 </ThemedText>
                 {result.correct && result.rank != null ? (
-                  <ThemedText type="small" style={{ color: "#166534" }}>
+                  <ThemedText type="metric" style={{ color: theme.successStrong }}>
                     Global rank: #{result.rank}
                   </ThemedText>
                 ) : null}
@@ -467,7 +471,7 @@ export default function ChallengeDetailScreen() {
             ) : null}
 
             {submitError ? (
-              <ThemedText type="small" style={{ color: "#dc2626" }}>
+              <ThemedText type="small" style={{ color: theme.danger }}>
                 {submitError}
               </ThemedText>
             ) : null}
@@ -493,7 +497,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bookmarkButton: {
-    padding: Spacing.one,
+    minWidth: TouchTarget.Android,
+    minHeight: TouchTarget.Android,
+    alignItems: "center",
+    justifyContent: "center",
   },
   metaRow: {
     flexDirection: "row",
@@ -529,36 +536,42 @@ const styles = StyleSheet.create({
     gap: Spacing.half,
   },
   unlockButton: {
-    backgroundColor: "#2563eb",
     borderRadius: 10,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     minWidth: 80,
+    minHeight: TouchTarget.Android,
     alignItems: "center",
+    justifyContent: "center",
   },
   unlockDisabled: {
     opacity: 0.5,
   },
+  resultBox: {
+    borderRadius: Radius.md,
+    padding: Spacing.three,
+    gap: Spacing.half,
+  },
   flagInput: {
-    width: "100%",
-    borderRadius: 12,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + Spacing.half,
-    fontSize: 15,
     fontFamily: "monospace",
   },
   submitButton: {
-    backgroundColor: "#2563eb",
-    borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
     paddingVertical: Spacing.three,
+    minHeight: TouchTarget.Android,
+    borderRadius: Radius.md,
+    overflow: "hidden",
+  },
+  buttonSpecular: {
+    position: "absolute",
+    top: 1,
+    left: 1,
+    right: 1,
+    height: 1,
+    opacity: 0.45,
   },
   cardPressed: {
     opacity: 0.85,
-  },
-  resultBox: {
-    borderRadius: 12,
-    padding: Spacing.three,
-    gap: Spacing.half,
   },
 });

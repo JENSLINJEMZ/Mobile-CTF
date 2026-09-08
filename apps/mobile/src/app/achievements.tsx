@@ -3,14 +3,17 @@ import { FlatList, RefreshControl, StyleSheet } from "react-native";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
+import { GlassSurface } from "@/components/glass-surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import { Radius, Spacing } from "@/constants/theme";
 import { getAchievements } from "@/services/achievements";
 import type { AchievementListResponse } from "@ctf/shared";
 import { useLoadable } from "@/hooks/use-loadable";
+import { useTheme } from "@/hooks/use-theme";
 
 export default function AchievementsScreen() {
+  const theme = useTheme();
   const { data, error, reload } = useLoadable(
     getAchievements,
     null as AchievementListResponse | null,
@@ -32,7 +35,11 @@ export default function AchievementsScreen() {
       ) : data ? (
         <>
           <ThemedText type="small" themeColor="textSecondary">
-            {data.earnedCount} of {data.items.length} badges earned
+            <ThemedText type="metric">
+              {data.earnedCount}
+            </ThemedText>{" "}
+            of <ThemedText type="metric">{data.items.length}</ThemedText>{" "}
+            badges earned
           </ThemedText>
           <FlatList
             data={data.items}
@@ -42,7 +49,7 @@ export default function AchievementsScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor="#2563eb"
+                tintColor={theme.accent}
               />
             }
             ListEmptyComponent={
@@ -52,8 +59,9 @@ export default function AchievementsScreen() {
               const earnedAt = item.earnedAt ?? null;
               const earned = earnedAt !== null;
               return (
-                <ThemedView
-                  type="backgroundElement"
+                <GlassSurface
+                  radius={Radius.lg}
+                  variant={earned ? "glass" : "subtle"}
                   style={[styles.badge, !earned && styles.locked]}
                   accessibilityLabel={`${item.title}: ${item.description}, ${earned ? "earned" : "locked"}`}
                 >
@@ -66,7 +74,7 @@ export default function AchievementsScreen() {
                       {item.description}
                     </ThemedText>
                     {earned && earnedAt !== null ? (
-                      <ThemedText type="small" style={{ color: "#16a34a" }}>
+                      <ThemedText type="small" style={{ color: theme.success }}>
                         Earned {new Date(earnedAt).toLocaleDateString()}
                       </ThemedText>
                     ) : (
@@ -75,7 +83,7 @@ export default function AchievementsScreen() {
                       </ThemedText>
                     )}
                   </ThemedView>
-                </ThemedView>
+                </GlassSurface>
               );
             }}
           />
@@ -92,7 +100,6 @@ const styles = StyleSheet.create({
   },
   badge: {
     width: "100%",
-    borderRadius: 14,
     padding: Spacing.three,
     flexDirection: "row",
     alignItems: "center",

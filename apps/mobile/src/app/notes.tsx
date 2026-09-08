@@ -14,13 +14,16 @@ import {
 import { OfflineBanner } from "@/components/offline-banner";
 import { EmptyState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
+import { GlassSurface } from "@/components/glass-surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import { Radius, Spacing, TouchTarget } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
 import { useNetwork } from "@/hooks/use-network";
 import { buildClientKey, useNoteStore } from "@/store/note-store";
 
 export default function NotesScreen() {
+  const theme = useTheme();
   const router = useRouter();
   const isOnline = useNetwork();
   const { notes, hydrated, syncing, syncError, hydrate, flush } =
@@ -91,7 +94,8 @@ export default function NotesScreen() {
       <OfflineBanner />
       <ThemedView style={styles.toolbar}>
         <ThemedText type="small" themeColor="textSecondary">
-          {notes.length} note{notes.length === 1 ? "" : "s"}
+          <ThemedText type="metric">{notes.length}</ThemedText> note
+          {notes.length === 1 ? "" : "s"}
         </ThemedText>
         <Pressable
           onPress={() => (isOnline ? void flush() : undefined)}
@@ -100,11 +104,12 @@ export default function NotesScreen() {
           accessibilityState={{ disabled: !isOnline || syncing }}
           style={({ pressed }) => [
             styles.syncButton,
+            { backgroundColor: theme.accent },
             pressed && styles.pressed,
           ]}
         >
           {syncing ? (
-            <ActivityIndicator size="small" />
+            <ActivityIndicator size="small" color="#ffffff" />
           ) : (
             <ThemedText
               type="small"
@@ -117,26 +122,32 @@ export default function NotesScreen() {
       </ThemedView>
 
       {syncError && !dismissedError ? (
-        <ThemedView
-          style={styles.syncError}
+        <GlassSurface
+          variant="strong"
+          radius={Radius.md}
+          style={[
+            styles.syncError,
+            { backgroundColor: theme.dangerSubtle },
+          ]}
           accessibilityRole="alert"
           accessibilityLabel={`Sync failed: ${syncError}`}
         >
-          <ThemedText type="small" style={{ color: "#dc2626", flex: 1 }}>
+          <ThemedText type="small" style={{ color: theme.dangerStrong, flex: 1 }}>
             {syncError}
           </ThemedText>
           <Pressable
             onPress={() => setDismissedError(true)}
             accessibilityRole="button"
             accessibilityLabel="Dismiss sync error"
+            hitSlop={12}
           >
-            <Ionicons name="close" size={18} color="#dc2626" />
+            <Ionicons name="close" size={18} color={theme.danger} />
           </Pressable>
-        </ThemedView>
+        </GlassSurface>
       ) : null}
 
       {!hydrated ? (
-        <ActivityIndicator style={{ marginTop: Spacing.five }} />
+        <ActivityIndicator style={{ marginTop: Spacing.five }} color={theme.accent} />
       ) : notes.length === 0 ? (
         <EmptyState message="No notes yet. Notes are private and sync automatically when you're back online." />
       ) : (
@@ -147,18 +158,21 @@ export default function NotesScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onPullRefresh}
-              tintColor="#2563eb"
+              tintColor={theme.accent}
             />
           }
         >
           {notes.map((note) => (
-            <ThemedView
+            <GlassSurface
               key={note.clientKey}
-              type="backgroundElement"
+              radius={Radius.lg}
               style={styles.noteRow}
             >
               <Pressable
-                style={styles.noteMain}
+                style={({ pressed }) => [
+                  styles.noteMain,
+                  pressed && styles.pressed,
+                ]}
                 onPress={() => openNote(note.clientKey)}
                 accessibilityRole="button"
                 accessibilityLabel={`Open note ${note.title || "Untitled"}`}
@@ -183,10 +197,11 @@ export default function NotesScreen() {
                 accessibilityLabel={`Delete note ${note.title || "Untitled"}`}
                 accessibilityHint="Permanently deletes this note"
                 style={styles.deleteButton}
+                hitSlop={12}
               >
-                <Ionicons name="trash-outline" size={18} color="#dc2626" />
+                <Ionicons name="trash-outline" size={18} color={theme.danger} />
               </Pressable>
-            </ThemedView>
+            </GlassSurface>
           ))}
         </ScrollView>
       )}
@@ -195,7 +210,11 @@ export default function NotesScreen() {
         onPress={createNote}
         accessibilityRole="button"
         accessibilityLabel="Create new note"
-        style={({ pressed }) => [styles.fab, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.fab,
+          { backgroundColor: theme.accent },
+          pressed && styles.pressed,
+        ]}
       >
         <Ionicons name="add" size={26} color="#ffffff" />
       </Pressable>
@@ -209,22 +228,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    minHeight: TouchTarget.Android,
   },
   syncButton: {
-    backgroundColor: "#2563eb",
     borderRadius: 10,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.one + Spacing.half,
     minWidth: 96,
+    minHeight: TouchTarget.Android,
     alignItems: "center",
+    justifyContent: "center",
   },
   syncError: {
     width: "100%",
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.two,
-    backgroundColor: "#fee2e2",
-    borderRadius: 10,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
   },
@@ -234,18 +253,23 @@ const styles = StyleSheet.create({
   },
   noteRow: {
     width: "100%",
-    borderRadius: 14,
     padding: Spacing.three,
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.two,
+    minHeight: TouchTarget.Android,
   },
   noteMain: {
     flex: 1,
     gap: Spacing.half,
+    paddingVertical: Spacing.one,
   },
   deleteButton: {
     padding: Spacing.one,
+    minWidth: TouchTarget.Android,
+    minHeight: TouchTarget.Android,
+    alignItems: "center",
+    justifyContent: "center",
   },
   fab: {
     position: "absolute",
@@ -254,7 +278,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#2563eb",
     alignItems: "center",
     justifyContent: "center",
   },

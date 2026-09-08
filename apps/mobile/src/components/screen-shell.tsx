@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import { StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { GlassBackground } from "@/components/glass-background";
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
 
 export function ScreenShell({
@@ -14,17 +14,15 @@ export function ScreenShell({
   children?: ReactNode;
 }) {
   return (
-    <ThemedView style={styles.container}>
+    <View style={styles.container}>
+      <GlassBackground />
       <SafeAreaView style={styles.safeArea} accessibilityRole="header">
-        <ThemedText type="subtitle" accessibilityRole="header">
+        <ThemedText type="title" accessibilityRole="header" style={styles.header}>
           {title}
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          CTF Platform
         </ThemedText>
         {children}
       </SafeAreaView>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -39,6 +37,9 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     paddingHorizontal: Spacing.four,
     paddingBottom: BottomTabInset + Spacing.three,
-    gap: Spacing.two,
+    gap: Spacing.three,
+  },
+  header: {
+    marginTop: Spacing.two,
   },
 });

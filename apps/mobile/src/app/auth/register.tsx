@@ -6,13 +6,12 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  TextInput,
 } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
+import { GlassInput } from "@/components/glass-input";
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import { Radius, Spacing, TouchTarget } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -55,48 +54,36 @@ export default function RegisterScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.form}
       >
-        <ThemedView type="backgroundElement" style={styles.field}>
-          <TextInput
-            style={[styles.input, { color: theme.text }]}
+        <GlassInput
+            value={email}
+            onChangeText={setEmail}
             placeholder="Email"
-            placeholderTextColor="#8e8e93"
             autoCapitalize="none"
             keyboardType="email-address"
             autoComplete="email"
             accessibilityLabel="Email"
-            value={email}
-            onChangeText={setEmail}
           />
-        </ThemedView>
 
-        <ThemedView type="backgroundElement" style={styles.field}>
-          <TextInput
-            style={[styles.input, { color: theme.text }]}
+          <GlassInput
+            value={username}
+            onChangeText={setUsername}
             placeholder="Username"
-            placeholderTextColor="#8e8e93"
             autoCapitalize="none"
             autoComplete="username"
             accessibilityLabel="Username"
-            value={username}
-            onChangeText={setUsername}
           />
-        </ThemedView>
 
-        <ThemedView type="backgroundElement" style={styles.field}>
-          <TextInput
-            style={[styles.input, { color: theme.text }]}
+          <GlassInput
+            value={password}
+            onChangeText={setPassword}
             placeholder="Password (min 8 chars)"
-            placeholderTextColor="#8e8e93"
             secureTextEntry
             autoComplete="new-password"
             accessibilityLabel="Password"
-            value={password}
-            onChangeText={setPassword}
           />
-        </ThemedView>
 
         {password.length > 0 && password.length < 8 ? (
-          <ThemedText type="small" style={{ color: "#d97706" }}>
+          <ThemedText type="small" style={{ color: theme.warning }}>
             Password must be at least 8 characters.
           </ThemedText>
         ) : null}
@@ -104,7 +91,7 @@ export default function RegisterScreen() {
         {error ? (
           <ThemedText
             type="small"
-            style={{ color: "#dc2626" }}
+            style={{ color: theme.danger }}
             accessibilityRole="alert"
           >
             {error}
@@ -114,6 +101,7 @@ export default function RegisterScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.button,
+            { backgroundColor: theme.accent },
             pressed && styles.buttonPressed,
             !canSubmit && styles.buttonDisabled,
           ]}
@@ -152,20 +140,11 @@ const styles = StyleSheet.create({
     width: "100%",
     gap: Spacing.two,
   },
-  field: {
-    borderRadius: 12,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-  input: {
-    fontSize: 16,
-    paddingVertical: Spacing.one,
-  },
   button: {
-    backgroundColor: "#2563eb",
-    borderRadius: 12,
+    borderRadius: Radius.md,
     alignItems: "center",
     justifyContent: "center",
+    minHeight: TouchTarget.Android,
     paddingVertical: Spacing.three,
     marginTop: Spacing.two,
   },
@@ -181,6 +160,8 @@ const styles = StyleSheet.create({
   },
   linkRow: {
     alignItems: "center",
+    minHeight: TouchTarget.Android,
+    justifyContent: "center",
     paddingVertical: Spacing.two,
   },
 });

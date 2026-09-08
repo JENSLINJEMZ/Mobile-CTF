@@ -8,15 +8,15 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
-  useColorScheme,
 } from "react-native";
 
 import { ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
+import { GlassSurface } from "@/components/glass-surface";
+import { GlassInput } from "@/components/glass-input";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import { Radius, Spacing, TouchTarget } from "@/constants/theme";
 import {
   createTeam,
   deleteTeam,
@@ -26,12 +26,11 @@ import {
   updateMemberRole,
 } from "@/services/teams";
 import { useAuthStore } from "@/store/auth-store";
+import { useTheme } from "@/hooks/use-theme";
 
 export default function TeamsScreen() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const theme = useTheme();
   const currentUser = useAuthStore((s) => s.user);
-  const surface = isDark ? "#1f2937" : "#f3f4f6";
 
   const [team, setTeam] = useState<TeamDetailDto | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -155,7 +154,7 @@ export default function TeamsScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <ThemedView type="backgroundElement" style={styles.card}>
+          <GlassSurface radius={Radius.lg} style={styles.card}>
             <ThemedView style={styles.teamHeader}>
               <ThemedView style={styles.teamTitle}>
                 <ThemedText type="subtitle">{team.name}</ThemedText>
@@ -165,7 +164,7 @@ export default function TeamsScreen() {
                   </ThemedText>
                 ) : null}
               </ThemedView>
-              <ThemedText type="smallBold" style={styles.countBadge}>
+              <ThemedText type="metric" style={[styles.countBadge, { backgroundColor: theme.accent }]}>
                 {team.memberCount}/{TEAM.MAX_MEMBERS}
               </ThemedText>
             </ThemedView>
@@ -210,6 +209,7 @@ export default function TeamsScreen() {
                           accessibilityLabel={`${member.role === "LEADER" ? "Demote" : "Promote"} ${member.username}`}
                           style={({ pressed }) => [
                             styles.secondaryButton,
+                            { backgroundColor: theme.accentSubtle },
                             pressed && styles.pressed,
                           ]}
                         >
@@ -218,7 +218,7 @@ export default function TeamsScreen() {
                           ) : (
                             <ThemedText
                               type="small"
-                              style={{ fontWeight: "600" }}
+                              style={{ fontWeight: "600", color: theme.accent }}
                             >
                               {member.role === "LEADER" ? "Demote" : "Promote"}
                             </ThemedText>
@@ -232,14 +232,16 @@ export default function TeamsScreen() {
                           accessibilityHint="Prompts for confirmation first"
                           style={({ pressed }) => [
                             styles.removeButton,
+                            { backgroundColor: theme.dangerSubtle },
                             (busy || member.role === "LEADER") &&
+                              styles.disabled,
+                            pressed && !busy && member.role !== "LEADER" &&
                               styles.pressed,
-                            pressed && styles.pressed,
                           ]}
                         >
                           <ThemedText
                             type="small"
-                            style={{ color: "#b91c1c", fontWeight: "600" }}
+                            style={{ color: theme.dangerStrong, fontWeight: "600" }}
                           >
                             Remove
                           </ThemedText>
@@ -260,45 +262,41 @@ export default function TeamsScreen() {
                 accessibilityHint="Prompts for confirmation first"
                 style={({ pressed }) => [
                   styles.dissolveButton,
-                  busy && styles.pressed,
-                  pressed && styles.pressed,
+                  busy && styles.disabled,
+                  pressed && !busy && styles.pressed,
                 ]}
               >
                 <ThemedText
                   type="small"
-                  style={{ color: "#b91c1c", fontWeight: "600" }}
+                  style={{ color: theme.dangerStrong, fontWeight: "600" }}
                 >
                   Dissolve team
                 </ThemedText>
               </Pressable>
             ) : null}
-          </ThemedView>
+          </GlassSurface>
         </ScrollView>
       ) : (
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <ThemedView type="backgroundElement" style={styles.card}>
+          <GlassSurface radius={Radius.lg} style={styles.card}>
             <ThemedText type="smallBold">Create a team</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               Teams have up to {TEAM.MAX_MEMBERS} members, and let you compete
               in events.
             </ThemedText>
-            <TextInput
+            <GlassInput
               value={name}
               onChangeText={setName}
               placeholder="Team name"
-              placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
-              style={[styles.input, { backgroundColor: surface }]}
               accessibilityLabel="Team name"
             />
-            <TextInput
+            <GlassInput
               value={tagline}
               onChangeText={setTagline}
               placeholder="Tagline (optional)"
-              placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
-              style={[styles.input, { backgroundColor: surface }]}
               accessibilityLabel="Team tagline"
             />
             <Pressable
@@ -309,8 +307,9 @@ export default function TeamsScreen() {
               accessibilityState={{ disabled: busy || name.trim().length === 0 }}
               style={({ pressed }) => [
                 styles.primaryButton,
-                (busy || name.trim().length === 0) && styles.pressed,
-                pressed && styles.pressed,
+                { backgroundColor: theme.accent },
+                (busy || name.trim().length === 0) && styles.disabled,
+                pressed && !busy && name.trim().length > 0 && styles.pressed,
               ]}
             >
               {busy ? (
@@ -321,16 +320,14 @@ export default function TeamsScreen() {
                 </ThemedText>
               )}
             </Pressable>
-          </ThemedView>
+          </GlassSurface>
 
-          <ThemedView type="backgroundElement" style={styles.card}>
+          <GlassSurface radius={Radius.lg} style={styles.card}>
             <ThemedText type="smallBold">Join with a code</ThemedText>
-            <TextInput
+            <GlassInput
               value={joinCode}
               onChangeText={setJoinCode}
               placeholder="6-character code"
-              placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
-              style={[styles.input, { backgroundColor: surface }]}
               autoCapitalize="characters"
               autoCorrect={false}
               accessibilityLabel="Join code"
@@ -343,15 +340,16 @@ export default function TeamsScreen() {
               accessibilityState={{ disabled: busy || joinCode.trim().length === 0 }}
               style={({ pressed }) => [
                 styles.secondaryFullButton,
-                (busy || joinCode.trim().length === 0) && styles.pressed,
-                pressed && styles.pressed,
+                { borderColor: theme.accent },
+                (busy || joinCode.trim().length === 0) && styles.disabled,
+                pressed && !busy && joinCode.trim().length > 0 && styles.pressed,
               ]}
             >
-              <ThemedText style={{ color: "#2563eb", fontWeight: "600" }}>
+              <ThemedText style={{ color: theme.accent, fontWeight: "600" }}>
                 Join team
               </ThemedText>
             </Pressable>
-          </ThemedView>
+          </GlassSurface>
         </ScrollView>
       )}
     </ScreenShell>
@@ -379,7 +377,6 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   countBadge: {
-    backgroundColor: "#2563eb",
     color: "#ffffff",
     borderRadius: 999,
     paddingHorizontal: Spacing.two,
@@ -407,39 +404,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,
     borderRadius: 8,
-    backgroundColor: "rgba(37, 99, 235, 0.1)",
+    minHeight: TouchTarget.Android,
+    justifyContent: "center",
   },
   removeButton: {
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,
     borderRadius: 8,
-    backgroundColor: "rgba(220, 38, 38, 0.1)",
+    minHeight: TouchTarget.Android,
+    justifyContent: "center",
   },
   dissolveButton: {
     alignSelf: "flex-start",
+    minHeight: TouchTarget.Android,
+    justifyContent: "center",
     paddingVertical: Spacing.one,
   },
-  input: {
-    width: "100%",
-    borderRadius: 12,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + Spacing.half,
-    fontSize: 15,
-  },
   primaryButton: {
-    backgroundColor: "#2563eb",
     borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: TouchTarget.Android,
     paddingVertical: Spacing.three,
   },
   secondaryFullButton: {
     borderWidth: 1,
-    borderColor: "#2563eb",
     borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: TouchTarget.Android,
     paddingVertical: Spacing.three,
   },
+  disabled: {
+    opacity: 0.5,
+  },
   pressed: {
-    opacity: 0.6,
+    opacity: 0.85,
   },
 });

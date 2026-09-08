@@ -9,14 +9,16 @@ import {
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
+import { GlassSurface } from "@/components/glass-surface";
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
+import { Radius, Spacing } from "@/constants/theme";
 import type { BookmarkDto } from "@ctf/shared";
 import { useLoadable } from "@/hooks/use-loadable";
 import { listBookmarks } from "@/services/bookmarks";
+import { useTheme } from "@/hooks/use-theme";
 
 export default function BookmarksScreen() {
+  const theme = useTheme();
   const router = useRouter();
   const { data, error, reload } = useLoadable(
     useCallback(async () => (await listBookmarks()).items, []),
@@ -49,28 +51,35 @@ export default function BookmarksScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#2563eb"
+              tintColor={theme.accent}
             />
           }
           renderItem={({ item }) => (
-            <ThemedView type="backgroundElement" style={styles.row}>
+            <GlassSurface radius={Radius.lg} style={styles.row}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Open bookmarked challenge ${item.title}`}
-                style={styles.rowMain}
+                style={({ pressed }) => [
+                  styles.rowMain,
+                  pressed && styles.rowPressed,
+                ]}
                 onPress={() => router.push(`/challenge/${item.challengeId}`)}
               >
                 <ThemedText type="smallBold">{item.title}</ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
-                  {item.difficulty} · {item.basePoints} pts
+                  {item.difficulty} ·{" "}
+                  <ThemedText type="metric">
+                    {item.basePoints}
+                  </ThemedText>{" "}
+                  pts
                 </ThemedText>
                 {item.solvedByMe ? (
-                  <ThemedText type="small" style={{ color: "#16a34a" }}>
+                  <ThemedText type="small" style={{ color: theme.success }}>
                     Solved ✓
                   </ThemedText>
                 ) : null}
               </Pressable>
-            </ThemedView>
+            </GlassSurface>
           )}
         />
       )}
@@ -85,10 +94,12 @@ const styles = StyleSheet.create({
   },
   row: {
     width: "100%",
-    borderRadius: 14,
     padding: Spacing.three,
   },
   rowMain: {
     gap: Spacing.half,
+  },
+  rowPressed: {
+    opacity: 0.85,
   },
 });
