@@ -39,6 +39,7 @@ Turborepo + npm workspaces monorepo. Staged build — **Stage 10 (Notifications,
 | All 16 screens converted: glass cards/rows/chips/inputs, metric numerals for points/ranks/scores/counts, specular top rim on primary CTAs (submit flag, sign-in, create/joint, send), press-scale 0.98/0.96 on cards/chips (reduced-motion aware) | ✅ |
 | Verification: mobile `tsc --noEmit` clean, `eslint` clean (3 unused imports removed), 18 vitest tests pass; Metro restarted after dep change; on-device uiautomator smoke of Challenges, challenge detail (glass hints + flag input), Leaderboard (metric scores + chips), Notes (offline pill + sync) | ✅ |
 | Sandbox incident (fixed): all terminal sessions 502 with `No such image: ctf-sandbox:latest` — image rebuilt (`docker build -t ctf-sandbox:latest infrastructure/sandbox`); POST session → `RUNNING`, host `ctf-tm-*` container Up, exec shell OK (`uid=10001(ctf)`, non-root), test containers cleaned up | ✅ |
+| Sandbox image expanded: CTF toolset added (`python3` 3.12 + py3-pycryptodome, `openssl`, `binutils`/strings, `xxd`, `file`, `jq`, `sqlite3`, `nano`, `zip`/`unzip`/`xz`, `bc`); image 28.7MB → 126MB; verified running under hardening (`ReadonlyRootfs`, `NetworkMode none`, `Memory`, `CapDrop ALL`, uid 10001) and via on-device terminal session | ✅ |
 | Git: first commit created and pushed to `origin` at `https://github.com/JENSLINJEMZ/Mobile-CTF.git` (`main`) | ✅ |
 
 Product goals (priority): security > working end-to-end > mobile UX > clean architecture > performance > polish > extensibility > testing > docs.
