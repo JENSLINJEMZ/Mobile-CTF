@@ -1,4 +1,5 @@
 import type {
+  TerminalCrashEvent,
   TerminalExitEvent,
   TerminalOutputEvent,
   TerminalSessionDto,
@@ -27,11 +28,13 @@ import {
   createTerminalSession,
   closeTerminalSession,
   listTerminalSessions,
+  reassembleTerminalSession,
 } from "@/services/terminal";
 import {
   connectTerminalSocket,
   disconnectTerminalSocket,
   sendTerminalInput,
+  subscribeTerminalCrash,
   subscribeTerminalError,
   subscribeTerminalExit,
   subscribeTerminalOutput,
@@ -45,6 +48,7 @@ const STATUS_LABELS: Record<TerminalSessionDto["status"], string> = {
   CLOSED: "closed",
   EXPIRED: "expired",
   FAILED: "failed",
+  CRASHED: "crashed",
 };
 
 function isActive(status: TerminalSessionDto["status"]): boolean {
@@ -64,6 +68,7 @@ export default function TerminalScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exitNote, setExitNote] = useState<string | null>(null);
+  const [crashNote, setCrashNote] = useState<string | null>(null);
 
   const scrollRef = useRef<ScrollView>(null);
   const mountedRef = useRef(true);
@@ -99,6 +104,7 @@ export default function TerminalScreen() {
       setBusy(true);
       setError(null);
       setExitNote(null);
+      setCrashNote(null);
       setOutput("");
       try {
         await connectTerminalSocket(sessionId);
@@ -126,6 +132,7 @@ export default function TerminalScreen() {
     setBusy(true);
     setError(null);
     setExitNote(null);
+    setCrashNote(null);
     try {
       const session = await createTerminalSession();
       setSessions((prev) => [session, ...prev]);
@@ -172,6 +179,26 @@ export default function TerminalScreen() {
     );
   }, [activeId, closeSession]);
 
+  const reassemble = useCallback(async () => {
+    if (!activeId) return;
+    setBusy(true);
+    setError(null);
+    setCrashNote(null);
+    try {
+      const revived = await reassembleTerminalSession(activeId);
+      setSessions((prev) =>
+        prev.map((s) => (s.id === activeId ? revived : s)),
+      );
+      setConnected(true);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to reassemble the sandbox",
+      );
+    } finally {
+      if (mountedRef.current) setBusy(false);
+    }
+  }, [activeId]);
+
   useEffect(() => {
     if (!isAuthenticated) return;
     const offOutput = subscribeTerminalOutput((event: TerminalOutputEvent) => {
@@ -188,12 +215,19 @@ export default function TerminalScreen() {
       disconnectTerminalSocket();
       void load();
     });
+    const offCrash = subscribeTerminalCrash((event: TerminalCrashEvent) => {
+      setConnected(false);
+      setCrashNote(event.reason);
+      disconnectTerminalSocket();
+      void load();
+    });
     const offError = subscribeTerminalError((message: string) => {
       setError(message);
     });
     return () => {
       offOutput();
       offExit();
+      offCrash();
       offError();
     };
   }, [isAuthenticated, connected, load]);
@@ -402,6 +436,38 @@ export default function TerminalScreen() {
             </GlassSurface>
           ) : null}
 
+          {crashNote ? (
+            <GlassSurface
+              variant="glass"
+              radius={Radius.md}
+              style={[styles.crashBanner, { borderColor: theme.danger }]}
+              accessibilityRole="alert"
+            >
+              <View style={styles.crashHeader}>
+                <ThemedText type="smallBold" style={{ color: theme.danger }}>
+                  Sandbox destroyed
+                </ThemedText>
+              </View>
+              <ThemedText type="small">{crashNote}</ThemedText>
+              <Pressable
+                onPress={() => void reassemble()}
+                disabled={busy}
+                accessibilityRole="button"
+                accessibilityLabel="Reassemble sandbox"
+                accessibilityState={{ disabled: busy }}
+                style={({ pressed }) => [
+                  styles.reassembleButton,
+                  { backgroundColor: theme.accent },
+                  pressed && styles.cardPressed,
+                ]}
+              >
+                <ThemedText style={styles.reassembleLabel}>
+                  {busy ? "Reassembling…" : "Reassemble sandbox"}
+                </ThemedText>
+              </Pressable>
+            </GlassSurface>
+          ) : null}
+
           <GlassSurface variant="strong" radius={Radius.md} style={styles.inputRow}>
             <TextInput
               style={[styles.input, { color: theme.text }]}
@@ -550,6 +616,28 @@ const styles = StyleSheet.create({
   exitBanner: {
     width: "100%",
     padding: Spacing.two,
+  },
+  crashBanner: {
+    width: "100%",
+    padding: Spacing.three,
+    gap: Spacing.two,
+    borderWidth: 1,
+  },
+  crashHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.one,
+  },
+  reassembleButton: {
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: TouchTarget.Android,
+    paddingVertical: Spacing.two,
+  },
+  reassembleLabel: {
+    color: "#ffffff",
+    fontWeight: "600",
   },
   inputRow: {
     width: "100%",

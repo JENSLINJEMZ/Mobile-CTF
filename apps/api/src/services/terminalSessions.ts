@@ -1,4 +1,5 @@
 import type {
+  TerminalCrashEvent,
   TerminalExitEvent,
   TerminalOutputEvent,
   TerminalSessionStatus,
@@ -13,6 +14,7 @@ import { env } from "../config/env";
 import { stripAnsi } from "../utils/ansi";
 import { logger } from "../utils/logger";
 import { DockerSandboxRuntime } from "./sandbox/dockerRuntime";
+import { scanDestructiveInput } from "./sandbox/destructiveGuard";
 import type { SandboxRuntime } from "./sandbox/types";
 
 export const terminalEvents = new EventEmitter();
@@ -24,6 +26,7 @@ function toDto(row: {
   createdAt: Date;
   expiresAt: Date;
   closedAt: Date | null;
+  crashReason: string | null;
 }): TerminalSessionDto {
   return {
     id: row.id,
@@ -32,6 +35,7 @@ function toDto(row: {
     createdAt: row.createdAt.toISOString(),
     expiresAt: row.expiresAt.toISOString(),
     closedAt: row.closedAt?.toISOString() ?? null,
+    crashReason: row.crashReason,
   };
 }
 
@@ -93,19 +97,14 @@ export async function createTerminalSession(
     const instance = await runtime.create(row.id);
     const containerId = instance.containerId;
 
-    await wipStream(instance);
+    wireOutputStream(row.id, instance.stream);
 
     const updated = await prisma.terminalSession.update({
       where: { id: row.id },
       data: { status: "RUNNING", containerId },
     });
 
-    instance.exited
-      .then((code) => handleContainerExit(row.id, code))
-      .catch((err) => {
-        logger.error({ err, sessionId: row.id }, "sandbox exited with error");
-        return handleContainerExit(row.id, null);
-      });
+    observeExit(row.id, instance.exited);
 
     return toDto(updated);
   } catch (err) {
@@ -124,22 +123,35 @@ export async function createTerminalSession(
       "Could not start sandbox container",
     );
   }
+}
 
-  async function wipStream(instance: {
-    stream: NodeJS.ReadableStream;
-  }): Promise<void> {
-    instance.stream.on("data", (chunk: Buffer | string) => {
-      const text = stripAnsi(
-        Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk,
-        env.terminalMaxOutput,
-      );
-      if (text)
-        terminalEvents.emit("output", {
-          sessionId: row.id,
-          data: text,
-        } satisfies TerminalOutputEvent);
+function wireOutputStream(
+  sessionIdValue: string,
+  stream: NodeJS.ReadableStream,
+): void {
+  stream.on("data", (chunk: Buffer | string) => {
+    const text = stripAnsi(
+      Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk,
+      env.terminalMaxOutput,
+    );
+    if (text)
+      terminalEvents.emit("output", {
+        sessionId: sessionIdValue,
+        data: text,
+      } satisfies TerminalOutputEvent);
+  });
+}
+
+function observeExit(
+  sessionIdValue: string,
+  exited: Promise<number | null>,
+): void {
+  exited
+    .then((code) => handleContainerExit(sessionIdValue, code))
+    .catch((err) => {
+      logger.error({ err, sessionId: sessionIdValue }, "sandbox exited with error");
+      return handleContainerExit(sessionIdValue, null);
     });
-  }
 }
 
 async function handleContainerExit(
@@ -149,10 +161,11 @@ async function handleContainerExit(
   const current = await prisma.terminalSession.findUnique({
     where: { id: sessionIdValue },
   });
-  if (
-    current &&
-    (current.status === "CREATING" || current.status === "RUNNING")
-  ) {
+  if (!current) return;
+  // A guard-triggered crash already updated the row and emitted
+  // `terminal:crash` in crashTerminalSession; do not overwrite or double-report.
+  if (current.status === "CRASHED") return;
+  if (current.status === "CREATING" || current.status === "RUNNING") {
     await prisma.terminalSession.update({
       where: { id: sessionIdValue },
       data: { status: "CLOSED", closedAt: new Date() },
@@ -221,7 +234,123 @@ export async function sendTerminalInput(
       "Terminal session is not running",
     );
   }
+
+  const threat = scanDestructiveInput(data);
+  if (threat) {
+    await crashTerminalSession(
+      userId,
+      id,
+      `destructive command fenced: ${threat.reason}`,
+    );
+    throw new ApiError(
+      409,
+      "SANDBOX_CRASHED",
+      "Destructive command blocked — sandbox destroyed; press Reassemble",
+    );
+  }
+
   await runtime.write(row.containerId, data);
+}
+
+/**
+ * Tear down a running sandbox after the destructive-command guard fires.
+ * Marks the session CRASHED (with the reason) *before* killing the container so
+ * the exit-wait handler cannot race it into CLOSED, then broadcasts the crash.
+ */
+export async function crashTerminalSession(
+  userId: number,
+  id: string,
+  reason: string,
+): Promise<TerminalSessionDto> {
+  const row = await prisma.terminalSession.findFirst({ where: { id, userId } });
+  if (!row) throw new ApiError(404, "NOT_FOUND", "Terminal session not found");
+  if (row.status !== "RUNNING" || !row.containerId) {
+    throw new ApiError(
+      409,
+      "SESSION_NOT_RUNNING",
+      "Terminal session is not running",
+    );
+  }
+
+  await prisma.terminalSession.update({
+    where: { id },
+    data: { status: "CRASHED", crashReason: reason, closedAt: new Date() },
+  });
+
+  terminalEvents.emit("output", {
+    sessionId: id,
+    data: `\n>> ${reason}\n>> sandbox destroyed — press Reassemble to rebuild a fresh container.\n`,
+  } satisfies TerminalOutputEvent);
+  terminalEvents.emit("crash", {
+    sessionId: id,
+    reason,
+  } satisfies TerminalCrashEvent);
+
+  const containerId = row.containerId;
+  await runtime.kill(containerId).catch((err) => {
+    logger.warn({ err, sessionId: id }, "kill on crash failed");
+  });
+
+  const updated = await prisma.terminalSession.findUnique({ where: { id } });
+  if (!updated) throw new ApiError(404, "NOT_FOUND", "Terminal session not found");
+  return toDto(updated);
+}
+
+/**
+ * Reconstruct a fresh container for a dead session (CRASHED or FAILED) without
+ * minting a new session id: reassemble → RUNNING again. Output keeps streaming
+ * to the same socket room because the session id is unchanged.
+ */
+export async function reassembleTerminalSession(
+  userId: number,
+  id: string,
+): Promise<TerminalSessionDto> {
+  const row = await prisma.terminalSession.findFirst({ where: { id, userId } });
+  if (!row) throw new ApiError(404, "NOT_FOUND", "Terminal session not found");
+  if (row.status !== "CRASHED" && row.status !== "FAILED") {
+    throw new ApiError(
+      409,
+      "SESSION_NOT_DEAD",
+      "Only crashed or failed sessions can be reassembled",
+    );
+  }
+
+  try {
+    const instance = await runtime.create(id);
+    const containerId = instance.containerId;
+
+    wireOutputStream(id, instance.stream);
+    observeExit(id, instance.exited);
+
+    const updated = await prisma.terminalSession.update({
+      where: { id },
+      data: {
+        status: "RUNNING",
+        containerId,
+        crashReason: null,
+        closedAt: null,
+        expiresAt: new Date(Date.now() + row.ttlSeconds * 1000),
+      },
+    });
+
+    terminalEvents.emit("output", {
+      sessionId: id,
+      data: "\n>> sandbox reassembled — fresh container ready.\n",
+    } satisfies TerminalOutputEvent);
+
+    logger.info({ sessionId: id, containerId }, "sandbox container reassembled");
+    return toDto(updated);
+  } catch (err) {
+    logger.error(
+      { err, sessionId: id },
+      "failed to reassemble terminal sandbox",
+    );
+    throw new ApiError(
+      502,
+      "SANDBOX_REASSEMBLE_FAILED",
+      "Could not reassemble sandbox container",
+    );
+  }
 }
 
 /**

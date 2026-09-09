@@ -12,6 +12,7 @@ export const terminalSessionStatusSchema = z.enum([
   "CLOSED",
   "EXPIRED",
   "FAILED",
+  "CRASHED",
 ]);
 
 export function isTerminalSessionStatus(

@@ -32,6 +32,7 @@ enum TerminalSessionStatus {
   CLOSED
   EXPIRED
   FAILED
+  CRASHED
 }
 
 enum EventStatus {
@@ -311,6 +312,7 @@ model TerminalSession {
   ttlSeconds  Int
   expiresAt   DateTime
   closedAt    DateTime?
+  crashReason String?
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
 

@@ -1,5 +1,10 @@
 export type TerminalSessionStatus =
-  "CREATING" | "RUNNING" | "CLOSED" | "EXPIRED" | "FAILED";
+  | "CREATING"
+  | "RUNNING"
+  | "CLOSED"
+  | "EXPIRED"
+  | "FAILED"
+  | "CRASHED";
 
 export interface TerminalSessionDto {
   id: string;
@@ -8,9 +13,15 @@ export interface TerminalSessionDto {
   createdAt: string;
   expiresAt: string;
   closedAt: string | null;
+  /** Why the session was torn down by the destructive-command guard, if any. */
+  crashReason: string | null;
 }
 
 export interface CreateTerminalSessionResponse {
+  session: TerminalSessionDto;
+}
+
+export interface ReassembleTerminalSessionResponse {
   session: TerminalSessionDto;
 }
 
@@ -31,4 +42,10 @@ export interface TerminalOutputEvent {
 export interface TerminalExitEvent {
   sessionId: string;
   code: number | null;
+}
+
+export interface TerminalCrashEvent {
+  sessionId: string;
+  /** Human-readable reason surfaced by the destructive-command guard. */
+  reason: string;
 }

@@ -1,4 +1,8 @@
-import type { TerminalExitEvent, TerminalOutputEvent } from "@ctf/shared";
+import type {
+  TerminalCrashEvent,
+  TerminalExitEvent,
+  TerminalOutputEvent,
+} from "@ctf/shared";
 import type { Socket } from "socket.io-client";
 
 import { API_URL } from "./http";
@@ -15,6 +19,7 @@ interface Ack {
 
 const outputHandlers = new Set<(event: TerminalOutputEvent) => void>();
 const exitHandlers = new Set<(event: TerminalExitEvent) => void>();
+const crashHandlers = new Set<(event: TerminalCrashEvent) => void>();
 const errorHandlers = new Set<(message: string) => void>();
 
 let socket: Socket | null = null;
@@ -49,6 +54,9 @@ export async function connectTerminalSocket(sessionId: string): Promise<void> {
     });
     s.on("terminal:exit", (event: TerminalExitEvent) => {
       for (const handler of exitHandlers) handler(event);
+    });
+    s.on("terminal:crash", (event: TerminalCrashEvent) => {
+      for (const handler of crashHandlers) handler(event);
     });
     s.on("terminal:error", (payload: { message?: string }) => {
       const message = payload?.message ?? "Terminal error";
@@ -119,6 +127,15 @@ export function subscribeTerminalExit(
   exitHandlers.add(handler);
   return () => {
     exitHandlers.delete(handler);
+  };
+}
+
+export function subscribeTerminalCrash(
+  handler: (event: TerminalCrashEvent) => void,
+): () => void {
+  crashHandlers.add(handler);
+  return () => {
+    crashHandlers.delete(handler);
   };
 }
 

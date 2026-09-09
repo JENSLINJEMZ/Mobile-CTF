@@ -1,6 +1,7 @@
 import type {
   CreateTerminalSessionResponse,
   ListTerminalSessionsResponse,
+  ReassembleTerminalSessionResponse,
 } from "@ctf/shared";
 import { terminalSessionIdSchema } from "@ctf/shared";
 import { Router } from "express";
@@ -12,6 +13,7 @@ import {
   createTerminalSession,
   getTerminalSession,
   listTerminalSessions,
+  reassembleTerminalSession,
 } from "../services/terminalSessions";
 
 export const terminalRouter = Router();
@@ -42,6 +44,16 @@ terminalRouter.get(
     const id = terminalSessionIdSchema.parse(req.params.id);
     const session = await getTerminalSession(req.user!.id, id);
     res.json({ success: true, data: { session } });
+  }),
+);
+
+terminalRouter.post(
+  "/sessions/:id/reassemble",
+  asyncHandler(async (req, res) => {
+    const id = terminalSessionIdSchema.parse(req.params.id);
+    const session = await reassembleTerminalSession(req.user!.id, id);
+    const body: ReassembleTerminalSessionResponse = { session };
+    res.json({ success: true, data: body });
   }),
 );
 

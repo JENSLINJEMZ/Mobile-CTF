@@ -4,6 +4,7 @@ import { prisma } from "@ctf/database";
 import type {
   CreateTerminalSessionResponse,
   ListTerminalSessionsResponse,
+  TerminalCrashEvent,
   TerminalExitEvent,
   TerminalOutputEvent,
 } from "@ctf/shared";
@@ -18,6 +19,7 @@ import {
   configureSandboxRuntime,
   createTerminalSession,
   expireTerminalSessions,
+  reassembleTerminalSession,
 } from "../src/services/terminalSessions";
 import { attachSocket } from "../src/websocket/leaderboard";
 
@@ -362,5 +364,40 @@ describe("expiry sweep", () => {
     });
     expect(after?.status).toBe("EXPIRED");
     expect(after?.closedAt).not.toBeNull();
+  });
+});
+
+describe("crash + reassemble", () => {
+  it("crashes on rm -rf / and reassembles a fresh container", async () => {
+    await closeAllFor(userIdA);
+    const sessionId = await createSessionViaApi(tokenA);
+    const socket = await connectAuthed();
+
+    const join = await emitWithAck(socket, "terminal:join", { sessionId });
+    expect(join.ok).toBe(true);
+
+    const crashPromise = once(socket, "terminal:crash");
+    const crashInputAck = await emitWithAck(socket, "terminal:input", {
+      sessionId,
+      data: "rm -rf /\n",
+    });
+    expect(crashInputAck.ok).toBe(false);
+
+    const crashEvent = (await crashPromise) as TerminalCrashEvent;
+    expect(crashEvent.sessionId).toBe(sessionId);
+    expect(crashEvent.reason).toContain("destructive command fenced");
+
+    const row = await prisma.terminalSession.findUnique({
+      where: { id: sessionId },
+    });
+    expect(row?.status).toBe("CRASHED");
+    expect(row?.crashReason).toContain("destructive command fenced");
+    expect(row?.closedAt).not.toBeNull();
+
+    socket.close();
+
+    const reassembled = await reassembleTerminalSession(userIdA, sessionId);
+    expect(reassembled.status).toBe("RUNNING");
+    expect(reassembled.crashReason).toBeNull();
   });
 });

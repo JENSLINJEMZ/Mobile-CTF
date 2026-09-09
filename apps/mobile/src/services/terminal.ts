@@ -44,3 +44,14 @@ export async function closeTerminalSession(
   );
   return response.session;
 }
+
+export async function reassembleTerminalSession(
+  id: string,
+): Promise<TerminalSessionDto> {
+  const response = await api.post<{ session: TerminalSessionDto }>(
+    `/terminal/sessions/${id}/reassemble`,
+    undefined,
+    { auth: true },
+  );
+  return response.session;
+}

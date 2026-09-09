@@ -1,4 +1,8 @@
-import type { TerminalExitEvent, TerminalOutputEvent } from "@ctf/shared";
+import type {
+  TerminalCrashEvent,
+  TerminalExitEvent,
+  TerminalOutputEvent,
+} from "@ctf/shared";
 import { terminalSessionIdSchema } from "@ctf/shared";
 import type { Server, Socket } from "socket.io";
 
@@ -62,6 +66,10 @@ export function attachTerminalNamespace(io: Server): void {
 
   terminalEvents.on("exit", (event: TerminalExitEvent) => {
     terminalNamespace.to(roomFor(event.sessionId)).emit("terminal:exit", event);
+  });
+
+  terminalEvents.on("crash", (event: TerminalCrashEvent) => {
+    terminalNamespace.to(roomFor(event.sessionId)).emit("terminal:crash", event);
   });
 }
 
