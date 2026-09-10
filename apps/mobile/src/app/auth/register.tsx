@@ -9,7 +9,7 @@ import {
 } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
-import { GlassInput } from "@/components/glass-input";
+import { Input } from "@/components/input";
 import { ThemedText } from "@/components/themed-text";
 import { Radius, Spacing, TouchTarget } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
@@ -54,7 +54,7 @@ export default function RegisterScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.form}
       >
-        <GlassInput
+        <Input
             value={email}
             onChangeText={setEmail}
             placeholder="Email"
@@ -64,7 +64,7 @@ export default function RegisterScreen() {
             accessibilityLabel="Email"
           />
 
-          <GlassInput
+          <Input
             value={username}
             onChangeText={setUsername}
             placeholder="Username"
@@ -73,7 +73,7 @@ export default function RegisterScreen() {
             accessibilityLabel="Username"
           />
 
-          <GlassInput
+          <Input
             value={password}
             onChangeText={setPassword}
             placeholder="Password (min 8 chars)"
@@ -113,9 +113,11 @@ export default function RegisterScreen() {
           accessibilityHint="Registers a new CTF Platform account"
         >
           {submitting ? (
-            <ActivityIndicator color="#ffffff" />
+            <ActivityIndicator color={theme.onAccent} />
           ) : (
-            <ThemedText style={styles.buttonLabel}>Create account</ThemedText>
+            <ThemedText style={[styles.buttonLabel, { color: theme.onAccent }]}>
+              Create account
+            </ThemedText>
           )}
         </Pressable>
 
@@ -155,7 +157,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   buttonLabel: {
-    color: "#ffffff",
     fontWeight: "600",
   },
   linkRow: {

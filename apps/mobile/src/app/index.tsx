@@ -15,8 +15,8 @@ import {
 
 import { EmptyState, ErrorState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
-import { GlassInput } from "@/components/glass-input";
-import { GlassSurface } from "@/components/glass-surface";
+import { Input } from "@/components/input";
+import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { difficultyColor, Radius, Spacing } from "@/constants/theme";
@@ -111,7 +111,7 @@ export default function ChallengesScreen() {
 
   return (
     <ScreenShell title="Challenges">
-      <GlassInput
+      <Input
         value={search}
         onChangeText={setSearch}
         placeholder="Search challenges…"
@@ -146,8 +146,8 @@ export default function ChallengesScreen() {
               style={({ pressed }) => [
                 styles.categoryChip,
                 {
-                  backgroundColor: active ? theme.accent : theme.glassSubtle,
-                  borderColor: active ? theme.accent : theme.glassBorder,
+                  backgroundColor: active ? theme.accent : theme.backgroundElement,
+                  borderColor: active ? theme.accent : theme.border,
                 },
                 pressed && !reduceMotion && styles.chipPressed,
               ]}
@@ -211,10 +211,10 @@ export default function ChallengesScreen() {
                   pressed && !reduceMotion && styles.cardPressed,
                 ]}
               >
-                <GlassSurface
+                <Surface
                   style={styles.cardInner}
                   radius={Radius.lg}
-                  variant={item.solvedByMe ? "strong" : "glass"}
+                  variant={item.solvedByMe ? "selected" : "elevated"}
                 >
                   <ThemedView
                     style={[
@@ -245,7 +245,7 @@ export default function ChallengesScreen() {
                       {item.basePoints} pts
                     </ThemedText>
                   </ThemedView>
-                </GlassSurface>
+                </Surface>
               </Pressable>
             </Link>
           )}

@@ -14,7 +14,7 @@ import {
 import { OfflineBanner } from "@/components/offline-banner";
 import { EmptyState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
-import { GlassSurface } from "@/components/glass-surface";
+import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Radius, Spacing, TouchTarget } from "@/constants/theme";
@@ -104,16 +104,22 @@ export default function NotesScreen() {
           accessibilityState={{ disabled: !isOnline || syncing }}
           style={({ pressed }) => [
             styles.syncButton,
-            { backgroundColor: theme.accent },
+            {
+              backgroundColor: isOnline ? theme.accent : theme.backgroundElement,
+              borderColor: isOnline ? "transparent" : theme.borderStrong,
+            },
             pressed && styles.pressed,
           ]}
         >
           {syncing ? (
-            <ActivityIndicator size="small" color="#ffffff" />
+            <ActivityIndicator size="small" color={theme.onAccent} />
           ) : (
             <ThemedText
               type="small"
-              style={{ color: "#ffffff", fontWeight: "600" }}
+              style={{
+                color: isOnline ? theme.onAccent : theme.textSecondary,
+                fontWeight: "600",
+              }}
             >
               {isOnline ? "Sync now" : "Offline"}
             </ThemedText>
@@ -122,8 +128,8 @@ export default function NotesScreen() {
       </ThemedView>
 
       {syncError && !dismissedError ? (
-        <GlassSurface
-          variant="strong"
+        <Surface
+          variant="selected"
           radius={Radius.md}
           style={[
             styles.syncError,
@@ -143,7 +149,7 @@ export default function NotesScreen() {
           >
             <Ionicons name="close" size={18} color={theme.danger} />
           </Pressable>
-        </GlassSurface>
+        </Surface>
       ) : null}
 
       {!hydrated ? (
@@ -163,7 +169,7 @@ export default function NotesScreen() {
           }
         >
           {notes.map((note) => (
-            <GlassSurface
+            <Surface
               key={note.clientKey}
               radius={Radius.lg}
               style={styles.noteRow}
@@ -201,7 +207,7 @@ export default function NotesScreen() {
               >
                 <Ionicons name="trash-outline" size={18} color={theme.danger} />
               </Pressable>
-            </GlassSurface>
+            </Surface>
           ))}
         </ScrollView>
       )}
@@ -216,7 +222,7 @@ export default function NotesScreen() {
           pressed && styles.pressed,
         ]}
       >
-        <Ionicons name="add" size={26} color="#ffffff" />
+        <Ionicons name="add" size={26} color={theme.onAccent} />
       </Pressable>
     </ScreenShell>
   );
@@ -232,6 +238,7 @@ const styles = StyleSheet.create({
   },
   syncButton: {
     borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.one + Spacing.half,
     minWidth: 96,

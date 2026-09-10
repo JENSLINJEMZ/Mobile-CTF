@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { GlassSurface } from "@/components/glass-surface";
+import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { Radius, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
@@ -46,13 +46,13 @@ export function OfflineBanner() {
           : "Offline mode. Changes will sync when you reconnect"
       }
     >
-      <GlassSurface
-        variant="strong"
+      <Surface
+        variant="selected"
         radius={Radius.pill}
         style={[
           styles.banner,
           {
-            backgroundColor: isOnline ? theme.warningSubtle : theme.scrim,
+            backgroundColor: isOnline ? theme.warningSubtle : theme.backgroundSelected,
           },
         ]}
       >
@@ -67,7 +67,7 @@ export function OfflineBanner() {
             ? `Offline queue: ${pending} pending submission${pending === 1 ? "" : "s"}`
             : "Offline — changes will sync when connected"}
         </ThemedText>
-      </GlassSurface>
+      </Surface>
     </View>
   );
 }

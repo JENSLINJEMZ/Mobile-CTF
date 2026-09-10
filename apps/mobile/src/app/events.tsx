@@ -11,7 +11,7 @@ import {
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
-import { GlassSurface } from "@/components/glass-surface";
+import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Radius, Spacing, TouchTarget } from "@/constants/theme";
@@ -119,8 +119,8 @@ export default function EventsScreen() {
             paddingBottom: Spacing.two,
           }}
           renderItem={({ item }) => (
-            <GlassSurface
-              variant={item.pinned ? "strong" : "glass"}
+            <Surface
+              variant={item.pinned ? "selected" : "elevated"}
               radius={Radius.md}
               style={[
                 styles.announcement,
@@ -141,7 +141,7 @@ export default function EventsScreen() {
               >
                 {item.body}
               </ThemedText>
-            </GlassSurface>
+            </Surface>
           )}
         />
       ) : null}
@@ -165,7 +165,7 @@ export default function EventsScreen() {
             />
           }
           renderItem={({ item }) => (
-            <GlassSurface radius={Radius.lg} style={styles.card}>
+            <Surface radius={Radius.lg} style={styles.card}>
               <Link href={`/event/${item.id}`} asChild>
                 <Pressable
                   accessibilityRole="button"
@@ -229,11 +229,28 @@ export default function EventsScreen() {
                   ]}
                 >
                   {busyId === item.id ? (
-                    <ActivityIndicator color="#ffffff" size="small" />
+                    <ActivityIndicator
+                      color={
+                        item.status === "DRAFT"
+                          ? theme.text
+                          : item.joinedByMe
+                            ? "#ffffff"
+                            : theme.onAccent
+                      }
+                      size="small"
+                    />
                   ) : (
                     <ThemedText
                       type="small"
-                      style={{ color: "#ffffff", fontWeight: "600" }}
+                      style={{
+                        color:
+                          item.status === "DRAFT"
+                            ? theme.text
+                            : item.joinedByMe
+                              ? "#ffffff"
+                              : theme.onAccent,
+                        fontWeight: "600",
+                      }}
                     >
                       {item.joinedByMe
                         ? "Leave"
@@ -244,7 +261,7 @@ export default function EventsScreen() {
                   )}
                 </Pressable>
               ) : null}
-            </GlassSurface>
+            </Surface>
           )}
           ListEmptyComponent={
             <EmptyState message="No events right now. Check back soon!" />

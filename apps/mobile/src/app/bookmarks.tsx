@@ -9,7 +9,7 @@ import {
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
-import { GlassSurface } from "@/components/glass-surface";
+import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { Radius, Spacing } from "@/constants/theme";
 import type { BookmarkDto } from "@ctf/shared";
@@ -55,7 +55,7 @@ export default function BookmarksScreen() {
             />
           }
           renderItem={({ item }) => (
-            <GlassSurface radius={Radius.lg} style={styles.row}>
+            <Surface radius={Radius.lg} style={styles.row}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Open bookmarked challenge ${item.title}`}
@@ -79,7 +79,7 @@ export default function BookmarksScreen() {
                   </ThemedText>
                 ) : null}
               </Pressable>
-            </GlassSurface>
+            </Surface>
           )}
         />
       )}

@@ -42,6 +42,42 @@ Turborepo + npm workspaces monorepo. Staged build — **Stage 10 (Notifications,
 | Sandbox image expanded: CTF toolset added (`python3` 3.12 + py3-pycryptodome, `openssl`, `binutils`/strings, `xxd`, `file`, `jq`, `sqlite3`, `nano`, `zip`/`unzip`/`xz`, `bc`); image 28.7MB → 126MB; verified running under hardening (`ReadonlyRootfs`, `NetworkMode none`, `Memory`, `CapDrop ALL`, uid 10001) and via on-device terminal session | ✅ |
 | Git: first commit created and pushed to `origin` at `https://github.com/JENSLINJEMZ/Mobile-CTF.git` (`main`) | ✅ |
 
+**🟢 HackTheBox-style UI redesign — DONE ✅ (Sep 2026)**
+
+| Task | Status |
+| --- | --- |
+| `constants/theme.ts` reworked to HTB identity: near-black navy canvas `#0b0e15`, HTB signature apple-green accent `#9FEF00`, violet secondary `#a78bfa`; light palette uses `#7cbd00` accent. Full `Palette` object (green/violet/cyan/red/amber/success/warning/danger/neutral) + `difficultyColor()` helper (EASY green / MEDIUM blue / HARD violet / EXPERT red, HTB machine-difficulty hues). All semantic keys preserved — screens never hardcode hex | ✅ |
+| New token `glowSecondary` (green+violet ambient washes); `glass-background.tsx` now renders a second violet `LinearGradient` wash (`/src/components/glass-background.tsx`) | ✅ |
+| Contrast fix: dark-mode accent buttons (apple green bg) now carry dark text via new `onAccent` token (`#0b0e15`); `button.tsx` primary label+loader + all hardcoded `#ffffff` accent-button labels swapped to `theme.onAccent` across 13 screens/components (terminal, leaderboard, challenge/[id], event/[id], events, teams, auth/login, auth/register, profile, toolkit, notes, state-views). Danger buttons intentionally keep white text; leaderboard medal gold/silver/bronze hexes preserved | ✅ |
+| Verification: mobile `tsc --noEmit` clean, `eslint` clean, app hot-reloaded on device via Metro and re-rendered Challenges list (challenge cards, category chips, tab bar) | ✅ |
+
+**🔵 SOLID "real-app" redesign (WhatsApp/Telegram-style) — DONE ✅ (Sep 2026)**
+
+Removed the entire liquid-glass material layer. Flat, opaque surfaces; references Telegram/WhatsApp chrome conventions + standard UI/UX heuristics (contrast, Fitts's law hit targets, distinct headers, clear active states).
+
+| Task | Status |
+| --- | --- |
+| Theme: deleted glass tokens — `glass/glassSubtle/glassStrong/glassBorder/specular/glow/glowSecondary/backdropTop/backdropBottom` — replaced with solid palette + new `header` (screen header bar), `tabBar`, `separator` (hairline dividers), `scrim` kept for overlay. Dark canvas `#10141c`, surface `#151c29`, element `#1a2130`, selected `#232c3e`; light mirror. Header/tabBar `#141924` dark, `#ffffff` light | ✅ |
+| New components: `surface.tsx` (variants `elevated`/`quiet`/`selected`) replacing `glass-surface.tsx`; `input.tsx` replacing `glass-input.tsx`; solid `button.tsx` (specular rim removed) | ✅ |
+| Deleted: `glass-background.tsx`, `glass-tab-bar.tsx`. `_layout.tsx` now sets an opaque tab bar via `tabBarStyle` (solid `tabBar` bg + hairline `separator` top border), `sceneStyle` solid `background` | ✅ |
+| `screen-shell.tsx`: solid background + a distinct full-width header bar per screen (solid fill + hairline bottom border) with padded content region — Telegram/WhatsApp app-bar convention | ✅ |
+| All 30+ `GlassSurface`/`GlassInput` JSX refs + conditional `variant="glass"/"subtle"/"strong"` uses renamed (`elevated`/`quiet`/`selected`) across 15 screen files + components; idle chips now use solid `backgroundElement`+`border`, offline banner uses `backgroundSelected` | ✅ |
+| Verification: mobile `tsc --noEmit` clean, `eslint` clean (0 errors), 18/18 vitest tests pass, bundle rebuilt on Metro & Challenges screen rendered on device (header bar, flat cards, chips, tab bar) | ✅ |
+
+**🔵 SOLID redesign — UI audit + full-screen + tab bar fixes — DONE ✅ (Sep 2026)**
+
+Audited all 8 tab screens on device (uiautomator dumps + pixel sampling; screenshots at `/tmp/ui-audit/*.png`). Fixes:
+
+| Task | Status |
+| --- | --- |
+| Full-screen: killed the double header (React Navigation tab header + `ScreenShell` header). `_layout.tsx` sets `headerShown: false` + `<StatusBar style>` (SDK 57 has no `backgroundColor` prop — Android 15 edge-to-edge) | ✅ |
+| Tab bar collapsed to a 21dp icon-only strip (labels zeroed): expo-router's *vendored* `BottomTabBar` only honors an explicit numeric `height` in `tabBarStyle`. Added `height: 60 + insets.bottom`, `paddingBottom: insets.bottom`, `paddingTop: 8`, `tabBarShowLabel: true`, label style 11/600, icon margin. Verified on device: 59dp bar, 8 evenly-spaced tabs, labels + active accent icon visible | ✅ |
+| Notifications screen: signed-out users saw a red "Missing bearer token — tap to retry" API error → now gated behind `useAuthGate` with a friendly "Sign in" prompt (and `Link` to `/auth/login`) | ✅ |
+| Notes sync pill: when offline the button kept accent-green (active look but dead) → now neutral `backgroundElement` + hairline `borderStrong` + `textSecondary` when offline | ✅ |
+| Notes "Offline" banner is accurate: test device has USB-tunnel-only connectivity (no real internet), so `useNetwork`/NetInfo correctly reports offline | ✅ |
+| Verified: `tsc --noEmit` clean, `eslint` clean, 18/18 vitest pass, all 8 tabs re-screenshot on device | ✅ |
+| **Committed & pushed** (all MEMORY.md + solid redesign + UI audit files) | ✅ |
+
 Product goals (priority): security > working end-to-end > mobile UX > clean architecture > performance > polish > extensibility > testing > docs.
 
 Non-negotiable rules (from spec §4/§19):

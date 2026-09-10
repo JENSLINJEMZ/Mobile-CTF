@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { Link, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -11,10 +11,11 @@ import {
 } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
-import { GlassSurface } from "@/components/glass-surface";
+import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Radius, Spacing, TouchTarget } from "@/constants/theme";
+import { useAuthGate } from "@/hooks/use-auth-gate";
 import { useTheme } from "@/hooks/use-theme";
 import {
   getNotifications,
@@ -36,6 +37,7 @@ const PAGE_LIMIT = 20;
 
 export default function NotificationsScreen() {
   const theme = useTheme();
+  const { needsAuth } = useAuthGate();
   const { unreadCount, setUnreadCount, refreshBadge } = useNotificationStore();
   const [data, setData] = useState<NotificationsResponse | null>(null);
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -183,8 +185,35 @@ export default function NotificationsScreen() {
 
   return (
     <ScreenShell title="Notifications">
+      {needsAuth ? (
+        <ThemedView style={styles.authBox}>
+          <Ionicons name="notifications-outline" size={40} color={theme.textSecondary} />
+          <ThemedText type="small" themeColor="textSecondary" style={styles.authText}>
+            Sign in to see notifications for your solves, events, and achievements.
+          </ThemedText>
+          <Link href="/auth/login" asChild>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Sign in to see notifications"
+              style={({ pressed }) => [
+                styles.signInButton,
+                { backgroundColor: theme.accent },
+                pressed && styles.pressed,
+              ]}
+            >
+              <ThemedText
+                type="small"
+                style={{ color: theme.onAccent, fontWeight: "600" }}
+              >
+                Sign in
+              </ThemedText>
+            </Pressable>
+          </Link>
+        </ThemedView>
+      ) : (
+        <>
       {isPushSupported() ? (
-        <GlassSurface radius={Radius.lg} style={styles.pushRow}>
+        <Surface radius={Radius.lg} style={styles.pushRow}>
           <ThemedView style={styles.flex}>
             <ThemedText type="smallBold">Push notifications</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
@@ -199,7 +228,7 @@ export default function NotificationsScreen() {
             thumbColor={theme.textInverse}
             accessibilityLabel="Push notifications"
           />
-        </GlassSurface>
+        </Surface>
       ) : null}
 
       <ThemedView style={styles.toolbar}>
@@ -278,9 +307,9 @@ export default function NotificationsScreen() {
                   pressed && styles.pressed,
                 ]}
               >
-                <GlassSurface
+                <Surface
                   radius={Radius.lg}
-                  variant={unread ? "strong" : "glass"}
+                  variant={unread ? "selected" : "elevated"}
                   style={styles.row}
                 >
                   <ThemedView
@@ -316,7 +345,7 @@ export default function NotificationsScreen() {
                       {formatRelativeTime(item.createdAt)}
                     </ThemedText>
                   </ThemedView>
-                </GlassSurface>
+                </Surface>
               </Pressable>
             );
           }}
@@ -341,11 +370,29 @@ export default function NotificationsScreen() {
           }
         />
       )}
+        </>
+      )}
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
+  authBox: {
+    alignItems: "center",
+    gap: Spacing.three,
+    paddingVertical: Spacing.six,
+    paddingHorizontal: Spacing.five,
+  },
+  authText: {
+    textAlign: "center",
+  },
+  signInButton: {
+    borderRadius: Radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: TouchTarget.Android,
+    paddingHorizontal: Spacing.five,
+  },
   pushRow: {
     flexDirection: "row",
     alignItems: "center",

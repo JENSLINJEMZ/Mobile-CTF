@@ -2,10 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { StyleSheet, useColorScheme } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { GlassTabBar } from "@/components/glass-tab-bar";
 import { useAuthStore } from "@/store/auth-store";
 import { useNotificationStore } from "@/store/notification-store";
 import {
@@ -20,6 +21,7 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const status = useAuthStore((s) => s.status);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const refreshBadge = useNotificationStore((s) => s.refreshBadge);
@@ -51,13 +53,29 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+      <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
       <Tabs
         screenOptions={{
+          headerShown: false,
           tabBarActiveTintColor: theme.accent,
           tabBarInactiveTintColor: theme.textSecondary,
-          tabBarStyle: styles.tabBar,
-          tabBarBackground: () => <GlassTabBar />,
-          sceneStyle: styles.scene,
+          tabBarShowLabel: true,
+          tabBarStyle: [
+            styles.tabBar,
+            {
+              backgroundColor: theme.tabBar,
+              borderTopColor: theme.separator,
+              height: 60 + insets.bottom,
+              paddingBottom: insets.bottom,
+              paddingTop: 8,
+            },
+          ],
+          tabBarLabelStyle: [
+            styles.tabBarLabel,
+            { color: theme.textSecondary },
+          ],
+          tabBarIconStyle: styles.tabBarIcon,
+          sceneStyle: [styles.scene, { backgroundColor: theme.background }],
         }}
       >
         <Tabs.Screen
@@ -173,8 +191,15 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     position: "absolute",
-    backgroundColor: "transparent",
-    borderTopWidth: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
     elevation: 0,
+  },
+  tabBarLabel: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "600",
+  },
+  tabBarIcon: {
+    marginVertical: 2,
   },
 });

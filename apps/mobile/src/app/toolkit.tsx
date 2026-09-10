@@ -27,8 +27,8 @@ import {
 } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
-import { GlassInput } from "@/components/glass-input";
-import { GlassSurface } from "@/components/glass-surface";
+import { Input } from "@/components/input";
+import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Fonts, Radius, Spacing, TouchTarget } from "@/constants/theme";
@@ -65,7 +65,7 @@ function SectionChips({
               isActive && [styles.chipActive, { backgroundColor: theme.accent }],
               !isActive && [
                 styles.chipIdle,
-                { backgroundColor: theme.glassSubtle, borderColor: theme.glassBorder },
+                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
               ],
               pressed && styles.pressed,
             ]}
@@ -85,10 +85,10 @@ function SectionChips({
 
 function ToolCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <GlassSurface radius={Radius.md} style={styles.card}>
+    <Surface radius={Radius.md} style={styles.card}>
       <ThemedText type="smallBold">{title}</ThemedText>
       {children}
-    </GlassSurface>
+    </Surface>
   );
 }
 
@@ -106,7 +106,7 @@ function TextArea({
   accessibilityLabel?: string;
 }) {
   return (
-    <GlassInput
+    <Input
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
@@ -129,11 +129,11 @@ function OutputBlock({ value, error }: { value: string; error?: string }) {
   }
   if (!value) return null;
   return (
-    <GlassSurface variant="subtle" radius={Radius.sm} style={styles.outputBox}>
+    <Surface variant="quiet" radius={Radius.sm} style={styles.outputBox}>
       <ThemedText selectable style={styles.output}>
         {value}
       </ThemedText>
-    </GlassSurface>
+    </Surface>
   );
 }
 
@@ -265,7 +265,7 @@ function EncodingTool() {
           pressed && styles.pressed,
         ]}
       >
-        <ThemedText style={styles.actionLabel}>
+        <ThemedText style={[styles.actionLabel, { color: theme.onAccent }]}>
           {direction === "encode" || mode === "rot13" ? "Transform" : "Decode"}
         </ThemedText>
       </Pressable>
@@ -370,7 +370,7 @@ function CipherTool() {
             pressed && styles.pressed,
           ]}
         >
-          <ThemedText style={styles.actionLabel}>Transform</ThemedText>
+          <ThemedText style={[styles.actionLabel, { color: theme.onAccent }]}>Transform</ThemedText>
         </Pressable>
       ) : null}
       {cipher !== "frequency" ? (
@@ -439,7 +439,7 @@ function HashIdentifyTool() {
         </ThemedText>
       ) : null}
       {result.candidates.map((candidate) => (
-        <GlassSurface key={candidate.name} variant="subtle" radius={Radius.sm} style={styles.hashRow}>
+        <Surface key={candidate.name} variant="quiet" radius={Radius.sm} style={styles.hashRow}>
           <ThemedText type="smallBold">{candidate.name}</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             {candidate.hexLength != null
@@ -447,7 +447,7 @@ function HashIdentifyTool() {
               : "prefixed format"}{" "}
             · {candidate.description}
           </ThemedText>
-        </GlassSurface>
+        </Surface>
       ))}
       {input.trim() ? (
         <ThemedText type="small" themeColor="textSecondary">
@@ -481,7 +481,7 @@ function JwtDecodeTool() {
         </ThemedText>
       ) : null}
       {hasInput && decoded.validStructure ? (
-        <GlassSurface variant="subtle" radius={Radius.sm} style={styles.jwtBlock}>
+        <Surface variant="quiet" radius={Radius.sm} style={styles.jwtBlock}>
           <ThemedText type="smallBold" themeColor="textSecondary">
             Header
           </ThemedText>
@@ -509,7 +509,7 @@ function JwtDecodeTool() {
                 : ""}
             </ThemedText>
           ) : null}
-        </GlassSurface>
+        </Surface>
       ) : null}
     </ToolCard>
   );
@@ -657,7 +657,6 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   actionLabel: {
-    color: "#ffffff",
     fontWeight: "600",
   },
   outputBox: {

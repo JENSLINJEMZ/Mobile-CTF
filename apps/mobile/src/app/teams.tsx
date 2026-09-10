@@ -12,8 +12,8 @@ import {
 
 import { ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
-import { GlassSurface } from "@/components/glass-surface";
-import { GlassInput } from "@/components/glass-input";
+import { Surface } from "@/components/surface";
+import { Input } from "@/components/input";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Radius, Spacing, TouchTarget } from "@/constants/theme";
@@ -154,7 +154,7 @@ export default function TeamsScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <GlassSurface radius={Radius.lg} style={styles.card}>
+          <Surface radius={Radius.lg} style={styles.card}>
             <ThemedView style={styles.teamHeader}>
               <ThemedView style={styles.teamTitle}>
                 <ThemedText type="subtitle">{team.name}</ThemedText>
@@ -164,7 +164,7 @@ export default function TeamsScreen() {
                   </ThemedText>
                 ) : null}
               </ThemedView>
-              <ThemedText type="metric" style={[styles.countBadge, { backgroundColor: theme.accent }]}>
+              <ThemedText type="metric" style={[styles.countBadge, { backgroundColor: theme.accent, color: theme.onAccent }]}>
                 {team.memberCount}/{TEAM.MAX_MEMBERS}
               </ThemedText>
             </ThemedView>
@@ -274,26 +274,26 @@ export default function TeamsScreen() {
                 </ThemedText>
               </Pressable>
             ) : null}
-          </GlassSurface>
+          </Surface>
         </ScrollView>
       ) : (
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <GlassSurface radius={Radius.lg} style={styles.card}>
+          <Surface radius={Radius.lg} style={styles.card}>
             <ThemedText type="smallBold">Create a team</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               Teams have up to {TEAM.MAX_MEMBERS} members, and let you compete
               in events.
             </ThemedText>
-            <GlassInput
+            <Input
               value={name}
               onChangeText={setName}
               placeholder="Team name"
               accessibilityLabel="Team name"
             />
-            <GlassInput
+            <Input
               value={tagline}
               onChangeText={setTagline}
               placeholder="Tagline (optional)"
@@ -313,18 +313,18 @@ export default function TeamsScreen() {
               ]}
             >
               {busy ? (
-                <ActivityIndicator color="#ffffff" size="small" />
+                <ActivityIndicator color={theme.onAccent} size="small" />
               ) : (
-                <ThemedText style={{ color: "#ffffff", fontWeight: "600" }}>
+                <ThemedText style={{ color: theme.onAccent, fontWeight: "600" }}>
                   Create team
                 </ThemedText>
               )}
             </Pressable>
-          </GlassSurface>
+          </Surface>
 
-          <GlassSurface radius={Radius.lg} style={styles.card}>
+          <Surface radius={Radius.lg} style={styles.card}>
             <ThemedText type="smallBold">Join with a code</ThemedText>
-            <GlassInput
+            <Input
               value={joinCode}
               onChangeText={setJoinCode}
               placeholder="6-character code"
@@ -349,7 +349,7 @@ export default function TeamsScreen() {
                 Join team
               </ThemedText>
             </Pressable>
-          </GlassSurface>
+          </Surface>
         </ScrollView>
       )}
     </ScreenShell>
@@ -377,7 +377,6 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   countBadge: {
-    color: "#ffffff",
     borderRadius: 999,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,

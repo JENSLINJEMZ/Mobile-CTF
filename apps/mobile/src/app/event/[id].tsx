@@ -18,7 +18,7 @@ import Markdown from "react-native-markdown-display";
 
 import { ScreenShell } from "@/components/screen-shell";
 import { ErrorState, LoadingState } from "@/components/state-views";
-import { GlassSurface } from "@/components/glass-surface";
+import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import {
@@ -190,9 +190,9 @@ export default function EventDetailScreen() {
           </ThemedText>
 
           {event.description ? (
-            <GlassSurface radius={Radius.md} style={styles.markdownBox}>
+            <Surface radius={Radius.md} style={styles.markdownBox}>
               <Markdown style={markdownTheme}>{event.description}</Markdown>
-            </GlassSurface>
+            </Surface>
           ) : null}
 
           {isAuthenticated && event.status !== "ENDED" ? (
@@ -223,9 +223,17 @@ export default function EventDetailScreen() {
               ]}
             >
               {busy ? (
-                <ActivityIndicator color="#ffffff" size="small" />
+                <ActivityIndicator
+                  color={event.joinedByMe ? "#ffffff" : theme.onAccent}
+                  size="small"
+                />
               ) : (
-                <ThemedText style={{ color: "#ffffff", fontWeight: "600" }}>
+                <ThemedText
+                  style={{
+                    color: event.joinedByMe ? "#ffffff" : theme.onAccent,
+                    fontWeight: "600",
+                  }}
+                >
                   {event.joinedByMe ? "Leave event" : "Join event"}
                 </ThemedText>
               )}
@@ -233,7 +241,7 @@ export default function EventDetailScreen() {
           ) : null}
 
           {event.joinedByMe ? (
-            <GlassSurface radius={Radius.md} style={styles.sectionCard}>
+            <Surface radius={Radius.md} style={styles.sectionCard}>
               <ThemedView style={styles.sectionHeader}>
                 <ThemedText type="smallBold">My Team</ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
@@ -257,7 +265,7 @@ export default function EventDetailScreen() {
                   </ThemedText>
                 </Pressable>
               </Link>
-            </GlassSurface>
+            </Surface>
           ) : null}
 
           <ThemedView style={styles.section}>
@@ -271,10 +279,10 @@ export default function EventDetailScreen() {
             ) : (
               challenges.map((item) =>
                 item.locked ? (
-                  <GlassSurface
+                  <Surface
                     key={item.id}
                     radius={Radius.md}
-                    variant="subtle"
+                    variant="quiet"
                     style={[styles.challengeRow, styles.lockedRow]}
                     accessible
                     accessibilityLabel={`${item.title}, locked, ${LOCKED_LABELS[item.lockedReason ?? ""] ?? "Locked"}, ${item.basePoints} points`}
@@ -294,7 +302,7 @@ export default function EventDetailScreen() {
                     <ThemedText type="metric" themeColor="textSecondary">
                       {item.basePoints} pts
                     </ThemedText>
-                  </GlassSurface>
+                  </Surface>
                 ) : (
                   <Link
                     key={item.id}
@@ -311,10 +319,10 @@ export default function EventDetailScreen() {
                         pressed && styles.pressed,
                       ]}
                     >
-                      <GlassSurface
+                      <Surface
                         style={styles.challengeSurface}
                         radius={Radius.md}
-                        variant={item.solvedByMe ? "strong" : "glass"}
+                        variant={item.solvedByMe ? "selected" : "elevated"}
                       >
                         <ThemedView style={styles.challengeBody}>
                           <ThemedText type="smallBold" numberOfLines={1}>
@@ -349,7 +357,7 @@ export default function EventDetailScreen() {
                         <ThemedText type="metric">
                           {item.basePoints} pts
                         </ThemedText>
-                      </GlassSurface>
+                      </Surface>
                     </Pressable>
                   </Link>
                 ),
@@ -401,11 +409,11 @@ export default function EventDetailScreen() {
                 </ThemedText>
               ) : (
                 leaderboard.entries.map((entry) => (
-                  <GlassSurface
+                  <Surface
                     key={`${leaderboard.scope}-${entry.id}`}
                     radius={Radius.md}
                     variant={
-                      leaderboard.me?.rank === entry.rank ? "strong" : "glass"
+                      leaderboard.me?.rank === entry.rank ? "selected" : "elevated"
                     }
                     style={[
                       styles.leaderboardRow,
@@ -419,7 +427,7 @@ export default function EventDetailScreen() {
                       {entry.name}
                     </ThemedText>
                     <ThemedText type="metric">{entry.score}</ThemedText>
-                  </GlassSurface>
+                  </Surface>
                 ))
               )}
             </ThemedView>

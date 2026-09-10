@@ -18,7 +18,7 @@ import {
 
 import { ScreenShell } from "@/components/screen-shell";
 import { EmptyState, ErrorState } from "@/components/state-views";
-import { GlassSurface } from "@/components/glass-surface";
+import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Fonts, Radius, Spacing, TouchTarget } from "@/constants/theme";
@@ -257,7 +257,7 @@ export default function TerminalScreen() {
   return (
     <ScreenShell title="Terminal">
       {!isAuthenticated ? (
-        <GlassSurface radius={Radius.md} style={styles.promptCard}>
+        <Surface radius={Radius.md} style={styles.promptCard}>
           <ThemedText type="small">
             Run commands in an isolated, auto-expiring Linux container.
           </ThemedText>
@@ -271,12 +271,14 @@ export default function TerminalScreen() {
                 pressed && styles.cardPressed,
               ]}
             >
-              <ThemedText style={styles.signInLabel}>
+              <ThemedText
+                style={[styles.signInLabel, { color: theme.onAccent }]}
+              >
                 Sign in to open a terminal
               </ThemedText>
             </Pressable>
           </Link>
-        </GlassSurface>
+        </Surface>
       ) : null}
 
       {isAuthenticated && !activeSession ? (
@@ -295,9 +297,9 @@ export default function TerminalScreen() {
               ]}
             >
               {busy ? (
-                <ActivityIndicator color="#ffffff" size="small" />
+                <ActivityIndicator color={theme.onAccent} size="small" />
               ) : (
-                <ThemedText style={styles.createLabel}>
+                <ThemedText style={[styles.createLabel, { color: theme.onAccent }]}>
                   Open terminal session
                 </ThemedText>
               )}
@@ -332,10 +334,10 @@ export default function TerminalScreen() {
               {sessions.map((session) => {
                 const active = isActive(session.status);
                 return (
-                  <GlassSurface
+                  <Surface
                     key={session.id}
                     radius={Radius.md}
-                    variant={active ? "glass" : "subtle"}
+                    variant={active ? "selected" : "quiet"}
                     style={styles.row}
                   >
                     <View style={styles.rowInfo}>
@@ -360,7 +362,7 @@ export default function TerminalScreen() {
                       >
                         <ThemedText
                           type="smallBold"
-                          style={styles.rowActionLabel}
+                          style={[styles.rowActionLabel, { color: theme.onAccent }]}
                         >
                           Open
                         </ThemedText>
@@ -370,7 +372,7 @@ export default function TerminalScreen() {
                         {session.status}
                       </ThemedText>
                     )}
-                  </GlassSurface>
+                  </Surface>
                 );
               })}
             </ScrollView>
@@ -380,7 +382,7 @@ export default function TerminalScreen() {
 
       {isAuthenticated && activeSession ? (
         <ThemedView style={styles.terminalContainer}>
-          <GlassSurface radius={Radius.md} style={styles.terminalHeader}>
+          <Surface radius={Radius.md} style={styles.terminalHeader}>
             <ThemedText
               type="smallBold"
               numberOfLines={1}
@@ -403,7 +405,7 @@ export default function TerminalScreen() {
                 Close
               </ThemedText>
             </Pressable>
-          </GlassSurface>
+          </Surface>
 
           <ScrollView
             ref={scrollRef}
@@ -426,19 +428,19 @@ export default function TerminalScreen() {
           ) : null}
 
           {exitNote ? (
-            <GlassSurface
-              variant="subtle"
+            <Surface
+              variant="quiet"
               radius={Radius.sm}
               style={styles.exitBanner}
               accessibilityRole="alert"
             >
               <ThemedText type="smallBold">{exitNote}</ThemedText>
-            </GlassSurface>
+            </Surface>
           ) : null}
 
           {crashNote ? (
-            <GlassSurface
-              variant="glass"
+            <Surface
+              variant="elevated"
               radius={Radius.md}
               style={[styles.crashBanner, { borderColor: theme.danger }]}
               accessibilityRole="alert"
@@ -461,14 +463,14 @@ export default function TerminalScreen() {
                   pressed && styles.cardPressed,
                 ]}
               >
-                <ThemedText style={styles.reassembleLabel}>
+                <ThemedText style={[styles.reassembleLabel, { color: theme.onAccent }]}>
                   {busy ? "Reassembling…" : "Reassemble sandbox"}
                 </ThemedText>
               </Pressable>
-            </GlassSurface>
+            </Surface>
           ) : null}
 
-          <GlassSurface variant="strong" radius={Radius.md} style={styles.inputRow}>
+          <Surface variant="selected" radius={Radius.md} style={styles.inputRow}>
             <TextInput
               style={[styles.input, { color: theme.text }]}
               value={input}
@@ -498,9 +500,9 @@ export default function TerminalScreen() {
                 pressed && styles.cardPressed,
               ]}
             >
-              <ThemedText style={styles.sendLabel}>Send</ThemedText>
+              <ThemedText style={[styles.sendLabel, { color: theme.onAccent }]}>Send</ThemedText>
             </Pressable>
-          </GlassSurface>
+          </Surface>
         </ThemedView>
       ) : null}
     </ScreenShell>
@@ -521,7 +523,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
   },
   signInLabel: {
-    color: "#ffffff",
     fontWeight: "600",
   },
   actionsRow: {
@@ -539,7 +540,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three,
   },
   createLabel: {
-    color: "#ffffff",
     fontWeight: "600",
   },
   refreshButton: {
@@ -572,9 +572,7 @@ const styles = StyleSheet.create({
     minHeight: TouchTarget.Android,
     justifyContent: "center",
   },
-  rowActionLabel: {
-    color: "#ffffff",
-  },
+  rowActionLabel: {},
   terminalContainer: {
     flex: 1,
     width: "100%",
@@ -636,7 +634,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
   },
   reassembleLabel: {
-    color: "#ffffff",
     fontWeight: "600",
   },
   inputRow: {
@@ -665,7 +662,6 @@ const styles = StyleSheet.create({
     opacity: 0.35,
   },
   sendLabel: {
-    color: "#ffffff",
     fontWeight: "600",
   },
   cardPressed: {

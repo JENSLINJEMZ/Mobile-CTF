@@ -15,8 +15,8 @@ import Markdown from "react-native-markdown-display";
 import { OfflineBanner } from "@/components/offline-banner";
 import { ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
-import { GlassInput } from "@/components/glass-input";
-import { GlassSurface } from "@/components/glass-surface";
+import { Input } from "@/components/input";
+import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { difficultyColor, Radius, Spacing, TouchTarget } from "@/constants/theme";
@@ -292,9 +292,9 @@ export default function ChallengeDetailScreen() {
             </ThemedText>
           ) : null}
 
-          <GlassSurface style={styles.markdownBox} radius={Radius.md}>
+          <Surface style={styles.markdownBox} radius={Radius.md}>
             <Markdown style={markdownTheme}>{challenge.description}</Markdown>
-          </GlassSurface>
+          </Surface>
 
           {challenge.attachments.length > 0 ? (
             <ThemedView style={styles.section}>
@@ -321,7 +321,7 @@ export default function ChallengeDetailScreen() {
               </ThemedText>
             ) : null}
             {challenge.hints.map((hint) => (
-              <GlassSurface
+              <Surface
                 key={hint.id}
                 radius={Radius.md}
                 style={styles.hintCard}
@@ -358,11 +358,11 @@ export default function ChallengeDetailScreen() {
                       ]}
                     >
                       {unlockingId === hint.id ? (
-                        <ActivityIndicator color="#ffffff" size="small" />
+                        <ActivityIndicator color={theme.onAccent} size="small" />
                       ) : (
                         <ThemedText
                           type="small"
-                          style={{ color: "#ffffff", fontWeight: "600" }}
+                          style={{ color: theme.onAccent, fontWeight: "600" }}
                         >
                           Unlock
                         </ThemedText>
@@ -370,7 +370,7 @@ export default function ChallengeDetailScreen() {
                     </Pressable>
                   </ThemedView>
                 )}
-              </GlassSurface>
+              </Surface>
             ))}
             {needsAuth ? (
               <ThemedText type="small" themeColor="textSecondary">
@@ -381,7 +381,7 @@ export default function ChallengeDetailScreen() {
 
           <ThemedView style={styles.section}>
             <ThemedText type="smallBold">Submit flag</ThemedText>
-            <GlassInput
+            <Input
               value={flag}
               onChangeText={setFlag}
               placeholder="ctf{...}"
@@ -409,14 +409,10 @@ export default function ChallengeDetailScreen() {
                 pressed && styles.cardPressed,
               ]}
             >
-              <ThemedView
-                pointerEvents="none"
-                style={[styles.buttonSpecular, { backgroundColor: theme.specular }]}
-              />
               {submitting ? (
-                <ActivityIndicator color="#ffffff" size="small" />
+                <ActivityIndicator color={theme.onAccent} size="small" />
               ) : (
-                <ThemedText style={{ color: "#ffffff", fontWeight: "600" }}>
+                <ThemedText style={{ color: theme.onAccent, fontWeight: "600" }}>
                   Submit
                 </ThemedText>
               )}
@@ -562,14 +558,6 @@ const styles = StyleSheet.create({
     minHeight: TouchTarget.Android,
     borderRadius: Radius.md,
     overflow: "hidden",
-  },
-  buttonSpecular: {
-    position: "absolute",
-    top: 1,
-    left: 1,
-    right: 1,
-    height: 1,
-    opacity: 0.45,
   },
   cardPressed: {
     opacity: 0.85,

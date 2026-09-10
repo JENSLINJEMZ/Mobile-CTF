@@ -1,7 +1,7 @@
 import { ActivityIndicator, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-import { GlassSurface } from "@/components/glass-surface";
+import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { Radius, Spacing, TouchTarget } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
@@ -9,9 +9,9 @@ import { useTheme } from "@/hooks/use-theme";
 export function LoadingState() {
   const theme = useTheme();
   return (
-    <GlassSurface style={styles.container} radius={Radius.lg} accessibilityLabel="Loading">
+    <Surface style={styles.container} radius={Radius.lg} accessibilityLabel="Loading">
       <ActivityIndicator size="large" color={theme.accent} />
-    </GlassSurface>
+    </Surface>
   );
 }
 
@@ -24,7 +24,7 @@ export function ErrorState({
 }) {
   const theme = useTheme();
   return (
-    <GlassSurface
+    <Surface
       style={styles.container}
       radius={Radius.lg}
       accessibilityRole="alert"
@@ -45,12 +45,12 @@ export function ErrorState({
             pressed && styles.pressed,
           ]}
         >
-          <ThemedText type="smallBold" style={{ color: "#ffffff" }}>
+          <ThemedText type="smallBold" style={{ color: theme.onAccent }}>
             Try again
           </ThemedText>
         </Pressable>
       ) : null}
-    </GlassSurface>
+    </Surface>
   );
 }
 
@@ -63,10 +63,10 @@ export function EmptyState({
 }) {
   const theme = useTheme();
   return (
-    <GlassSurface
+    <Surface
       style={styles.container}
       radius={Radius.lg}
-      variant="subtle"
+      variant="quiet"
     >
       <Ionicons name={icon} size={32} color={theme.textSecondary} />
       <ThemedText
@@ -76,7 +76,7 @@ export function EmptyState({
       >
         {message}
       </ThemedText>
-    </GlassSurface>
+    </Surface>
   );
 }
 

@@ -10,7 +10,7 @@ import {
 
 import { OfflineBanner } from "@/components/offline-banner";
 import { ScreenShell } from "@/components/screen-shell";
-import { GlassInput } from "@/components/glass-input";
+import { Input } from "@/components/input";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing, TouchTarget } from "@/constants/theme";
@@ -135,14 +135,14 @@ export default function NoteEditorScreen() {
         </ThemedText>
       ) : null}
 
-      <GlassInput
+      <Input
         value={title}
         onChangeText={onTitle}
         placeholder="Note title"
         style={styles.titleInput}
         accessibilityLabel="Note title"
       />
-      <GlassInput
+      <Input
         value={body}
         onChangeText={onBody}
         placeholder="Write your notes… markdown supported"

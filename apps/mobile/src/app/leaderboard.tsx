@@ -12,7 +12,7 @@ import {
 
 import { EmptyState, ErrorState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
-import { GlassSurface } from "@/components/glass-surface";
+import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Radius, Spacing, TouchTarget } from "@/constants/theme";
@@ -94,7 +94,7 @@ export default function LeaderboardScreen() {
   return (
     <ScreenShell title="Leaderboard">
       {!isAuthenticated ? (
-        <GlassSurface radius={Radius.md} style={styles.promptCard}>
+        <Surface radius={Radius.md} style={styles.promptCard}>
           <ThemedText type="small">
             Live rankings update over WebSockets.
           </ThemedText>
@@ -108,12 +108,12 @@ export default function LeaderboardScreen() {
                 pressed && styles.cardPressed,
               ]}
             >
-              <ThemedText style={styles.signInLabel}>
+              <ThemedText style={[styles.signInLabel, { color: theme.onAccent }]}>
                 Sign in for live updates
               </ThemedText>
             </Pressable>
           </Link>
-        </GlassSurface>
+        </Surface>
       ) : null}
 
       <ThemedView style={styles.chips}>
@@ -136,7 +136,7 @@ export default function LeaderboardScreen() {
                 active && [styles.chipActive, { backgroundColor: theme.accent }],
                 !active && [
                   styles.chipIdle,
-                  { backgroundColor: theme.glassSubtle, borderColor: theme.glassBorder },
+                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                 ],
                 pressed && styles.cardPressed,
               ]}
@@ -153,21 +153,21 @@ export default function LeaderboardScreen() {
       </ThemedView>
 
       {me != null ? (
-        <GlassSurface radius={Radius.md} style={styles.scoreCard} variant="strong">
+        <Surface radius={Radius.md} style={styles.scoreCard} variant="selected">
           <ThemedText type="smallBold">
             {me.rank != null ? `You are #${me.rank}` : "Unranked"}
           </ThemedText>
           <ThemedText type="metric" themeColor="textSecondary">
             {me.score} points · {me.solves} solves
           </ThemedText>
-        </GlassSurface>
+        </Surface>
       ) : currentUser ? (
-        <GlassSurface radius={Radius.md} style={styles.scoreCard}>
+        <Surface radius={Radius.md} style={styles.scoreCard}>
           <ThemedText type="smallBold">You have no points yet</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             Solve a challenge to appear on the board.
           </ThemedText>
-        </GlassSurface>
+        </Surface>
       ) : null}
 
       {loading && !data ? (
@@ -196,10 +196,10 @@ export default function LeaderboardScreen() {
           const medal = MEDAL_COLORS[entry.rank];
           const isMe = entry.userId === currentUser?.id;
           return (
-            <GlassSurface
+            <Surface
               key={entry.userId}
               radius={Radius.md}
-              variant={isMe ? "strong" : "glass"}
+              variant={isMe ? "selected" : "elevated"}
               style={[
                 styles.row,
                 isMe && [styles.rowMe, { borderColor: theme.accent }],
@@ -218,7 +218,7 @@ export default function LeaderboardScreen() {
                 {entry.username}
               </ThemedText>
               <ThemedText type="metric">{entry.score}</ThemedText>
-            </GlassSurface>
+            </Surface>
           );
         })}
       </ScrollView>
@@ -251,7 +251,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   signInLabel: {
-    color: "#ffffff",
     fontWeight: "600",
   },
   chips: {

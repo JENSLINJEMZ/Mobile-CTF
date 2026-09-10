@@ -3,7 +3,7 @@ import { FlatList, RefreshControl, StyleSheet } from "react-native";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
-import { GlassSurface } from "@/components/glass-surface";
+import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Radius, Spacing } from "@/constants/theme";
@@ -59,9 +59,9 @@ export default function AchievementsScreen() {
               const earnedAt = item.earnedAt ?? null;
               const earned = earnedAt !== null;
               return (
-                <GlassSurface
+                <Surface
                   radius={Radius.lg}
-                  variant={earned ? "glass" : "subtle"}
+                  variant={earned ? "selected" : "quiet"}
                   style={[styles.badge, !earned && styles.locked]}
                   accessibilityLabel={`${item.title}: ${item.description}, ${earned ? "earned" : "locked"}`}
                 >
@@ -83,7 +83,7 @@ export default function AchievementsScreen() {
                       </ThemedText>
                     )}
                   </ThemedView>
-                </GlassSurface>
+                </Surface>
               );
             }}
           />

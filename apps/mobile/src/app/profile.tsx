@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
-import { GlassSurface } from "@/components/glass-surface";
+import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Radius, Spacing, TouchTarget } from "@/constants/theme";
@@ -72,7 +72,7 @@ export default function ProfileScreen() {
             accessibilityRole="button"
             accessibilityLabel="Sign in"
           >
-            <ThemedText style={styles.buttonLabel}>Sign in</ThemedText>
+            <ThemedText style={[styles.buttonLabel, { color: theme.onAccent }]}>Sign in</ThemedText>
           </Pressable>
         </Link>
         <Link href="/auth/register" asChild>
@@ -90,7 +90,7 @@ export default function ProfileScreen() {
 
   return (
     <ScreenShell title="Profile">
-      <GlassSurface radius={Radius.lg} style={styles.card}>
+      <Surface radius={Radius.lg} style={styles.card}>
         <ThemedText type="subtitle">{user.username}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           {user.email}
@@ -98,7 +98,7 @@ export default function ProfileScreen() {
         <ThemedText type="smallBold" style={{ marginTop: Spacing.one }}>
           Role: {user.role}
         </ThemedText>
-      </GlassSurface>
+      </Surface>
 
       <ThemedView style={styles.links}>
         <Link href="/achievements" asChild>
@@ -157,11 +157,11 @@ export default function ProfileScreen() {
         </Link>
       </ThemedView>
 
-      <GlassSurface radius={Radius.lg} style={styles.card}>
+      <Surface radius={Radius.lg} style={styles.card}>
         <ThemedText type="small" themeColor="textSecondary">
           Member since {new Date(user.createdAt).toLocaleDateString()}
         </ThemedText>
-      </GlassSurface>
+      </Surface>
 
       <Pressable
         style={({ pressed }) => [styles.button, { backgroundColor: theme.danger }, pressed && styles.pressed]}
@@ -170,7 +170,7 @@ export default function ProfileScreen() {
         accessibilityLabel="Sign out all devices"
         accessibilityHint="Revokes your session on every device"
       >
-        <ThemedText style={styles.buttonLabel}>Sign out all devices</ThemedText>
+        <ThemedText style={[styles.buttonLabel, { color: "#ffffff" }]}>Sign out all devices</ThemedText>
       </Pressable>
 
       {error ? (
@@ -217,7 +217,6 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   buttonLabel: {
-    color: "#ffffff",
     fontWeight: "600",
   },
   ghostButton: {

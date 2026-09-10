@@ -3,7 +3,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  View,
 } from "react-native";
 
 import { Radius, Spacing, TouchTarget } from "@/constants/theme";
@@ -37,7 +36,6 @@ export function Button({
   const theme = useTheme();
   const reduceMotion = useReduceMotion();
   const isUnavailable = disabled || loading;
-  const isFilled = variant === "primary" || variant === "danger";
 
   return (
     <Pressable
@@ -54,9 +52,6 @@ export function Button({
         isUnavailable && styles.disabled,
       ]}
     >
-      {isFilled ? (
-        <View pointerEvents="none" style={[styles.specular, { backgroundColor: theme.specular }]} />
-      ) : null}
       {loading ? (
         <ActivityIndicator size="small" color={loaderColor[variant](theme)} />
       ) : (
@@ -87,14 +82,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
   },
-  specular: {
-    position: "absolute",
-    top: 1,
-    left: 1,
-    right: 1,
-    height: 1,
-    opacity: 0.4,
-  },
   pressedOpacity: {
     opacity: 0.85,
   },
@@ -121,7 +108,7 @@ const variantStyles: Record<ButtonVariant, (t: T) => object> = {
 };
 
 const variantLabelStyles: Record<ButtonVariant, (t: T) => object> = {
-  primary: () => ({ color: "#ffffff" }),
+  primary: (t) => ({ color: t.onAccent }),
   quiet: (t) => ({ color: t.text }),
   outline: (t) => ({ color: t.accent }),
   danger: () => ({ color: "#ffffff" }),
@@ -129,7 +116,7 @@ const variantLabelStyles: Record<ButtonVariant, (t: T) => object> = {
 };
 
 const loaderColor: Record<ButtonVariant, (t: T) => string> = {
-  primary: () => "#ffffff",
+  primary: (t) => t.onAccent,
   quiet: (t) => t.text,
   outline: (t) => t.accent,
   danger: () => "#ffffff",

@@ -9,7 +9,7 @@ import {
 } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
-import { GlassInput } from "@/components/glass-input";
+import { Input } from "@/components/input";
 import { ThemedText } from "@/components/themed-text";
 import { Radius, Spacing, TouchTarget } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
@@ -47,7 +47,7 @@ export default function LoginScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.form}
       >
-        <GlassInput
+        <Input
             value={email}
             onChangeText={setEmail}
             placeholder="Email"
@@ -58,7 +58,7 @@ export default function LoginScreen() {
             accessibilityRole="text"
           />
 
-          <GlassInput
+          <Input
             value={password}
             onChangeText={setPassword}
             placeholder="Password"
@@ -93,9 +93,11 @@ export default function LoginScreen() {
           accessibilityHint="Logs you into your CTF Platform account"
         >
           {submitting ? (
-            <ActivityIndicator color="#ffffff" />
+            <ActivityIndicator color={theme.onAccent} />
           ) : (
-            <ThemedText style={styles.buttonLabel}>Sign in</ThemedText>
+            <ThemedText style={[styles.buttonLabel, { color: theme.onAccent }]}>
+              Sign in
+            </ThemedText>
           )}
         </Pressable>
 
@@ -132,7 +134,6 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   buttonLabel: {
-    color: "#ffffff",
     fontWeight: "600",
   },
   linkRow: {
