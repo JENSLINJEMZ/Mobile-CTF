@@ -2,6 +2,7 @@ import type {
   ChallengeCategoryDto,
   ChallengeSummaryDto,
   EventSummaryDto,
+  LeaderboardMeDto,
   PaginatedResult,
 } from "@ctf/shared";
 import { Link } from "expo-router";
@@ -29,6 +30,7 @@ import {
 } from "@/constants/theme";
 import { listChallengeCategories, listChallenges } from "@/services/challenges";
 import { listEvents } from "@/services/events";
+import { getLeaderboard } from "@/services/leaderboard";
 import { useAuthGate } from "@/hooks/use-auth-gate";
 import { useAuthStore } from "@/store/auth-store";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
@@ -36,6 +38,15 @@ import { useTheme } from "@/hooks/use-theme";
 
 function difficultyLabel(value: string): string {
   return value.charAt(0) + value.slice(1).toLowerCase();
+}
+
+function formatRemaining(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${days}d ${pad(hours)}h ${pad(minutes)}m`;
 }
 
 export default function HomeScreen() {
@@ -48,6 +59,7 @@ export default function HomeScreen() {
     null,
   );
   const [events, setEvents] = useState<EventSummaryDto[]>([]);
+  const [me, setMe] = useState<LeaderboardMeDto | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<
     string | undefined
   >();
@@ -98,6 +110,16 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
+    if (authStatus !== "authenticated") {
+      setMe(null);
+      return;
+    }
+    getLeaderboard("global", 1)
+      .then((result) => setMe(result.me))
+      .catch(() => setMe(null));
+  }, [authStatus]);
+
+  useEffect(() => {
     void load();
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -126,29 +148,42 @@ export default function HomeScreen() {
         <ThemedText type="smallBold" style={styles.brandLabel}>
           MOBILECTF
         </ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          Welcome back,
+        </ThemedText>
         <ThemedText type="title" style={styles.greeting}>
-          Welcome back, {user?.username ?? "Player"}
+          {user?.username ?? "CTF Player"}
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           Ready to hack something awesome?
         </ThemedText>
 
-        <View style={[styles.statsRow, { backgroundColor: theme.surface }]}>
+        <Surface radius={Radius.lg} style={styles.statsCard}>
           <View style={styles.statItem}>
             <ThemedText type="small" themeColor="textSecondary">Rank</ThemedText>
-            <ThemedText type="smallBold">—</ThemedText>
+            <ThemedText type="smallBold" style={styles.statValue}>
+              {me?.rank != null ? `#${me.rank}` : "—"}
+            </ThemedText>
           </View>
           <View style={[styles.statDivider, { backgroundColor: theme.separator }]} />
           <View style={styles.statItem}>
             <ThemedText type="small" themeColor="textSecondary">Score</ThemedText>
-            <ThemedText type="smallBold">—</ThemedText>
+            <ThemedText type="smallBold" style={styles.statValue}>
+              {me?.score != null ? me.score.toLocaleString() : "—"}
+            </ThemedText>
           </View>
           <View style={[styles.statDivider, { backgroundColor: theme.separator }]} />
           <View style={styles.statItem}>
             <ThemedText type="small" themeColor="textSecondary">Solved</ThemedText>
-            <ThemedText type="smallBold">{String(solvedCount)}</ThemedText>
+            <ThemedText type="smallBold" style={styles.statValue}>
+              {me?.solves != null
+                ? String(me.solves)
+                : solvedCount > 0
+                  ? String(solvedCount)
+                  : "—"}
+            </ThemedText>
           </View>
-        </View>
+        </Surface>
       </View>
 
       {events.length > 0 && (
@@ -167,24 +202,44 @@ export default function HomeScreen() {
             keyExtractor={(item) => String(item.id)}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: Spacing.two }}
-            renderItem={({ item }) => (
-              <Link href={`/event/${item.id}`} asChild>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={item.title}
-                  style={({ pressed }) => [
-                    styles.eventCard,
-                    { backgroundColor: theme.surface },
-                    pressed && !reduceMotion && styles.cardPressed,
-                  ]}
-                >
-                  <ThemedText type="smallBold" numberOfLines={1}>{item.title}</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                    {item.status === "RUNNING" ? "Live now" : `Ends ${new Date(item.endsAt).toLocaleDateString()}`}
-                  </ThemedText>
-                </Pressable>
-              </Link>
-            )}
+            renderItem={({ item }) => {
+              const isLive = item.status === "RUNNING";
+              const endsInMs = new Date(item.endsAt).getTime() - Date.now();
+              const startsInMs = new Date(item.startsAt).getTime() - Date.now();
+              return (
+                <Link href={`/event/${item.id}`} asChild>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={item.title}
+                    style={({ pressed }) => [
+                      styles.eventCard,
+                      { backgroundColor: theme.surface },
+                      pressed && !reduceMotion && styles.cardPressed,
+                    ]}
+                  >
+                    <View style={styles.eventTopRow}>
+                      <ThemedText type="smallBold" numberOfLines={1} style={styles.eventTitle}>
+                        {item.title}
+                      </ThemedText>
+                      {isLive ? (
+                        <View style={[styles.liveBadge, { backgroundColor: theme.danger }]}>
+                          <ThemedText type="small" style={styles.liveBadgeLabel}>
+                            LIVE
+                          </ThemedText>
+                        </View>
+                      ) : null}
+                    </View>
+                    <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                      {isLive
+                        ? `Ends in ${formatRemaining(endsInMs)}`
+                        : item.status === "SCHEDULED"
+                          ? `Starts in ${formatRemaining(startsInMs)}`
+                          : `Ended ${new Date(item.endsAt).toLocaleDateString()}`}
+                    </ThemedText>
+                  </Pressable>
+                </Link>
+              );
+            }}
           />
         </View>
       )}
@@ -317,21 +372,26 @@ export default function HomeScreen() {
                     ]}
                   />
                   <ThemedView style={styles.cardBody}>
-                    <ThemedText type="smallBold" numberOfLines={1}>
-                      {item.title}
-                    </ThemedText>
                     <ThemedText
                       type="small"
                       themeColor="textSecondary"
-                      numberOfLines={2}
+                      numberOfLines={1}
+                      style={styles.cardCategory}
                     >
-                      {item.category.name} · {difficultyLabel(item.difficulty)}
+                      {item.category.name}
+                    </ThemedText>
+                    <ThemedText type="smallBold" numberOfLines={1}>
+                      {item.title}
                     </ThemedText>
                     {item.solvedByMe ? (
                       <ThemedText type="small" style={{ color: theme.success }}>
                         Solved ✓
                       </ThemedText>
-                    ) : null}
+                    ) : (
+                      <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                        {item.solvedCount > 0 ? `${item.solvedCount} solves` : "Be the first to solve"}
+                      </ThemedText>
+                    )}
                   </ThemedView>
                   <ThemedView style={styles.pointsBox}>
                     <ThemedText type="metric">
@@ -365,17 +425,21 @@ const styles = StyleSheet.create({
   greeting: {
     fontWeight: "700",
   },
-  statsRow: {
+  statsCard: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: Radius.md,
-    padding: Spacing.three,
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.two,
     marginTop: Spacing.two,
+    width: "100%",
   },
   statItem: {
     flex: 1,
     alignItems: "center",
     gap: Spacing.half,
+  },
+  statValue: {
+    fontSize: 18,
   },
   statDivider: {
     width: StyleSheet.hairlineWidth,
@@ -395,6 +459,29 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     padding: Spacing.three,
     gap: Spacing.one,
+  },
+  eventTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.one,
+  },
+  eventTitle: {
+    flex: 1,
+  },
+  liveBadge: {
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.one,
+    paddingVertical: 2,
+  },
+  liveBadgeLabel: {
+    color: "#ffffff",
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  cardCategory: {
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   search: {
     width: "100%",

@@ -193,13 +193,13 @@ const LIGHT_SCOPED: ScopedTokens = {
 
 const DARK_SCOPED: ScopedTokens = {
   header: {
-    bg: "#0c111d",
+    bg: "#040914",
     title: "#f3f4f5",
     subtitle: "#797c87",
     border: "rgba(220, 228, 240, 0.08)",
   },
   tabBar: {
-    bg: "#0c111d",
+    bg: "#040914",
     iconActive: "#ecebfa",
     iconInactive: "#797c87",
     label: "#797c87",
@@ -288,7 +288,7 @@ export const Colors = {
     text: "#f3f4f5",
     textSecondary: "#929ba6",
     textInverse: "#0c111d",
-    background: "#0c111d",
+    background: "#040914",
     backgroundElement: "#0d1320",
     backgroundSelected: "#141a28",
     surface: "#0e1420",
