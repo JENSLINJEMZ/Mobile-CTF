@@ -28,6 +28,8 @@ Turborepo + npm workspaces monorepo. Staged build — **Stage 10 (Notifications,
 
 **Notes:** remote push needs a development/EAS build (Expo Go Android no push since SDK 53). In-app Notification center shipped earlier in Stage 10 (`app/notifications.tsx` + bell tab with unread badge).
 
+**🔵 Offline-submission gateway: reachability-based online detection — DONE ✅ (Sep 2026)** — Flags were always enqueued ("Flag queued") on the USB-tunnel test device because the gateway keyed "online" off NetInfo (device internet), which reports offline there even though the backend at `127.0.0.1:4000` is up through the adb reverse tunnel. Fix: `http.ts` gained `isApiReachable()` (probes `/api/health`, 4s abort timeout); `submitFlagViaGateway` now submits when NetInfo is online **or** the probe succeeds, enqueues only when the backend is truly unreachable, and degrades transient network failures (fetch `TypeError`) to the queue while never queueing HTTP errors (wrong flags, rate limits); `startSubmissionGateway` drains on any NetInfo event **and** at startup gated by the same probe. On-device: queued Caesar's Secret flag auto-drained at boot ("Solved ✓"), and a live "wrong" flag hit `POST /api/challenges/5/submissions` (200, "Incorrect flag. Keep trying!", score 110) with NetInfo still offline. Tests 23/23 (5 new), tsc/eslint clean.
+
 **🔵 Mobile liquid-glass polish — DONE ✅ (Sep 2026)**
 
 | Task | Status |
@@ -454,6 +456,23 @@ cd apps/mobile && npm run web                 # Expo web dev
 cd apps/admin && npm run dev                  # Vite dev on :5173 (proxies /api → :4000)
 npm install-scripts approve <pkg>             # allow blocked postinstall (npm 11)
 ```
+
+**🔵 Challenge UI/UX-law fixes — DONE ✅ (Sep 2026)** — Five usability-law problems identified and resolved in the challenge detail screen (`challenge/[id].tsx`):
+1. **Hick's law (competing CTAs):** Hint unlock buttons restyled to secondary outline (transparent bg + accent border + accent text); "Submit flag" is now the sole filled-accent primary CTA. Pixel-verified: Submit filled `(87,129,14)` (disabled opacity) vs hint interior `(16,20,28)` with border accent.
+2. **Proximity (misattributed errors):** `submitError` no longer cross-contaminates from hint-unlock or bookmark failures; removed `setSubmitError` calls from their catch blocks (keep toasts only).
+3. **Fitts's law (keyboard hides Submit):** Flag input gets `returnKeyType="send"` + `submitBehavior="submit"` + `onSubmitEditing` → on-device: typed "hehe" → Enter → `POST /api/challenges/1/submissions` fired live, keyboard stayed up.
+4. **Affordance labeling:** Free hints (penaltyPoints 0) labeled "View" (Caesar's Secret verified: `content-desc="View hint Direction of travel"`); paid hints keep "Unlock" (XOR verified).
+5. **Semantic grouping (metaRow):** Difficulty dot moved next to the "Category · Difficulty" text inside a new `metaGroup` row; points stay right-aligned.
+
+All verified on-device (Caesar's Secret free hints + XOR paid hints), tsc/eslint clean, vitest 23/23.
+
+**🔵 Index (Challenges list) UI fixes — DONE ✅ (Sep 2026)** — Pixel-audited the list screen (`/tmp/opencode/index_v4.png`; device density 2.0 = 320dpi, so px → 2px/dp):
+1. **Card fragmentation (THE bug):** `ThemedView` (`components/themed-view.tsx`) painted an opaque `backgroundColor: theme.background` by default. Cards put `ThemedView`s (`cardBody`/`pointsBox`) inside `<Surface>`, so each card showed a dark canvas-colored rectangle across its body. **Fix:** default transparent — `type ? { backgroundColor: theme[type] } : null`. Healed app-wide: index cards, Events cards, event challenge rows, challenge meta/hint sections (all verified solid surfaces after fix). 52 `<ThemedView>` usages; explicit in-style backgrounds (difficultyDot, freqTrack) unaffected.
+2. **Glued cards:** `marginBottom: Spacing.two` on the `card` style never rendered (gap measured ~1px). **Fix:** vertical FlatList `contentContainerStyle={{ gap: Spacing.two, paddingBottom: Spacing.five }}`, dropped the dead marginBottom. Gap now real (~8dp = 16px).
+3. **Thin chips:** category pills rendered 31dp (label box shrank them). Added `minHeight: TouchTarget.Android` + centering → ~39.5dp.
+4. **Search field:** at 40dp it was already token-spec; tightened single-line text box via `input` `lineHeight: 20` (kept; harmless for multiline via `inputMultiline` override).
+- Dead ends NOT pursued: `includeFontPadding: false` proved a **zero-effect no-op** on this RN/device (reverted both edits); header bar "bulk" (52dp tall) is density misread, not a bug; `minHeight` on chips does not fully engage (RN Android + FlatList cell quirk) yet measured result is spec-good.
+- Verified: index cards solid `#232c3e` (solved) / `#151c29` (unsolved) with uniform 16px gaps; challenge + Events screens regression-free; tsc 0, eslint 0, vitest 23/23.
 
 ---
 
