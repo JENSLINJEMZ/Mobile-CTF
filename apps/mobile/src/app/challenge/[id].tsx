@@ -3,7 +3,6 @@ import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,12 +12,15 @@ import { Ionicons } from "@expo/vector-icons";
 import Markdown from "react-native-markdown-display";
 
 import { OfflineBanner } from "@/components/offline-banner";
+import { BottomSheet } from "@/components/bottom-sheet";
 import { ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
 import { Input } from "@/components/input";
 import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { Button } from "@/components/button";
+import { useToast } from "@/components/toast";
 import { difficultyColor, Radius, Spacing, TouchTarget } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useNetwork } from "@/hooks/use-network";
@@ -41,6 +43,13 @@ export default function ChallengeDetailScreen() {
   const eventId = event ? Number(event) : undefined;
   const theme = useTheme();
   const { needsAuth } = useAuthGate();
+  const toast = useToast();
+
+  const [confirmHint, setConfirmHint] = useState<{
+    hintId: number;
+    title: string;
+    penaltyPoints: number;
+  } | null>(null);
 
   const markdownTheme = useMemo(
     () => ({
@@ -125,16 +134,36 @@ export default function ChallengeDetailScreen() {
       const outcome = await submitFlagViaGateway(challengeId, flag.trim(), eventId, isOnline);
       if (outcome.status === "queued") {
         setQueued(true);
+        toast.show({
+          title: "Flag queued",
+          body: "It will submit automatically when you're back online.",
+        });
         if (challenge?.solvedByMe) setFlag("");
         return;
       }
       setResult(outcome.response);
       if (outcome.response.correct) {
         setFlag("");
+        toast.show({
+          title: "Correct!",
+          body: outcome.response.message,
+          tone: "success",
+        });
         void load();
+      } else {
+        toast.show({
+          title: "Incorrect flag",
+          body: outcome.response.message,
+          tone: "error",
+        });
       }
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Submission failed");
+      toast.show({
+        title: "Submission failed",
+        body: err instanceof Error ? err.message : "Could not submit flag",
+        tone: "error",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -146,6 +175,7 @@ export default function ChallengeDetailScreen() {
     eventId,
     isOnline,
     challenge?.solvedByMe,
+    toast,
   ]);
 
   useEffect(() => {
@@ -161,47 +191,58 @@ export default function ChallengeDetailScreen() {
   const onUnlockHint = useCallback(
     async (hintId: number) => {
       if (unlockingId !== null) return;
-      const hint = challenge?.hints.find((h) => h.id === hintId);
-      const confirm = () => {
-        void (async () => {
-          setUnlockingId(hintId);
-          try {
-            const { hint: unlocked } = await unlockHint(challengeId, hintId);
-            setChallenge((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    hints: prev.hints.map((h) =>
-                      h.id === hintId
-                        ? { ...h, unlocked: true, body: unlocked.body }
-                        : h,
-                    ),
-                  }
-                : prev,
-            );
-          } catch (err) {
-            setSubmitError(
-              err instanceof Error ? err.message : "Could not unlock hint",
-            );
-          } finally {
-            setUnlockingId(null);
-          }
-        })();
-      };
-      if (hint && hint.penaltyPoints > 0) {
-        Alert.alert(
-          "Unlock this hint?",
-          `This costs ${hint.penaltyPoints} points and can't be undone.`,
-          [
-            { text: "Cancel", style: "cancel" },
-            { text: "Unlock", style: "destructive", onPress: confirm },
-          ],
+      setUnlockingId(hintId);
+      setConfirmHint(null);
+      try {
+        const { hint: unlocked } = await unlockHint(challengeId, hintId);
+        setChallenge((prev) =>
+          prev
+            ? {
+                ...prev,
+                hints: prev.hints.map((h) =>
+                  h.id === hintId
+                    ? { ...h, unlocked: true, body: unlocked.body }
+                    : h,
+                ),
+              }
+            : prev,
         );
-      } else {
-        confirm();
+        toast.show({
+          title: "Hint unlocked",
+          body: unlocked.body?.slice(0, 60),
+          tone: "success",
+        });
+      } catch (err) {
+        setSubmitError(
+          err instanceof Error ? err.message : "Could not unlock hint",
+        );
+        toast.show({
+          title: "Could not unlock hint",
+          body: err instanceof Error ? err.message : undefined,
+          tone: "error",
+        });
+      } finally {
+        setUnlockingId(null);
       }
     },
-    [challengeId, unlockingId, challenge?.hints],
+    [challengeId, unlockingId, toast],
+  );
+
+  const onRequestHintUnlock = useCallback(
+    (hintId: number) => {
+      const hint = challenge?.hints.find((h) => h.id === hintId);
+      if (!hint) return;
+      if (hint.penaltyPoints > 0) {
+        setConfirmHint({
+          hintId: hint.id,
+          title: hint.title,
+          penaltyPoints: hint.penaltyPoints,
+        });
+      } else {
+        void onUnlockHint(hintId);
+      }
+    },
+    [challenge?.hints, onUnlockHint],
   );
 
   const onToggleBookmark = useCallback(async () => {
@@ -343,7 +384,7 @@ export default function ChallengeDetailScreen() {
                     </ThemedView>
                     <Pressable
                       disabled={needsAuth || unlockingId !== null}
-                      onPress={() => void onUnlockHint(hint.id)}
+                      onPress={() => void onRequestHintUnlock(hint.id)}
                       accessibilityRole="button"
                       accessibilityLabel={`Unlock hint ${hint.title}${hint.penaltyPoints > 0 ? ` for ${hint.penaltyPoints} points` : ""}`}
                       accessibilityState={{
@@ -474,6 +515,30 @@ export default function ChallengeDetailScreen() {
           </ThemedView>
         </ScrollView>
       ) : null}
+
+      <BottomSheet
+        visible={confirmHint !== null}
+        onClose={() => setConfirmHint(null)}
+        title="Unlock this hint?"
+      >
+        <ThemedText type="small" themeColor="textSecondary">
+          This costs {confirmHint?.penaltyPoints} points and can&apos;t be
+          undone.
+        </ThemedText>
+        <ThemedView style={styles.sheetActions}>
+          <Button
+            label="Cancel"
+            variant="quiet"
+            onPress={() => setConfirmHint(null)}
+          />
+          <Button
+            label="Unlock"
+            onPress={() => {
+              if (confirmHint) void onUnlockHint(confirmHint.hintId);
+            }}
+          />
+        </ThemedView>
+      </BottomSheet>
     </ScreenShell>
   );
 }
@@ -558,6 +623,11 @@ const styles = StyleSheet.create({
     minHeight: TouchTarget.Android,
     borderRadius: Radius.md,
     overflow: "hidden",
+  },
+  sheetActions: {
+    flexDirection: "row",
+    gap: Spacing.two,
+    marginTop: Spacing.three,
   },
   cardPressed: {
     opacity: 0.85,

@@ -80,6 +80,180 @@ export const Palette = {
   },
 } as const;
 
+/**
+ * Scoped token namespaces (Telegram `PresentationTheme` pattern).
+ * Flat semantic colors stay in the root for one-off uses; the namespaces
+ * group the colors each UI surface actually consumes so components read
+ * `theme.header.bg` instead of reaching for a "generic" color.
+ */
+type ScopedTokens = {
+  header: {
+    bg: string;
+    title: string;
+    subtitle: string;
+    border: string;
+  };
+  tabBar: {
+    bg: string;
+    iconActive: string;
+    iconInactive: string;
+    label: string;
+    border: string;
+  };
+  list: {
+    cellBg: string;
+    separator: string;
+    groupHeader: string;
+    groupFooter: string;
+  };
+  badge: {
+    bg: string;
+    fg: string;
+  };
+  input: {
+    bg: string;
+    value: string;
+    placeholder: string;
+    focusBorder: string;
+  };
+  card: {
+    bg: string;
+    border: string;
+    title: string;
+    meta: string;
+  };
+  segmented: {
+    track: string;
+    thumb: string;
+    activeText: string;
+    idleText: string;
+  };
+  toast: {
+    bg: string;
+    title: string;
+    body: string;
+    success: string;
+    error: string;
+    border: string;
+  };
+  skeleton: {
+    base: string;
+    highlight: string;
+  };
+};
+
+const LIGHT_SCOPED: ScopedTokens = {
+  header: {
+    bg: "#ffffff",
+    title: "#16181d",
+    subtitle: "#5a6474",
+    border: "rgba(20, 25, 36, 0.08)",
+  },
+  tabBar: {
+    bg: "#ffffff",
+    iconActive: "#7cbd00",
+    iconInactive: "#5a6474",
+    label: "#5a6474",
+    border: "rgba(20, 25, 36, 0.08)",
+  },
+  list: {
+    cellBg: "#ffffff",
+    separator: "rgba(20, 25, 36, 0.08)",
+    groupHeader: "#5a6474",
+    groupFooter: "#9ca3af",
+  },
+  badge: {
+    bg: "#dc2626",
+    fg: "#ffffff",
+  },
+  input: {
+    bg: "#e9ebf0",
+    value: "#16181d",
+    placeholder: "#9ca3af",
+    focusBorder: "#7cbd00",
+  },
+  card: {
+    bg: "#ffffff",
+    border: "rgba(20, 25, 36, 0.12)",
+    title: "#16181d",
+    meta: "#5a6474",
+  },
+  segmented: {
+    track: "#e9ebf0",
+    thumb: "#ffffff",
+    activeText: "#16181d",
+    idleText: "#5a6474",
+  },
+  toast: {
+    bg: "#ffffff",
+    title: "#16181d",
+    body: "#5a6474",
+    success: "#16a34a",
+    error: "#dc2626",
+    border: "rgba(20, 25, 36, 0.12)",
+  },
+  skeleton: {
+    base: "#e9ebf0",
+    highlight: "#dfe3ea",
+  },
+};
+
+const DARK_SCOPED: ScopedTokens = {
+  header: {
+    bg: "#141924",
+    title: "#e8eaf0",
+    subtitle: "#8b94a5",
+    border: "rgba(220, 228, 240, 0.09)",
+  },
+  tabBar: {
+    bg: "#141924",
+    iconActive: "#9FEF00",
+    iconInactive: "#8b94a5",
+    label: "#8b94a5",
+    border: "rgba(220, 228, 240, 0.09)",
+  },
+  list: {
+    cellBg: "#151c29",
+    separator: "rgba(220, 228, 240, 0.09)",
+    groupHeader: "#8b94a5",
+    groupFooter: "#6b7280",
+  },
+  badge: {
+    bg: "#f87171",
+    fg: "#ffffff",
+  },
+  input: {
+    bg: "#1a2130",
+    value: "#e8eaf0",
+    placeholder: "#6b7280",
+    focusBorder: "#9FEF00",
+  },
+  card: {
+    bg: "#151c29",
+    border: "rgba(220, 228, 240, 0.12)",
+    title: "#e8eaf0",
+    meta: "#8b94a5",
+  },
+  segmented: {
+    track: "#1a2130",
+    thumb: "#232c3e",
+    activeText: "#e8eaf0",
+    idleText: "#8b94a5",
+  },
+  toast: {
+    bg: "#1a2130",
+    title: "#e8eaf0",
+    body: "#8b94a5",
+    success: "#4ade80",
+    error: "#f87171",
+    border: "rgba(220, 228, 240, 0.12)",
+  },
+  skeleton: {
+    base: "#1a2130",
+    highlight: "#232c3e",
+  },
+};
+
 export const Colors = {
   light: {
     text: "#16181d",
@@ -89,8 +263,6 @@ export const Colors = {
     backgroundElement: "#e9ebf0",
     backgroundSelected: "#dfe3ea",
     surface: "#ffffff",
-    header: "#ffffff",
-    tabBar: "#ffffff",
     separator: "rgba(20, 25, 36, 0.08)",
     border: "rgba(20, 25, 36, 0.12)",
     borderStrong: "rgba(20, 25, 36, 0.22)",
@@ -99,6 +271,7 @@ export const Colors = {
     accentPressed: "#5f9000",
     accentSubtle: "#f2fae0",
     onAccent: "#ffffff",
+    onDanger: "#ffffff",
     success: "#16a34a",
     successStrong: "#15803d",
     successSubtle: "#dcfce7",
@@ -113,6 +286,10 @@ export const Colors = {
     difficultyHard: "#8b5cf6",
     difficultyExpert: "#f43f5e",
     placeholder: "#9ca3af",
+    medalGold: "#d4af37",
+    medalSilver: "#b5b5bd",
+    medalBronze: "#cd7f32",
+    ...LIGHT_SCOPED,
   },
   dark: {
     text: "#e8eaf0",
@@ -122,8 +299,6 @@ export const Colors = {
     backgroundElement: "#1a2130",
     backgroundSelected: "#232c3e",
     surface: "#151c29",
-    header: "#141924",
-    tabBar: "#141924",
     separator: "rgba(220, 228, 240, 0.09)",
     border: "rgba(220, 228, 240, 0.12)",
     borderStrong: "rgba(220, 228, 240, 0.22)",
@@ -132,6 +307,7 @@ export const Colors = {
     accentPressed: "#c6f76a",
     accentSubtle: "#1d280a",
     onAccent: "#0b0e15",
+    onDanger: "#ffffff",
     success: "#4ade80",
     successStrong: "#86efac",
     successSubtle: "#10331f",
@@ -146,10 +322,25 @@ export const Colors = {
     difficultyHard: "#a78bfa",
     difficultyExpert: "#fb7185",
     placeholder: "#6b7280",
+    medalGold: "#f6d365",
+    medalSilver: "#b9c0cc",
+    medalBronze: "#e0a36a",
+    ...DARK_SCOPED,
   },
 } as const;
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+/**
+ * Keys of a color object whose values are plain colors (excludes the
+ * scoped namespaces, which are objects — they are consumed via components,
+ * never via `theme[color]`).
+ */
+type FlatColorKey<T> = {
+  [K in keyof T]: T[K] extends string ? K : never;
+}[keyof T];
+
+export type ThemeColor =
+  | FlatColorKey<(typeof Colors)["light"]>
+  | FlatColorKey<(typeof Colors)["dark"]>;
 
 export type Difficulty = "EASY" | "MEDIUM" | "HARD" | "EXPERT";
 

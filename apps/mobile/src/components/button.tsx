@@ -111,7 +111,7 @@ const variantLabelStyles: Record<ButtonVariant, (t: T) => object> = {
   primary: (t) => ({ color: t.onAccent }),
   quiet: (t) => ({ color: t.text }),
   outline: (t) => ({ color: t.accent }),
-  danger: () => ({ color: "#ffffff" }),
+  danger: (t) => ({ color: t.onDanger }),
   link: (t) => ({ color: t.accent }),
 };
 
@@ -119,6 +119,6 @@ const loaderColor: Record<ButtonVariant, (t: T) => string> = {
   primary: (t) => t.onAccent,
   quiet: (t) => t.text,
   outline: (t) => t.accent,
-  danger: () => "#ffffff",
+  danger: (t) => t.onDanger,
   link: (t) => t.accent,
 };

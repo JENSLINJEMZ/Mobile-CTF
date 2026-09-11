@@ -17,7 +17,7 @@ export type SurfaceProps = ViewProps & {
 };
 
 const TONE: Record<SurfaceVariant, (t: ReturnType<typeof useTheme>) => string> = {
-  elevated: (t) => t.surface,
+  elevated: (t) => t.card.bg,
   quiet: (t) => t.backgroundElement,
   selected: (t) => t.backgroundSelected,
 };
@@ -42,7 +42,7 @@ export function Surface({
       style={[
         {
           backgroundColor: TONE[variant](theme),
-          borderColor: theme.border,
+          borderColor: theme.card.border,
           borderWidth: StyleSheet.hairlineWidth,
           borderRadius: radius,
           overflow: "hidden",

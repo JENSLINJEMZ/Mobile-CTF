@@ -78,6 +78,23 @@ Audited all 8 tab screens on device (uiautomator dumps + pixel sampling; screens
 | Verified: `tsc --noEmit` clean, `eslint` clean, 18/18 vitest pass, all 8 tabs re-screenshot on device | ✅ |
 | **Committed & pushed** (all MEMORY.md + solid redesign + UI audit files) | ✅ |
 
+**🟡 P0 design-system hardening (from docs/IMPROVEMENT_PLAN.md) — DONE code + on-device verification (Sep 2026)**
+
+Phase 0 of the professionalization plan: scoped theme tokens (Telegram `PresentationTheme` pattern), new component library, wired into the flagship screens.
+
+| Task | Status |
+| --- | --- |
+| `theme.ts`: added `ScopedTokens` + `LIGHT_SCOPED`/`DARK_SCOPED` namespaces (`header`, `tabBar`, `list`, `badge`, `input`, `card`, `segmented`, `toast`, `skeleton`), `onDanger`, `medalGold/Silver/Bronze`; removed flat `header`/`tabBar` strings (migrated 2 consumers); `ThemeColor` = flat string keys only | ✅ |
+| New components: `badge` (max 99+), `segmented-control` (generic, animated thumb, reduceMotion-aware), `toast` (`ToastProvider`+`useToast`, default/success/error, top-stacked under header), `bottom-sheet` (Modal + scrim + spring), `skeleton` (pulsing); barrel `components/index.ts` | ✅ |
+| `EmptyState` gained `action?: {label; onPress}`; `Input` migrated to `input.*` tokens + focus ring (keeps `transform` always-present — **fixes RN crash "Cannot read property 'forEach' of null"** that toggling `transform` undefined↔array caused); `Surface` reads `card.*` | ✅ |
+| `_layout.tsx`: wrapped app in `<ToastProvider>`, Notifications tab icon has unread-count badge (theme.badge, "99+"); `tabBarStyle` → `theme.tabBar.*`; `ScreenShell` header → `theme.header.*`; badge padding 3→4 (4px grid) | ✅ |
+| Leaderboard: chips → `<SegmentedControl<LeaderboardScope>>`; `MEDAL_COLORS` hex → themed medal tokens; spinner → `<Skeleton count={6}>`; dead chip styles removed | ✅ |
+| Hardcoded-ui-hex scan (excl theme.ts/tests) → NONE (`#ffffff`→`onDanger` in events/event/button/profile; toolkit track→`backgroundElement`) | ✅ |
+| `challenge/[id].tsx`: flag submit result → `useToast` (Correct!/Incorrect/queued/error), hint-unlock `Alert.alert` → `BottomSheet` confirmation (paid hints) + success/error toasts | ✅ |
+| **On-device verification** (Expo Go, dark mode): SegmentedControl renders (Global selected, thumb + white text, idle segments dim); Toast error tone confirmed via pixel capture (red `#f87171` icon + title/body on `#1a2130` card at top under header); BottomSheet confirmed (scrim darkens screen, rounded sheet + Cancel/Unlock buttons, "Unlock this hint?"/"This costs 20 points"); Input focus no longer crashes; Notifications tab badge renders (dark `#f87171` pill + white "1" at `[601,1371][630,1403]`) after inserting an unread row; login as `player1` works | ✅ |
+| `scripts/run.sh` created: one-command full dev bring-up — infra (postgres/redis; `docker compose` or fallback `docker run/start`), `ctf-sandbox` image (terminal access), prisma generate/deploy/seed, API (tsx watch :4000), Metro (:8081), optional admin (:5173) + `--device` adb reverse; `start/stop/status/logs` subcommands; setsid-detached pids (no orphans); `.run/` gitignored. Verified full stop/start cycles end-to-end | ✅ |
+| P0 commit: not yet requested by user | ⏳ |
+
 Product goals (priority): security > working end-to-end > mobile UX > clean architecture > performance > polish > extensibility > testing > docs.
 
 Non-negotiable rules (from spec §4/§19):

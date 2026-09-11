@@ -57,9 +57,11 @@ export function ErrorState({
 export function EmptyState({
   message,
   icon = "book-outline",
+  action,
 }: {
   message: string;
   icon?: keyof typeof Ionicons.glyphMap;
+  action?: { label: string; onPress: () => void };
 }) {
   const theme = useTheme();
   return (
@@ -76,6 +78,22 @@ export function EmptyState({
       >
         {message}
       </ThemedText>
+      {action ? (
+        <Pressable
+          onPress={action.onPress}
+          accessibilityRole="button"
+          accessibilityLabel={action.label}
+          style={({ pressed }) => [
+            styles.emptyAction,
+            { backgroundColor: theme.accent },
+            pressed && styles.pressed,
+          ]}
+        >
+          <ThemedText type="smallBold" style={{ color: theme.onAccent }}>
+            {action.label}
+          </ThemedText>
+        </Pressable>
+      ) : null}
     </Surface>
   );
 }
@@ -100,5 +118,13 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: "center",
+  },
+  emptyAction: {
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.two,
+    minHeight: TouchTarget.Android,
+    justifyContent: "center",
+    marginTop: Spacing.one,
   },
 });

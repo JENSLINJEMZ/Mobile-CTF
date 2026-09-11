@@ -234,7 +234,7 @@ export default function EventsScreen() {
                         item.status === "DRAFT"
                           ? theme.text
                           : item.joinedByMe
-                            ? "#ffffff"
+                            ? theme.onDanger
                             : theme.onAccent
                       }
                       size="small"
@@ -247,7 +247,7 @@ export default function EventsScreen() {
                           item.status === "DRAFT"
                             ? theme.text
                             : item.joinedByMe
-                              ? "#ffffff"
+                              ? theme.onDanger
                               : theme.onAccent,
                         fontWeight: "600",
                       }}

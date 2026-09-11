@@ -22,6 +22,9 @@ apps/mobile/dist/
 *.log
 npm-debug.log*
 
+# Runtime state (run.sh)
+.run/
+
 # OS / editor
 .DS_Store
 Thumbs.db

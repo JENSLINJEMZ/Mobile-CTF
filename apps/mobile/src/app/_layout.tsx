@@ -4,9 +4,10 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { StyleSheet, useColorScheme } from "react-native";
+import { StyleSheet, Text, View, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ToastProvider } from "@/components/toast";
 import { useAuthStore } from "@/store/auth-store";
 import { useNotificationStore } from "@/store/notification-store";
 import {
@@ -54,7 +55,8 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-      <Tabs
+      <ToastProvider>
+        <Tabs
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: theme.accent,
@@ -63,8 +65,8 @@ export default function RootLayout() {
           tabBarStyle: [
             styles.tabBar,
             {
-              backgroundColor: theme.tabBar,
-              borderTopColor: theme.separator,
+              backgroundColor: theme.tabBar.bg,
+              borderTopColor: theme.tabBar.border,
               height: 60 + insets.bottom,
               paddingBottom: insets.bottom,
               paddingTop: 8,
@@ -136,9 +138,23 @@ export default function RootLayout() {
           name="notifications"
           options={{
             title: "Notifications",
-            tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="notifications" size={size} color={color} />
+              <View style={styles.badgeWrap}>
+                <Ionicons name="notifications" size={size} color={color} />
+                {unreadCount > 0 ? (
+                  <Text
+                    style={[
+                      styles.badge,
+                      {
+                        backgroundColor: theme.badge.bg,
+                        color: theme.badge.fg,
+                      },
+                    ]}
+                  >
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Text>
+                ) : null}
+              </View>
             ),
           }}
         />
@@ -180,7 +196,8 @@ export default function RootLayout() {
           name="auth/register"
           options={{ href: null, title: "Create account" }}
         />
-      </Tabs>
+        </Tabs>
+      </ToastProvider>
     </ThemeProvider>
   );
 }
@@ -201,5 +218,25 @@ const styles = StyleSheet.create({
   },
   tabBarIcon: {
     marginVertical: 2,
+  },
+  badgeWrap: {
+    width: 28,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badge: {
+    position: "absolute",
+    top: -2,
+    right: -10,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    fontSize: 10,
+    lineHeight: 16,
+    fontWeight: "700",
+    textAlign: "center",
+    overflow: "hidden",
   },
 });

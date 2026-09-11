@@ -224,13 +224,13 @@ export default function EventDetailScreen() {
             >
               {busy ? (
                 <ActivityIndicator
-                  color={event.joinedByMe ? "#ffffff" : theme.onAccent}
+                  color={event.joinedByMe ? theme.onDanger : theme.onAccent}
                   size="small"
                 />
               ) : (
                 <ThemedText
                   style={{
-                    color: event.joinedByMe ? "#ffffff" : theme.onAccent,
+                    color: event.joinedByMe ? theme.onDanger : theme.onAccent,
                     fontWeight: "600",
                   }}
                 >

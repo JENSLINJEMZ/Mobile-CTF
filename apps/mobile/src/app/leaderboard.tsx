@@ -3,18 +3,18 @@ import { LEADERBOARD } from "@ctf/shared";
 import { Link, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
 } from "react-native";
 
+import { SegmentedControl } from "@/components/segmented-control";
+import { Skeleton } from "@/components/skeleton";
 import { EmptyState, ErrorState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
 import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { Radius, Spacing, TouchTarget } from "@/constants/theme";
 import { getLeaderboard } from "@/services/leaderboard";
 import {
@@ -30,12 +30,6 @@ const SCOPE_LABELS: Record<LeaderboardScope, string> = {
   global: "Global",
   daily: "Daily",
   weekly: "Weekly",
-};
-
-const MEDAL_COLORS: Record<number, string> = {
-  1: "#d4af37",
-  2: "#b5b5bd",
-  3: "#cd7f32",
 };
 
 export default function LeaderboardScreen() {
@@ -116,41 +110,15 @@ export default function LeaderboardScreen() {
         </Surface>
       ) : null}
 
-      <ThemedView style={styles.chips}>
-        {LEADERBOARD.SCOPES.map((value) => {
-          const active = value === scope;
-          return (
-            <Pressable
-              key={value}
-              onPress={() => {
-                if (!active) {
-                  setScope(value);
-                  void load(value);
-                }
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={`Show ${SCOPE_LABELS[value]} leaderboard`}
-              accessibilityState={{ selected: active }}
-              style={({ pressed }) => [
-                styles.chip,
-                active && [styles.chipActive, { backgroundColor: theme.accent }],
-                !active && [
-                  styles.chipIdle,
-                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                ],
-                pressed && styles.cardPressed,
-              ]}
-            >
-              <ThemedText
-                type="smallBold"
-                style={{ color: active ? theme.onAccent : theme.text }}
-              >
-                {SCOPE_LABELS[value]}
-              </ThemedText>
-            </Pressable>
-          );
-        })}
-      </ThemedView>
+      <SegmentedControl<LeaderboardScope>
+        accessibilityLabel="Leaderboard scope"
+        value={scope}
+        onChange={setScope}
+        options={LEADERBOARD.SCOPES.map((value) => ({
+          value,
+          label: SCOPE_LABELS[value],
+        }))}
+      />
 
       {me != null ? (
         <Surface radius={Radius.md} style={styles.scoreCard} variant="selected">
@@ -170,9 +138,7 @@ export default function LeaderboardScreen() {
         </Surface>
       ) : null}
 
-      {loading && !data ? (
-        <ActivityIndicator style={{ marginTop: Spacing.four }} />
-      ) : null}
+      {loading && !data ? <Skeleton count={6} height={56} /> : null}
 
       {error ? (
         <ErrorState message={error} onRetry={() => void load(scope)} />
@@ -193,7 +159,14 @@ export default function LeaderboardScreen() {
         }
       >
         {entries.map((entry) => {
-          const medal = MEDAL_COLORS[entry.rank];
+          const medal =
+            entry.rank === 1
+              ? theme.medalGold
+              : entry.rank === 2
+                ? theme.medalSilver
+                : entry.rank === 3
+                  ? theme.medalBronze
+                  : undefined;
           const isMe = entry.userId === currentUser?.id;
           return (
             <Surface
@@ -252,20 +225,6 @@ const styles = StyleSheet.create({
   },
   signInLabel: {
     fontWeight: "600",
-  },
-  chips: {
-    flexDirection: "row",
-    gap: Spacing.two,
-  },
-  chip: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one + Spacing.half,
-    borderRadius: 999,
-    backgroundColor: "transparent",
-  },
-  chipActive: {},
-  chipIdle: {
-    borderWidth: StyleSheet.hairlineWidth,
   },
   scoreCard: {
     width: "100%",

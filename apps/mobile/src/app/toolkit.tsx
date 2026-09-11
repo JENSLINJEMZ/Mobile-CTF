@@ -1,3 +1,4 @@
+import * as Clipboard from "expo-clipboard";
 import {
   analyzeFrequency,
   caesar,
@@ -17,13 +18,14 @@ import {
   xorWithKey,
 } from "@ctf/toolkit";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  View,
 } from "react-native";
 
 import { ScreenShell } from "@/components/screen-shell";
@@ -118,6 +120,48 @@ function TextArea({
   );
 }
 
+function CopyButton({ value }: { value: string }) {
+  const theme = useTheme();
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (copied) {
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
+    }
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [copied]);
+
+  const onCopy = () => {
+    void Clipboard.setStringAsync(value);
+    setCopied(true);
+  };
+
+  return (
+    <Pressable
+      onPress={onCopy}
+      disabled={copied}
+      accessibilityRole="button"
+      accessibilityLabel={copied ? "Output copied" : "Copy output"}
+      accessibilityState={{ disabled: copied }}
+      style={({ pressed }) => [
+        styles.copyButton,
+        { backgroundColor: theme.backgroundElement },
+        pressed && styles.pressed,
+      ]}
+    >
+      <ThemedText
+        type="small"
+        style={{ color: copied ? theme.accent : theme.textSecondary }}
+      >
+        {copied ? "Copied" : "Copy"}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
 function OutputBlock({ value, error }: { value: string; error?: string }) {
   const theme = useTheme();
   if (error) {
@@ -130,6 +174,12 @@ function OutputBlock({ value, error }: { value: string; error?: string }) {
   if (!value) return null;
   return (
     <Surface variant="quiet" radius={Radius.sm} style={styles.outputBox}>
+      <View style={styles.outputHeader}>
+        <ThemedText type="small" themeColor="textSecondary">
+          Output
+        </ThemedText>
+        <CopyButton value={value} />
+      </View>
       <ThemedText selectable style={styles.output}>
         {value}
       </ThemedText>
@@ -387,7 +437,7 @@ function CipherTool() {
                 <ThemedText type="small" style={styles.freqLetter}>
                   {entry.letter}
                 </ThemedText>
-                <ThemedView style={styles.freqTrack}>
+                <ThemedView style={[styles.freqTrack, { backgroundColor: theme.backgroundElement }]}>
                   <ThemedView
                     style={[
                       styles.freqBar,
@@ -663,6 +713,19 @@ const styles = StyleSheet.create({
     padding: Spacing.two,
     width: "100%",
   },
+  outputHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.one,
+  },
+  copyButton: {
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.half,
+    borderRadius: Radius.sm,
+    minHeight: TouchTarget.Android * 0.9,
+    justifyContent: "center",
+  },
   output: {
     fontFamily: Fonts.mono,
     fontSize: 12,
@@ -685,7 +748,6 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "rgba(128,128,128,0.25)",
     overflow: "hidden",
   },
   freqBar: {

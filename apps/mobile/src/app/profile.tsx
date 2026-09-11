@@ -170,7 +170,7 @@ export default function ProfileScreen() {
         accessibilityLabel="Sign out all devices"
         accessibilityHint="Revokes your session on every device"
       >
-        <ThemedText style={[styles.buttonLabel, { color: "#ffffff" }]}>Sign out all devices</ThemedText>
+        <ThemedText style={[styles.buttonLabel, { color: theme.onDanger }]}>Sign out all devices</ThemedText>
       </Pressable>
 
       {error ? (

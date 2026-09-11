@@ -21,7 +21,7 @@ export function ScreenShell({
         <View
           style={[
             styles.headerBar,
-            { backgroundColor: theme.tabBar, borderBottomColor: theme.separator },
+            { backgroundColor: theme.header.bg, borderBottomColor: theme.header.border },
           ]}
         >
           <ThemedText type="subtitle" accessibilityRole="header" style={styles.header}>
