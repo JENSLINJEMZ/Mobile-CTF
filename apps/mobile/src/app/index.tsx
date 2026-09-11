@@ -5,7 +5,7 @@ import type {
   LeaderboardMeDto,
   PaginatedResult,
 } from "@ctf/shared";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -29,10 +29,10 @@ import {
   TouchTarget,
 } from "@/constants/theme";
 import { listChallengeCategories, listChallenges } from "@/services/challenges";
-import { listEvents } from "@/services/events";
+import { listEvents, joinEvent } from "@/services/events";
+import { getAchievements } from "@/services/achievements";
 import { getLeaderboard } from "@/services/leaderboard";
 import { useAuthGate } from "@/hooks/use-auth-gate";
-import { useAuthStore } from "@/store/auth-store";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { useTheme } from "@/hooks/use-theme";
 
@@ -49,10 +49,24 @@ function formatRemaining(ms: number): string {
   return `${days}d ${pad(hours)}h ${pad(minutes)}m`;
 }
 
+function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+const HOME_INDIGO = "#6a4afb";
+const HOME_SURFACE = "#0a1a2c";
+const HOME_SURFACE_HI = "#102031";
+const HOME_PILLS = ["LEARN", "HACK", "COMPETE", "ANYWHERE"] as const;
+
 export default function HomeScreen() {
   const theme = useTheme();
   const reduceMotion = useReduceMotion();
-  const { user } = useAuthStore();
+  const router = useRouter();
   const { status: authStatus } = useAuthGate();
   const [categories, setCategories] = useState<ChallengeCategoryDto[]>([]);
   const [data, setData] = useState<PaginatedResult<ChallengeSummaryDto> | null>(
@@ -60,6 +74,8 @@ export default function HomeScreen() {
   );
   const [events, setEvents] = useState<EventSummaryDto[]>([]);
   const [me, setMe] = useState<LeaderboardMeDto | null>(null);
+  const [badges, setBadges] = useState<number | null>(null);
+  const [expandLearning, setExpandLearning] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<
     string | undefined
   >();
@@ -112,11 +128,15 @@ export default function HomeScreen() {
   useEffect(() => {
     if (authStatus !== "authenticated") {
       setMe(null);
+      setBadges(null);
       return;
     }
     getLeaderboard("global", 1)
       .then((result) => setMe(result.me))
       .catch(() => setMe(null));
+    getAchievements()
+      .then((result) => setBadges(result.earnedCount))
+      .catch(() => setBadges(null));
   }, [authStatus]);
 
   useEffect(() => {
@@ -142,116 +162,366 @@ export default function HomeScreen() {
 
   const solvedCount = data?.items.filter((c) => c.solvedByMe).length ?? 0;
 
+  const runningEvent = events.find((e) => e.status === "RUNNING") ?? null;
+  const scheduledEvent =
+    runningEvent ?? events.find((e) => e.status === "SCHEDULED") ?? null;
+  const heroEvent = scheduledEvent;
+  const heroDeadline = heroEvent
+    ? new Date(heroEvent.endsAt).getTime() - Date.now()
+    : 0;
+  const heroStartIn = heroEvent
+    ? new Date(heroEvent.startsAt).getTime() - Date.now()
+    : 0;
+  const level = Math.max(1, Math.floor((me?.score ?? 0) / 250) + 1);
+  const featured = (data?.items ?? []).slice(0, expandLearning ? 8 : 4);
+  const maxSolves = Math.max(
+    1,
+    ...(data?.items ?? []).map((c) => c.solvedCount),
+  );
+  const nextUnsolved =
+    data?.items.find((c) => !c.solvedByMe) ?? data?.items[0] ?? null;
+  const missionDeadline = runningEvent
+    ? new Date(runningEvent.endsAt).getTime() - Date.now()
+    : 0;
+  const milestone = Math.max(500, Math.ceil((me?.score ?? 0) / 500) * 500);
+
+  const heroCta = () => {
+    if (!heroEvent) return;
+    if (!heroEvent.joinedByMe) void joinEvent(heroEvent.id).catch(() => undefined);
+    router.push(`/event/${heroEvent.id}`);
+  };
+
+  const missionCta = () => {
+    if (nextUnsolved) router.push(`/challenge/${nextUnsolved.id}`);
+  };
+
   const listHeader = (
     <>
-      <View style={styles.dashboardHeader}>
-        <ThemedText type="smallBold" style={styles.brandLabel}>
-          MOBILECTF
+      <View style={styles.headerRow}>
+        <ThemedText type="title" style={styles.brand}>
+          Mobile CTF
         </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          Welcome back,
-        </ThemedText>
-        <ThemedText type="title" style={styles.greeting}>
-          {user?.username ?? "CTF Player"}
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          Ready to hack something awesome?
-        </ThemedText>
-
-        <Surface radius={Radius.lg} style={styles.statsCard}>
-          <View style={styles.statItem}>
-            <ThemedText type="small" themeColor="textSecondary">Rank</ThemedText>
-            <ThemedText type="smallBold" style={styles.statValue}>
-              {me?.rank != null ? `#${me.rank}` : "—"}
-            </ThemedText>
-          </View>
-          <View style={[styles.statDivider, { backgroundColor: theme.separator }]} />
-          <View style={styles.statItem}>
-            <ThemedText type="small" themeColor="textSecondary">Score</ThemedText>
-            <ThemedText type="smallBold" style={styles.statValue}>
-              {me?.score != null ? me.score.toLocaleString() : "—"}
-            </ThemedText>
-          </View>
-          <View style={[styles.statDivider, { backgroundColor: theme.separator }]} />
-          <View style={styles.statItem}>
-            <ThemedText type="small" themeColor="textSecondary">Solved</ThemedText>
-            <ThemedText type="smallBold" style={styles.statValue}>
-              {me?.solves != null
-                ? String(me.solves)
-                : solvedCount > 0
-                  ? String(solvedCount)
-                  : "—"}
-            </ThemedText>
-          </View>
-        </Surface>
+        <View style={styles.levelChip}>
+          <ThemedText type="smallBold" style={styles.levelChipLabel}>
+            Lv. {level}
+          </ThemedText>
+        </View>
       </View>
 
-      {events.length > 0 && (
+      <View style={styles.pillRow}>
+        {HOME_PILLS.map((pill) => (
+          <View key={pill} style={[styles.pill, { borderColor: theme.border }]}>
+            <ThemedText
+              type="small"
+              themeColor="textSecondary"
+              style={styles.pillLabel}
+            >
+              {pill}
+            </ThemedText>
+          </View>
+        ))}
+      </View>
+
+      {heroEvent ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Open event ${heroEvent.title}`}
+          onPress={heroCta}
+          style={({ pressed }) => [
+            styles.heroCard,
+            pressed && !reduceMotion && styles.cardPressed,
+          ]}
+        >
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroLiveRow}>
+              <View style={styles.liveDot} />
+              <ThemedText type="small" style={styles.heroLiveText}>
+                {runningEvent ? "LIVE EVENT" : "UPCOMING EVENT"}
+              </ThemedText>
+            </View>
+            <ThemedText type="small" themeColor="textSecondary">
+              HACK · LEARN · GROW
+            </ThemedText>
+          </View>
+          <ThemedText type="title" style={styles.heroTitle} numberOfLines={2}>
+            {heroEvent.title}
+          </ThemedText>
+          <ThemedText
+            type="small"
+            themeColor="textSecondary"
+            numberOfLines={2}
+            style={styles.heroSub}
+          >
+            {heroEvent.description || "The ultimate hacking event."}
+          </ThemedText>
+
+          <View style={styles.heroStatsRow}>
+            <View style={styles.heroStat}>
+              <ThemedText type="smallBold" style={styles.heroStatValue}>
+                {heroEvent.participantCount.toLocaleString()}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Players
+              </ThemedText>
+            </View>
+            <View style={styles.heroStat}>
+              <ThemedText type="smallBold" style={styles.heroStatValue}>
+                {heroEvent.teamCount.toLocaleString()}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Teams
+              </ThemedText>
+            </View>
+            <View style={styles.heroStat}>
+              <ThemedText type="smallBold" style={styles.heroStatValue}>
+                {runningEvent
+                  ? formatRemaining(heroDeadline)
+                  : formatRemaining(heroStartIn)}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {runningEvent ? "Time Left" : "Starts In"}
+              </ThemedText>
+            </View>
+          </View>
+
+          <View style={[styles.joinBtn, { backgroundColor: HOME_INDIGO }]}>
+            <ThemedText style={styles.joinLabel}>
+              {heroEvent.joinedByMe ? "View Event" : "Join Event"}
+            </ThemedText>
+          </View>
+        </Pressable>
+      ) : null}
+
+      {featured.length > 0 ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <ThemedText type="smallBold">Active Events</ThemedText>
-            <Link href="/events" asChild>
-              <Pressable accessibilityRole="link" accessibilityLabel="View all events">
-                <ThemedText type="small" style={{ color: theme.accent }}>View All</ThemedText>
-              </Pressable>
-            </Link>
+            <ThemedText type="smallBold">Continue Learning</ThemedText>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                expandLearning ? "Show fewer challenges" : "See all challenges"
+              }
+              onPress={() => setExpandLearning((v) => !v)}
+              style={({ pressed }) => pressed && styles.textPillPressed}
+            >
+              <ThemedText type="small" style={{ color: theme.accent }}>
+                {expandLearning ? "Show less →" : "See All →"}
+              </ThemedText>
+            </Pressable>
           </View>
-          <FlatList
-            horizontal
-            data={events.slice(0, 4)}
-            keyExtractor={(item) => String(item.id)}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: Spacing.two }}
-            renderItem={({ item }) => {
-              const isLive = item.status === "RUNNING";
-              const endsInMs = new Date(item.endsAt).getTime() - Date.now();
-              const startsInMs = new Date(item.startsAt).getTime() - Date.now();
+          <View style={styles.grid}>
+            {featured.map((item) => {
+              const pct = Math.round((item.solvedCount / maxSolves) * 100);
               return (
-                <Link href={`/event/${item.id}`} asChild>
+                <Link key={item.id} href={`/challenge/${item.id}`} asChild>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={item.title}
+                    accessibilityLabel={`Challenge ${item.title}, ${item.basePoints} points, ${difficultyLabel(item.difficulty)}`}
                     style={({ pressed }) => [
-                      styles.eventCard,
-                      { backgroundColor: theme.surface },
+                      styles.gridCard,
                       pressed && !reduceMotion && styles.cardPressed,
                     ]}
                   >
-                    <View style={styles.eventTopRow}>
-                      <ThemedText type="smallBold" numberOfLines={1} style={styles.eventTitle}>
-                        {item.title}
+                    <View style={styles.gridHeader}>
+                      <ThemedText
+                        type="small"
+                        themeColor="textSecondary"
+                        numberOfLines={1}
+                        style={styles.gridCategory}
+                      >
+                        {item.category.name}
                       </ThemedText>
-                      {isLive ? (
-                        <View style={[styles.liveBadge, { backgroundColor: theme.danger }]}>
-                          <ThemedText type="small" style={styles.liveBadgeLabel}>
-                            LIVE
-                          </ThemedText>
-                        </View>
-                      ) : null}
+                      <ThemedText
+                        type="small"
+                        style={{
+                          color: difficultyColor(item.difficulty, theme),
+                        }}
+                      >
+                        {difficultyLabel(item.difficulty)}
+                      </ThemedText>
                     </View>
-                    <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                      {isLive
-                        ? `Ends in ${formatRemaining(endsInMs)}`
-                        : item.status === "SCHEDULED"
-                          ? `Starts in ${formatRemaining(startsInMs)}`
-                          : `Ended ${new Date(item.endsAt).toLocaleDateString()}`}
+                    <ThemedText type="smallBold" numberOfLines={2} style={styles.gridTitle}>
+                      {item.title}
                     </ThemedText>
+                    <View style={styles.progressRow}>
+                      <View style={styles.progressTrack}>
+                        <View style={[styles.progressFill, { flex: pct }]} />
+                        <View
+                          style={[
+                            styles.progressSpacer,
+                            { flex: Math.max(0, 100 - pct) },
+                          ]}
+                        />
+                      </View>
+                      <ThemedText type="small" themeColor="textSecondary" style={styles.progressPct}>
+                        {pct}%
+                      </ThemedText>
+                    </View>
                   </Pressable>
                 </Link>
               );
-            }}
-          />
+            })}
+          </View>
         </View>
-      )}
+      ) : null}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open offline packs in the toolkit"
+        onPress={() => router.push("/toolkit")}
+        style={({ pressed }) => [
+          styles.tile,
+          pressed && !reduceMotion && styles.cardPressed,
+        ]}
+      >
+        <View style={styles.tileBody}>
+          <ThemedText type="smallBold">Offline Packs</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            Tools that work without a signal
+          </ThemedText>
+        </View>
+        <ThemedText type="small" style={{ color: theme.accent }}>→</ThemedText>
+      </Pressable>
+
+      {nextUnsolved ? (
+        <View style={styles.missionCard}>
+          <View style={styles.missionTopRow}>
+            <ThemedText type="smallBold">Daily Mission</ThemedText>
+            {runningEvent ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                {formatCountdown(missionDeadline)}
+              </ThemedText>
+            ) : null}
+          </View>
+          <View style={styles.missionSubRow}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Your Progress
+            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              Level {level}
+            </ThemedText>
+          </View>
+          <ThemedText type="subtitle" style={styles.missionTitle}>
+            Can you find the flag?
+          </ThemedText>
+          <View style={styles.xpRow}>
+            <View style={[styles.progressTrack, styles.xpTrack]}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    flex: Math.min(
+                      100,
+                      Math.round(((me?.score ?? 0) / milestone) * 100),
+                    ),
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.progressSpacer,
+                  {
+                    flex: Math.max(
+                      0,
+                      100 -
+                        Math.min(
+                          100,
+                          Math.round(((me?.score ?? 0) / milestone) * 100),
+                        ),
+                    ),
+                  },
+                ]}
+              />
+            </View>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.xpLabel}>
+              {(me?.score ?? 0).toLocaleString()}/
+              {milestone.toLocaleString()} pts
+            </ThemedText>
+          </View>
+          <View style={styles.rewardRow}>
+            <View style={styles.rewardChip}>
+              <ThemedText type="small" style={{ color: theme.success }}>
+                +{nextUnsolved.basePoints} pts
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                Solve &ldquo;{nextUnsolved.title}&rdquo;
+              </ThemedText>
+            </View>
+            <View style={styles.rewardChip}>
+              <ThemedText type="small" style={{ color: theme.accent }}>
+                +{Math.max(10, Math.round(nextUnsolved.basePoints / 2))} Bonus
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                First attempt bonus
+              </ThemedText>
+            </View>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Start challenge ${nextUnsolved.title}`}
+            onPress={missionCta}
+            style={({ pressed }) => [
+              styles.missionCta,
+              pressed && !reduceMotion && styles.cardPressed,
+            ]}
+          >
+            <ThemedText type="small" style={{ color: theme.accent }}>
+              Start Challenge →
+            </ThemedText>
+          </Pressable>
+          <View style={styles.missionStatsRow}>
+            <View style={styles.missionStat}>
+              <ThemedText type="smallBold">{me?.solves ?? solvedCount}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Solved
+              </ThemedText>
+            </View>
+            <View style={styles.missionStat}>
+              <ThemedText type="smallBold">—</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                First Bloods
+              </ThemedText>
+            </View>
+            <View style={styles.missionStat}>
+              <ThemedText type="smallBold">—</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Day Streak
+              </ThemedText>
+            </View>
+            <View style={styles.missionStat}>
+              <ThemedText type="smallBold">{badges ?? "—"}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Badges
+              </ThemedText>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open the cyber toolkit"
+        onPress={() => router.push("/toolkit")}
+        style={({ pressed }) => [
+          styles.tile,
+          pressed && !reduceMotion && styles.cardPressed,
+        ]}
+      >
+        <View style={styles.tileBody}>
+          <ThemedText type="smallBold">Cyber Toolkit</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            Powerful tools for every hacker.
+          </ThemedText>
+        </View>
+        <ThemedText type="small" style={{ color: theme.accent }}>→</ThemedText>
+      </Pressable>
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <ThemedText type="smallBold">Recent Challenges</ThemedText>
-          <Link href="/" asChild>
-            <Pressable accessibilityRole="link" accessibilityLabel="View all challenges">
-              <ThemedText type="small" style={{ color: theme.accent }}>View All</ThemedText>
-            </Pressable>
-          </Link>
+          <ThemedText type="smallBold">All Challenges</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {data ? `${data.items.length} on this page` : ""}
+          </ThemedText>
         </View>
       </View>
 
@@ -412,38 +682,100 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  dashboardHeader: {
-    gap: Spacing.one,
-    paddingBottom: Spacing.one,
-  },
-  brandLabel: {
-    fontWeight: "800",
-    letterSpacing: 1,
-    fontSize: 11,
-    marginBottom: Spacing.half,
-  },
-  greeting: {
-    fontWeight: "700",
-  },
-  statsCard: {
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.two,
-    marginTop: Spacing.two,
-    width: "100%",
+    justifyContent: "space-between",
+    paddingBottom: Spacing.one,
   },
-  statItem: {
-    flex: 1,
+  brand: {
+    fontWeight: "800",
+  },
+  levelChip: {
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(220, 228, 240, 0.18)",
+    backgroundColor: HOME_SURFACE,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+  },
+  levelChipLabel: {
+    color: HOME_INDIGO,
+  },
+  pillRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.two,
+    marginTop: Spacing.two,
+  },
+  pill: {
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
+  },
+  pillLabel: {
+    letterSpacing: 0.75,
+    fontWeight: "600",
+  },
+  heroCard: {
+    backgroundColor: HOME_SURFACE,
+    borderRadius: Radius.lg,
+    padding: Spacing.four,
+    marginTop: Spacing.three,
+    gap: Spacing.two,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(220, 228, 240, 0.08)",
+  },
+  heroTopRow: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+  },
+  heroLiveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.one,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#c9344f",
+  },
+  heroLiveText: {
+    color: "#c9344f",
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  heroTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+  },
+  heroSub: {
+    opacity: 0.9,
+  },
+  heroStatsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: Spacing.two,
+  },
+  heroStat: {
     gap: Spacing.half,
   },
-  statValue: {
-    fontSize: 18,
+  heroStatValue: {
+    fontSize: 16,
   },
-  statDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 32,
+  joinBtn: {
+    borderRadius: Radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.three,
+    marginTop: Spacing.one,
+  },
+  joinLabel: {
+    color: "#ffffff",
+    fontWeight: "700",
   },
   section: {
     marginTop: Spacing.three,
@@ -454,30 +786,134 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  eventCard: {
-    width: 200,
-    borderRadius: Radius.md,
-    padding: Spacing.three,
-    gap: Spacing.one,
-  },
-  eventTopRow: {
+  grid: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.two,
+  },
+  gridCard: {
+    backgroundColor: HOME_SURFACE_HI,
+    borderRadius: Radius.lg,
+    padding: Spacing.three,
+    gap: Spacing.two,
+    width: "48%",
+  },
+  gridHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
     gap: Spacing.one,
   },
-  eventTitle: {
+  gridCategory: {
     flex: 1,
-  },
-  liveBadge: {
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.one,
-    paddingVertical: 2,
-  },
-  liveBadgeLabel: {
-    color: "#ffffff",
-    fontSize: 9,
-    fontWeight: "800",
+    textTransform: "uppercase",
     letterSpacing: 0.5,
+  },
+  gridTitle: {
+    minHeight: 36,
+  },
+  progressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+  },
+  progressTrack: {
+    flex: 1,
+    flexDirection: "row",
+    height: 4,
+    borderRadius: 2,
+    overflow: "hidden",
+    backgroundColor: "rgba(220, 228, 240, 0.10)",
+  },
+  progressFill: {
+    backgroundColor: HOME_INDIGO,
+  },
+  progressSpacer: {
+    backgroundColor: "transparent",
+  },
+  progressPct: {
+    minWidth: 30,
+    textAlign: "right",
+  },
+  tile: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: HOME_SURFACE_HI,
+    borderRadius: Radius.lg,
+    padding: Spacing.four,
+    marginTop: Spacing.three,
+    gap: Spacing.two,
+  },
+  tileBody: {
+    flex: 1,
+    gap: Spacing.half,
+  },
+  missionCard: {
+    backgroundColor: HOME_SURFACE,
+    borderRadius: Radius.lg,
+    padding: Spacing.four,
+    marginTop: Spacing.three,
+    gap: Spacing.two,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(220, 228, 240, 0.08)",
+  },
+  missionTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  missionSubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.one,
+  },
+  missionTitle: {
+    fontWeight: "800",
+  },
+  xpRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+  },
+  xpTrack: {
+    height: 6,
+  },
+  xpLabel: {
+    minWidth: 90,
+    textAlign: "right",
+  },
+  rewardRow: {
+    flexDirection: "row",
+    gap: Spacing.two,
+    marginTop: Spacing.one,
+  },
+  rewardChip: {
+    flex: 1,
+    backgroundColor: HOME_SURFACE_HI,
+    borderRadius: Radius.md,
+    padding: Spacing.two + Spacing.half,
+    gap: 2,
+  },
+  missionCta: {
+    alignSelf: "flex-start",
+    paddingVertical: Spacing.one,
+  },
+  missionStatsRow: {
+    flexDirection: "row",
+    marginTop: Spacing.one,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(220, 228, 240, 0.08)",
+    paddingTop: Spacing.three,
+  },
+  missionStat: {
+    flex: 1,
+    alignItems: "center",
+    gap: 2,
+  },
+  textPillPressed: {
+    opacity: 0.7,
   },
   cardCategory: {
     textTransform: "uppercase",
