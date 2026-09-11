@@ -463,7 +463,7 @@ export default function ChallengeDetailScreen() {
                 <ActivityIndicator color={theme.onAccent} size="small" />
               ) : (
                 <ThemedText style={{ color: theme.onAccent, fontWeight: "600" }}>
-                  Submit
+                  Submit Flag
                 </ThemedText>
               )}
             </Pressable>

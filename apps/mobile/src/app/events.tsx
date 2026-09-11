@@ -11,6 +11,7 @@ import {
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
+import { SegmentedControl } from "@/components/segmented-control";
 import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -25,7 +26,7 @@ function statusColor(status: EventSummaryDto["status"], theme: ReturnType<typeof
     case "DRAFT":
       return theme.textSecondary;
     case "SCHEDULED":
-      return theme.accent;
+      return theme.difficultyMedium;
     case "RUNNING":
       return theme.success;
     case "ENDED":
@@ -54,6 +55,7 @@ function remainingLabel(event: EventSummaryDto): string {
 export default function EventsScreen() {
   const theme = useTheme();
   const { isAuthenticated } = useAuthGate();
+  const [filter, setFilter] = useState<"UPCOMING" | "LIVE" | "FINISHED">("LIVE");
   const [events, setEvents] = useState<EventSummaryDto[] | null>(null);
   const [announcements, setAnnouncements] = useState<AnnouncementDto[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -106,8 +108,30 @@ export default function EventsScreen() {
     setRefreshing(false);
   }, [load]);
 
+  const filteredEvents = (events ?? []).filter((e) => {
+    switch (filter) {
+      case "UPCOMING":
+        return e.status === "SCHEDULED" || e.status === "DRAFT";
+      case "LIVE":
+        return e.status === "RUNNING";
+      case "FINISHED":
+        return e.status === "ENDED";
+    }
+  });
+
   return (
     <ScreenShell title="Events">
+      <SegmentedControl
+        accessibilityLabel="Filter events"
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { label: "Upcoming", value: "UPCOMING" },
+          { label: "Live", value: "LIVE" },
+          { label: "Finished", value: "FINISHED" },
+        ]}
+      />
+
       {announcements.length > 0 ? (
         <FlatList
           horizontal
@@ -154,7 +178,7 @@ export default function EventsScreen() {
         <LoadingState />
       ) : (
         <FlatList
-          data={events}
+          data={filteredEvents}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.listContent}
           refreshControl={

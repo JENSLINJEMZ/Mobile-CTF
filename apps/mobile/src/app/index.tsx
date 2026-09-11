@@ -1,6 +1,7 @@
 import type {
   ChallengeCategoryDto,
   ChallengeSummaryDto,
+  EventSummaryDto,
   PaginatedResult,
 } from "@ctf/shared";
 import { Link } from "expo-router";
@@ -11,6 +12,7 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
+  View,
 } from "react-native";
 
 import { EmptyState, ErrorState } from "@/components/state-views";
@@ -26,7 +28,9 @@ import {
   TouchTarget,
 } from "@/constants/theme";
 import { listChallengeCategories, listChallenges } from "@/services/challenges";
+import { listEvents } from "@/services/events";
 import { useAuthGate } from "@/hooks/use-auth-gate";
+import { useAuthStore } from "@/store/auth-store";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { useTheme } from "@/hooks/use-theme";
 
@@ -34,14 +38,16 @@ function difficultyLabel(value: string): string {
   return value.charAt(0) + value.slice(1).toLowerCase();
 }
 
-export default function ChallengesScreen() {
+export default function HomeScreen() {
   const theme = useTheme();
   const reduceMotion = useReduceMotion();
+  const { user } = useAuthStore();
   const { status: authStatus } = useAuthGate();
   const [categories, setCategories] = useState<ChallengeCategoryDto[]>([]);
   const [data, setData] = useState<PaginatedResult<ChallengeSummaryDto> | null>(
     null,
   );
+  const [events, setEvents] = useState<EventSummaryDto[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<
     string | undefined
   >();
@@ -86,6 +92,9 @@ export default function ChallengesScreen() {
     void listChallengeCategories()
       .then(setCategories)
       .catch(() => undefined);
+    void listEvents()
+      .then(setEvents)
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -109,13 +118,88 @@ export default function ChallengesScreen() {
     if (authStatus === "authenticated") void load(selectedCategory, search);
   }, [authStatus, selectedCategory, search, load]);
 
-  const sub = useCallback(
-    (text: string) => text.slice(0, 92) + (text.length > 92 ? "…" : ""),
-    [],
-  );
+  const solvedCount = data?.items.filter((c) => c.solvedByMe).length ?? 0;
 
-  return (
-    <ScreenShell title="Challenges">
+  const listHeader = (
+    <>
+      <View style={styles.dashboardHeader}>
+        <ThemedText type="smallBold" style={styles.brandLabel}>
+          MOBILECTF
+        </ThemedText>
+        <ThemedText type="title" style={styles.greeting}>
+          Welcome back, {user?.username ?? "Player"}
+        </ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">
+          Ready to hack something awesome?
+        </ThemedText>
+
+        <View style={[styles.statsRow, { backgroundColor: theme.surface }]}>
+          <View style={styles.statItem}>
+            <ThemedText type="small" themeColor="textSecondary">Rank</ThemedText>
+            <ThemedText type="smallBold">—</ThemedText>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: theme.separator }]} />
+          <View style={styles.statItem}>
+            <ThemedText type="small" themeColor="textSecondary">Score</ThemedText>
+            <ThemedText type="smallBold">—</ThemedText>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: theme.separator }]} />
+          <View style={styles.statItem}>
+            <ThemedText type="small" themeColor="textSecondary">Solved</ThemedText>
+            <ThemedText type="smallBold">{String(solvedCount)}</ThemedText>
+          </View>
+        </View>
+      </View>
+
+      {events.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <ThemedText type="smallBold">Active Events</ThemedText>
+            <Link href="/events" asChild>
+              <Pressable accessibilityRole="link" accessibilityLabel="View all events">
+                <ThemedText type="small" style={{ color: theme.accent }}>View All</ThemedText>
+              </Pressable>
+            </Link>
+          </View>
+          <FlatList
+            horizontal
+            data={events.slice(0, 4)}
+            keyExtractor={(item) => String(item.id)}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: Spacing.two }}
+            renderItem={({ item }) => (
+              <Link href={`/event/${item.id}`} asChild>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={item.title}
+                  style={({ pressed }) => [
+                    styles.eventCard,
+                    { backgroundColor: theme.surface },
+                    pressed && !reduceMotion && styles.cardPressed,
+                  ]}
+                >
+                  <ThemedText type="smallBold" numberOfLines={1}>{item.title}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                    {item.status === "RUNNING" ? "Live now" : `Ends ${new Date(item.endsAt).toLocaleDateString()}`}
+                  </ThemedText>
+                </Pressable>
+              </Link>
+            )}
+          />
+        </View>
+      )}
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <ThemedText type="smallBold">Recent Challenges</ThemedText>
+          <Link href="/" asChild>
+            <Pressable accessibilityRole="link" accessibilityLabel="View all challenges">
+              <ThemedText type="small" style={{ color: theme.accent }}>View All</ThemedText>
+            </Pressable>
+          </Link>
+        </View>
+      </View>
+
       <Input
         value={search}
         onChangeText={setSearch}
@@ -160,9 +244,7 @@ export default function ChallengesScreen() {
               <ThemedText
                 style={[
                   styles.categoryChipLabel,
-                  {
-                    color: active ? theme.onAccent : theme.textSecondary,
-                  },
+                  { color: active ? theme.onAccent : theme.textSecondary },
                 ]}
               >
                 {item.name}
@@ -171,7 +253,11 @@ export default function ChallengesScreen() {
           );
         }}
       />
+    </>
+  );
 
+  return (
+    <ScreenShell title="">
       {error ? (
         <ErrorState
           message={error}
@@ -183,6 +269,7 @@ export default function ChallengesScreen() {
         <ActivityIndicator style={{ marginTop: Spacing.five }} />
       ) : (
         <FlatList
+          ListHeaderComponent={listHeader}
           data={data.items}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.listContent}
@@ -199,6 +286,7 @@ export default function ChallengesScreen() {
                   await Promise.all([
                     load(selectedCategory, search, false),
                     listChallengeCategories().then(setCategories),
+                    listEvents().then(setEvents),
                   ]);
                 } catch {
                   // error surfaced via load()
@@ -237,8 +325,7 @@ export default function ChallengesScreen() {
                       themeColor="textSecondary"
                       numberOfLines={2}
                     >
-                      {sub(item.category.name)} ·{" "}
-                      {difficultyLabel(item.difficulty)}
+                      {item.category.name} · {difficultyLabel(item.difficulty)}
                     </ThemedText>
                     {item.solvedByMe ? (
                       <ThemedText type="small" style={{ color: theme.success }}>
@@ -265,8 +352,53 @@ export default function ChallengesScreen() {
 }
 
 const styles = StyleSheet.create({
+  dashboardHeader: {
+    gap: Spacing.one,
+    paddingBottom: Spacing.one,
+  },
+  brandLabel: {
+    fontWeight: "800",
+    letterSpacing: 1,
+    fontSize: 11,
+    marginBottom: Spacing.half,
+  },
+  greeting: {
+    fontWeight: "700",
+  },
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: Radius.md,
+    padding: Spacing.three,
+    marginTop: Spacing.two,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+    gap: Spacing.half,
+  },
+  statDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 32,
+  },
+  section: {
+    marginTop: Spacing.three,
+    gap: Spacing.two,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  eventCard: {
+    width: 200,
+    borderRadius: Radius.md,
+    padding: Spacing.three,
+    gap: Spacing.one,
+  },
   search: {
     width: "100%",
+    marginTop: Spacing.two,
   },
   categoryChip: {
     borderRadius: Radius.pill,

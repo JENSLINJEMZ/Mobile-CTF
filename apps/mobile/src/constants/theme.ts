@@ -1,11 +1,11 @@
 /**
  * Design tokens — single source of truth for the mobile app.
  *
- * Solid, real-app identity (Telegram/WhatsApp-like): opaque flat surfaces,
- * a distinct header bar per screen, hairline separators between rows, and
- * the HackTheBox apple-green accent kept as the primary action color.
- * No translucency, no glows, no specular rims — every token is an opaque
- * color that signals meaning, not material. Screens never hardcode hex.
+ * Dark violet/navy identity: deep navy canvas (#0c111d), muted card
+ * surfaces (#0e1420), near-black input fields (#030713), lavender
+ * primary CTAs (#ecebfa), violet secondary accents (#806dc4),
+ * and a clean text hierarchy from white to dim gray. No translucency,
+ * no glows — every token is opaque and semantic.
  */
 
 import "@/global.css";
@@ -13,32 +13,51 @@ import "@/global.css";
 import { Platform } from "react-native";
 
 export const Palette = {
-  green: {
-    100: "#eaffd1",
-    300: "#c6f76a",
-    400: "#b3f515",
-    500: "#9FEF00",
-    600: "#7cbd00",
-    700: "#5f9000",
-    800: "#3f6100",
+  lavender: {
+    100: "#f5f4ff",
+    200: "#ecebfa",
+    300: "#d7d5f7",
+    400: "#c4c0f0",
+    500: "#b0abe8",
   },
   violet: {
-    400: "#b7a1fa",
-    500: "#a78bfa",
-    600: "#8b74e2",
-    700: "#6d5bd1",
-    900: "#2a2440",
+    300: "#b6a4f0",
+    400: "#9783e0",
+    500: "#806dc4",
+    600: "#7d6dc9",
+    700: "#5b4da6",
+    800: "#331d6a",
+    900: "#1e1a30",
   },
-  cyan: {
-    400: "#38bdf8",
-    500: "#0ea5e9",
-    700: "#0369a1",
+  navy: {
+    50: "#0c111d",
+    100: "#0d1320",
+    200: "#0e1420",
+    300: "#141a28",
+    400: "#1a1f2e",
+    500: "#212838",
+    600: "#2a3244",
+    700: "#353e52",
+  },
+  blue: {
+    300: "#b6c7dc",
+    400: "#a7b7d6",
+    500: "#7c8da8",
+    600: "#213668",
+    700: "#0a2443",
   },
   red: {
-    400: "#fb7185",
-    500: "#f43f5e",
-    700: "#be123c",
+    400: "#e05670",
+    500: "#c9344f",
+    600: "#a82840",
+    700: "#871e33",
     900: "#3f0d18",
+  },
+  green: {
+    300: "#7dde6a",
+    400: "#54ae33",
+    500: "#376c21",
+    600: "#2a5518",
   },
   amber: {
     300: "#fcd34d",
@@ -46,46 +65,20 @@ export const Palette = {
     600: "#d97706",
     800: "#92400e",
   },
-  success: {
-    100: "#dcfce7",
-    600: "#16a34a",
-    700: "#15803d",
-    800: "#166534",
-    900: "#10331f",
-  },
-  warning: {
-    100: "#fef3c7",
-    600: "#d97706",
-    700: "#b45309",
-    800: "#92400e",
-  },
-  danger: {
-    100: "#fee2e2",
-    600: "#dc2626",
-    700: "#b91c1c",
-    800: "#991b1b",
-  },
   neutral: {
-    100: "#f3f4f6",
-    200: "#e5e7eb",
-    300: "#d1d5db",
-    400: "#9ca3af",
-    500: "#6b7280",
-    600: "#4b5563",
-    700: "#39404d",
-    800: "#232a35",
-    850: "#1b2130",
-    900: "#141721",
-    950: "#0b0e15",
+    50: "#f3f4f5",
+    100: "#e5e7eb",
+    200: "#c8cfd0",
+    300: "#929ba6",
+    400: "#797c87",
+    500: "#555257",
+    600: "#3d3a40",
+    700: "#2a2830",
+    800: "#1a1820",
+    900: "#0d0b12",
   },
 } as const;
 
-/**
- * Scoped token namespaces (Telegram `PresentationTheme` pattern).
- * Flat semantic colors stay in the root for one-off uses; the namespaces
- * group the colors each UI surface actually consumes so components read
- * `theme.header.bg` instead of reaching for a "generic" color.
- */
 type ScopedTokens = {
   header: {
     bg: string;
@@ -145,183 +138,183 @@ type ScopedTokens = {
 const LIGHT_SCOPED: ScopedTokens = {
   header: {
     bg: "#ffffff",
-    title: "#16181d",
-    subtitle: "#5a6474",
-    border: "rgba(20, 25, 36, 0.08)",
+    title: "#0c111d",
+    subtitle: "#797c87",
+    border: "rgba(12, 17, 29, 0.08)",
   },
   tabBar: {
     bg: "#ffffff",
-    iconActive: "#7cbd00",
-    iconInactive: "#5a6474",
-    label: "#5a6474",
-    border: "rgba(20, 25, 36, 0.08)",
+    iconActive: "#7d6dc9",
+    iconInactive: "#797c87",
+    label: "#797c87",
+    border: "rgba(12, 17, 29, 0.08)",
   },
   list: {
     cellBg: "#ffffff",
-    separator: "rgba(20, 25, 36, 0.08)",
-    groupHeader: "#5a6474",
-    groupFooter: "#9ca3af",
+    separator: "rgba(12, 17, 29, 0.08)",
+    groupHeader: "#797c87",
+    groupFooter: "#929ba6",
   },
   badge: {
-    bg: "#dc2626",
+    bg: "#c9344f",
     fg: "#ffffff",
   },
   input: {
-    bg: "#e9ebf0",
-    value: "#16181d",
-    placeholder: "#9ca3af",
-    focusBorder: "#7cbd00",
+    bg: "#f0f1f5",
+    value: "#0c111d",
+    placeholder: "#929ba6",
+    focusBorder: "#7d6dc9",
   },
   card: {
     bg: "#ffffff",
-    border: "rgba(20, 25, 36, 0.12)",
-    title: "#16181d",
-    meta: "#5a6474",
+    border: "rgba(12, 17, 29, 0.10)",
+    title: "#0c111d",
+    meta: "#797c87",
   },
   segmented: {
-    track: "#e9ebf0",
+    track: "#f0f1f5",
     thumb: "#ffffff",
-    activeText: "#16181d",
-    idleText: "#5a6474",
+    activeText: "#0c111d",
+    idleText: "#797c87",
   },
   toast: {
     bg: "#ffffff",
-    title: "#16181d",
-    body: "#5a6474",
-    success: "#16a34a",
-    error: "#dc2626",
-    border: "rgba(20, 25, 36, 0.12)",
+    title: "#0c111d",
+    body: "#797c87",
+    success: "#376c21",
+    error: "#c9344f",
+    border: "rgba(12, 17, 29, 0.10)",
   },
   skeleton: {
-    base: "#e9ebf0",
-    highlight: "#dfe3ea",
+    base: "#f0f1f5",
+    highlight: "#e5e7eb",
   },
 };
 
 const DARK_SCOPED: ScopedTokens = {
   header: {
-    bg: "#141924",
-    title: "#e8eaf0",
-    subtitle: "#8b94a5",
-    border: "rgba(220, 228, 240, 0.09)",
+    bg: "#0c111d",
+    title: "#f3f4f5",
+    subtitle: "#797c87",
+    border: "rgba(220, 228, 240, 0.08)",
   },
   tabBar: {
-    bg: "#141924",
-    iconActive: "#9FEF00",
-    iconInactive: "#8b94a5",
-    label: "#8b94a5",
-    border: "rgba(220, 228, 240, 0.09)",
+    bg: "#0c111d",
+    iconActive: "#ecebfa",
+    iconInactive: "#797c87",
+    label: "#797c87",
+    border: "rgba(220, 228, 240, 0.08)",
   },
   list: {
-    cellBg: "#151c29",
-    separator: "rgba(220, 228, 240, 0.09)",
-    groupHeader: "#8b94a5",
-    groupFooter: "#6b7280",
+    cellBg: "#0e1420",
+    separator: "rgba(220, 228, 240, 0.08)",
+    groupHeader: "#797c87",
+    groupFooter: "#555257",
   },
   badge: {
-    bg: "#f87171",
+    bg: "#c9344f",
     fg: "#ffffff",
   },
   input: {
-    bg: "#1a2130",
-    value: "#e8eaf0",
-    placeholder: "#6b7280",
-    focusBorder: "#9FEF00",
+    bg: "#030713",
+    value: "#f3f4f5",
+    placeholder: "#797c87",
+    focusBorder: "#ecebfa",
   },
   card: {
-    bg: "#151c29",
-    border: "rgba(220, 228, 240, 0.12)",
-    title: "#e8eaf0",
-    meta: "#8b94a5",
+    bg: "#0e1420",
+    border: "rgba(220, 228, 240, 0.10)",
+    title: "#f3f4f5",
+    meta: "#797c87",
   },
   segmented: {
-    track: "#1a2130",
-    thumb: "#232c3e",
-    activeText: "#e8eaf0",
-    idleText: "#8b94a5",
+    track: "#0d1320",
+    thumb: "#141a28",
+    activeText: "#f3f4f5",
+    idleText: "#797c87",
   },
   toast: {
-    bg: "#1a2130",
-    title: "#e8eaf0",
-    body: "#8b94a5",
+    bg: "#0e1420",
+    title: "#f3f4f5",
+    body: "#797c87",
     success: "#4ade80",
-    error: "#f87171",
-    border: "rgba(220, 228, 240, 0.12)",
+    error: "#c9344f",
+    border: "rgba(220, 228, 240, 0.10)",
   },
   skeleton: {
-    base: "#1a2130",
-    highlight: "#232c3e",
+    base: "#0d1320",
+    highlight: "#141a28",
   },
 };
 
 export const Colors = {
   light: {
-    text: "#16181d",
-    textSecondary: "#5a6474",
+    text: "#0c111d",
+    textSecondary: "#555566",
     textInverse: "#ffffff",
-    background: "#f2f3f6",
-    backgroundElement: "#e9ebf0",
-    backgroundSelected: "#dfe3ea",
+    background: "#f0f1f5",
+    backgroundElement: "#e5e7eb",
+    backgroundSelected: "#d5d7dc",
     surface: "#ffffff",
-    separator: "rgba(20, 25, 36, 0.08)",
-    border: "rgba(20, 25, 36, 0.12)",
-    borderStrong: "rgba(20, 25, 36, 0.22)",
-    scrim: "rgba(11, 14, 21, 0.4)",
-    accent: "#7cbd00",
-    accentPressed: "#5f9000",
-    accentSubtle: "#f2fae0",
+    separator: "rgba(12, 17, 29, 0.08)",
+    border: "rgba(12, 17, 29, 0.10)",
+    borderStrong: "rgba(12, 17, 29, 0.18)",
+    scrim: "rgba(12, 17, 29, 0.5)",
+    accent: "#7d6dc9",
+    accentPressed: "#5b4da6",
+    accentSubtle: "#f0eefc",
     onAccent: "#ffffff",
     onDanger: "#ffffff",
-    success: "#16a34a",
-    successStrong: "#15803d",
-    successSubtle: "#dcfce7",
+    success: "#376c21",
+    successStrong: "#2a5518",
+    successSubtle: "#e8f5e2",
     warning: "#d97706",
     warningStrong: "#b45309",
     warningSubtle: "#fef3c7",
-    danger: "#dc2626",
-    dangerStrong: "#b91c1c",
-    dangerSubtle: "#fee2e2",
-    difficultyEasy: "#16a34a",
-    difficultyMedium: "#0ea5e9",
-    difficultyHard: "#8b5cf6",
-    difficultyExpert: "#f43f5e",
-    placeholder: "#9ca3af",
+    danger: "#c9344f",
+    dangerStrong: "#a82840",
+    dangerSubtle: "#fde8ec",
+    difficultyEasy: "#376c21",
+    difficultyMedium: "#213668",
+    difficultyHard: "#7d6dc9",
+    difficultyExpert: "#c9344f",
+    placeholder: "#929ba6",
     medalGold: "#d4af37",
     medalSilver: "#b5b5bd",
     medalBronze: "#cd7f32",
     ...LIGHT_SCOPED,
   },
   dark: {
-    text: "#e8eaf0",
-    textSecondary: "#8b94a5",
-    textInverse: "#ffffff",
-    background: "#10141c",
-    backgroundElement: "#1a2130",
-    backgroundSelected: "#232c3e",
-    surface: "#151c29",
-    separator: "rgba(220, 228, 240, 0.09)",
-    border: "rgba(220, 228, 240, 0.12)",
-    borderStrong: "rgba(220, 228, 240, 0.22)",
-    scrim: "rgba(5, 8, 14, 0.6)",
-    accent: "#9FEF00",
-    accentPressed: "#c6f76a",
-    accentSubtle: "#1d280a",
-    onAccent: "#0b0e15",
+    text: "#f3f4f5",
+    textSecondary: "#929ba6",
+    textInverse: "#0c111d",
+    background: "#0c111d",
+    backgroundElement: "#0d1320",
+    backgroundSelected: "#141a28",
+    surface: "#0e1420",
+    separator: "rgba(220, 228, 240, 0.08)",
+    border: "rgba(220, 228, 240, 0.10)",
+    borderStrong: "rgba(220, 228, 240, 0.15)",
+    scrim: "rgba(3, 5, 13, 0.7)",
+    accent: "#ecebfa",
+    accentPressed: "#d7d5f7",
+    accentSubtle: "#1e1a30",
+    onAccent: "#0c111d",
     onDanger: "#ffffff",
     success: "#4ade80",
-    successStrong: "#86efac",
-    successSubtle: "#10331f",
+    successStrong: "#7dde6a",
+    successSubtle: "#0a2a14",
     warning: "#fbbf24",
     warningStrong: "#fcd34d",
     warningSubtle: "#3b2c08",
-    danger: "#f87171",
-    dangerStrong: "#fca5a5",
-    dangerSubtle: "#3f1418",
-    difficultyEasy: "#a3e635",
-    difficultyMedium: "#38bdf8",
-    difficultyHard: "#a78bfa",
-    difficultyExpert: "#fb7185",
-    placeholder: "#6b7280",
+    danger: "#c9344f",
+    dangerStrong: "#e05670",
+    dangerSubtle: "#3f0d18",
+    difficultyEasy: "#54ae33",
+    difficultyMedium: "#a7b7d6",
+    difficultyHard: "#9783e0",
+    difficultyExpert: "#e05670",
+    placeholder: "#797c87",
     medalGold: "#f6d365",
     medalSilver: "#b9c0cc",
     medalBronze: "#e0a36a",
@@ -329,11 +322,6 @@ export const Colors = {
   },
 } as const;
 
-/**
- * Keys of a color object whose values are plain colors (excludes the
- * scoped namespaces, which are objects — they are consumed via components,
- * never via `theme[color]`).
- */
 type FlatColorKey<T> = {
   [K in keyof T]: T[K] extends string ? K : never;
 }[keyof T];
@@ -367,13 +355,9 @@ export const Radius = {
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: "system-ui",
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: "ui-serif",
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: "ui-rounded",
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: "ui-monospace",
   },
   default: {
@@ -396,7 +380,6 @@ export const Typography = {
   body: { fontSize: 16, lineHeight: 24 },
   title: { fontSize: 22, lineHeight: 28 },
   display: { fontSize: 28, lineHeight: 34 },
-  /** Monospaced tabular numerals — for points, ranks, timers and scores. */
   metric: {
     fontSize: 15,
     lineHeight: 22,
@@ -416,7 +399,6 @@ export const Spacing = {
   six: 64,
 } as const;
 
-/** Unpressable hit target floors by platform. */
 export const TouchTarget = {
   iOS: 44,
   Android: 48,
