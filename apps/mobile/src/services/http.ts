@@ -9,6 +9,28 @@ import {
 export const API_URL =
   process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
 
+/**
+ * Whether the backend is actually reachable right now. The app's online-ness
+ * for the submission gateway is decided by this, not by the device's general
+ * internet state (NetInfo): the API can legitimately be up over a LAN or a
+ * local adb reverse tunnel while the phone reports no internet at all.
+ */
+export async function isApiReachable(timeoutMs = 4000): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${API_URL}${API_PREFIX}/health`, {
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export class ApiClientError extends Error {
   constructor(
     public readonly status: number,
