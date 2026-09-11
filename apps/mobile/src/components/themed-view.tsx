@@ -12,7 +12,7 @@ export function ThemedView({ style, type, ...otherProps }: ThemedViewProps) {
 
   return (
     <View
-      style={[{ backgroundColor: theme[type ?? "background"] }, style]}
+      style={[type ? { backgroundColor: theme[type] } : null, style]}
       {...otherProps}
     />
   );

@@ -19,7 +19,12 @@ import { Input } from "@/components/input";
 import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { difficultyColor, Radius, Spacing } from "@/constants/theme";
+import {
+  difficultyColor,
+  Radius,
+  Spacing,
+  TouchTarget,
+} from "@/constants/theme";
 import { listChallengeCategories, listChallenges } from "@/services/challenges";
 import { useAuthGate } from "@/hooks/use-auth-gate";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
@@ -180,6 +185,7 @@ export default function ChallengesScreen() {
         <FlatList
           data={data.items}
           keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.listContent}
           onEndReached={() => {
             if (dataRef.current?.meta.hasNext)
               void load(selectedCategory, search, true);
@@ -267,6 +273,9 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
+    minHeight: TouchTarget.Android,
+    alignItems: "center",
+    justifyContent: "center",
   },
   categoryChipLabel: {
     fontWeight: "600",
@@ -276,7 +285,10 @@ const styles = StyleSheet.create({
   },
   card: {
     width: "100%",
-    marginBottom: Spacing.two,
+  },
+  listContent: {
+    gap: Spacing.two,
+    paddingBottom: Spacing.five,
   },
   cardPressed: {
     transform: [{ scale: 0.98 }],

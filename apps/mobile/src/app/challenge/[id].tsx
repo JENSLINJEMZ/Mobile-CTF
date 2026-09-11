@@ -213,9 +213,6 @@ export default function ChallengeDetailScreen() {
           tone: "success",
         });
       } catch (err) {
-        setSubmitError(
-          err instanceof Error ? err.message : "Could not unlock hint",
-        );
         toast.show({
           title: "Could not unlock hint",
           body: err instanceof Error ? err.message : undefined,
@@ -258,13 +255,15 @@ export default function ChallengeDetailScreen() {
         prev ? { ...prev, bookmarkedByMe: !prev.bookmarkedByMe } : prev,
       );
     } catch (err) {
-      setSubmitError(
-        err instanceof Error ? err.message : "Could not update bookmark",
-      );
+      toast.show({
+        title: "Could not update bookmark",
+        body: err instanceof Error ? err.message : undefined,
+        tone: "error",
+      });
     } finally {
       setIsBookmarking(false);
     }
-  }, [challenge, isBookmarking]);
+  }, [challenge, isBookmarking, toast]);
 
   return (
     <ScreenShell title="Challenge">
@@ -313,19 +312,19 @@ export default function ChallengeDetailScreen() {
             ) : null}
           </ThemedView>
           <ThemedView style={styles.metaRow}>
-            <ThemedText type="small" themeColor="textSecondary">
+            <ThemedView style={styles.metaGroup}>
+              <ThemedView
+                style={[
+                  styles.difficultyDot,
+                  { backgroundColor: difficultyColor(challenge.difficulty, theme) },
+                ]}
+              />
+              <ThemedText type="small" themeColor="textSecondary">
                 {challenge.category.name} ·{" "}
                 {difficultyLabel(challenge.difficulty)}
               </ThemedText>
-              <ThemedText type="metric">
-                {challenge.basePoints} pts
-              </ThemedText>
-            <ThemedView
-              style={[
-                styles.difficultyDot,
-                { backgroundColor: difficultyColor(challenge.difficulty, theme) },
-              ]}
-            />
+            </ThemedView>
+            <ThemedText type="metric">{challenge.basePoints} pts</ThemedText>
           </ThemedView>
           {challenge.solvedByMe ? (
             <ThemedText type="small" style={{ color: theme.success }}>
@@ -386,26 +385,33 @@ export default function ChallengeDetailScreen() {
                       disabled={needsAuth || unlockingId !== null}
                       onPress={() => void onRequestHintUnlock(hint.id)}
                       accessibilityRole="button"
-                      accessibilityLabel={`Unlock hint ${hint.title}${hint.penaltyPoints > 0 ? ` for ${hint.penaltyPoints} points` : ""}`}
+                      accessibilityLabel={
+                        hint.penaltyPoints > 0
+                          ? `Unlock hint ${hint.title} for ${hint.penaltyPoints} points`
+                          : `View hint ${hint.title}`
+                      }
                       accessibilityState={{
                         disabled: needsAuth || unlockingId !== null,
                       }}
                       style={({ pressed }) => [
                         styles.unlockButton,
-                        { backgroundColor: theme.accent },
+                        {
+                          backgroundColor: "transparent",
+                          borderColor: theme.accent,
+                        },
                         (needsAuth || unlockingId !== null) &&
                           styles.unlockDisabled,
                         pressed && styles.cardPressed,
                       ]}
                     >
                       {unlockingId === hint.id ? (
-                        <ActivityIndicator color={theme.onAccent} size="small" />
+                        <ActivityIndicator color={theme.accent} size="small" />
                       ) : (
                         <ThemedText
                           type="small"
-                          style={{ color: theme.onAccent, fontWeight: "600" }}
+                          style={{ color: theme.accent, fontWeight: "600" }}
                         >
-                          Unlock
+                          {hint.penaltyPoints > 0 ? "Unlock" : "View"}
                         </ThemedText>
                       )}
                     </Pressable>
@@ -432,6 +438,9 @@ export default function ChallengeDetailScreen() {
               accessibilityLabel="Flag"
               accessibilityHint="Enter the flag for this challenge"
               spellCheck={false}
+              returnKeyType="send"
+              submitBehavior="submit"
+              onSubmitEditing={() => void onSubmit()}
               style={styles.flagInput}
             />
             <Pressable
@@ -569,6 +578,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: Spacing.two,
   },
+  metaGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two,
+  },
   difficultyDot: {
     width: 10,
     height: 10,
@@ -598,6 +612,7 @@ const styles = StyleSheet.create({
   },
   unlockButton: {
     borderRadius: 10,
+    borderWidth: 1,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     minWidth: 80,

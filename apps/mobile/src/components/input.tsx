@@ -74,6 +74,7 @@ const styles = StyleSheet.create({
   },
   input: {
     fontSize: 15,
+    lineHeight: 20,
     paddingVertical: 0,
   },
   inputMultiline: {
