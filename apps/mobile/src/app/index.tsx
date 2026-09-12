@@ -1,34 +1,27 @@
+import { Ionicons } from "@expo/vector-icons";
 import type {
-  ChallengeCategoryDto,
   ChallengeSummaryDto,
   EventSummaryDto,
   LeaderboardMeDto,
-  PaginatedResult,
 } from "@ctf/shared";
 import { Link, useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
   Pressable,
-  RefreshControl,
+  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
 
-import { EmptyState, ErrorState } from "@/components/state-views";
+import { ErrorState } from "@/components/state-views";
 import { ScreenShell } from "@/components/screen-shell";
-import { Input } from "@/components/input";
-import { Surface } from "@/components/surface";
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import {
   difficultyColor,
   Radius,
   Spacing,
-  TouchTarget,
 } from "@/constants/theme";
-import { listChallengeCategories, listChallenges } from "@/services/challenges";
+import { listChallenges } from "@/services/challenges";
 import { listEvents, joinEvent } from "@/services/events";
 import { getAchievements } from "@/services/achievements";
 import { getLeaderboard } from "@/services/leaderboard";
@@ -58,72 +51,83 @@ function formatCountdown(ms: number): string {
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
+function cleanMarkdown(value: string): string {
+  return value
+    .split("\n")
+    .map((line) =>
+      line
+        .replace(/^\s*#{1,6}\s*/, "")
+        .replace(/^\s*[-*+]\s*/, "")
+        .replace(/[*_`]/g, ""),
+    )
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stripLeadingTitle(value: string, title: string): string {
+  const clean = value.trim();
+  const prefix = title.trim();
+  if (clean.startsWith(prefix)) {
+    const rest = clean.slice(prefix.length).replace(/^\s*[-–—:.]?\s*/, "").trim();
+    if (rest) return rest;
+  }
+  return clean;
+}
+
 const HOME_INDIGO = "#6a4afb";
+const HOME_RED = "#c9344f";
 const HOME_SURFACE = "#0a1a2c";
 const HOME_SURFACE_HI = "#102031";
 const HOME_PILLS = ["LEARN", "HACK", "COMPETE", "ANYWHERE"] as const;
+
+type QuickLink = {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  href: `/challenges` | `/events` | `/terminal` | `/toolkit` | `/teams` | `/leaderboard`;
+};
+
+const QUICK_LINKS: QuickLink[] = [
+  { label: "Challenges", icon: "flag", href: "/challenges" },
+  { label: "Events", icon: "calendar", href: "/events" },
+  { label: "Terminal", icon: "terminal", href: "/terminal" },
+  { label: "Tools", icon: "construct", href: "/toolkit" },
+  { label: "Teams", icon: "people", href: "/teams" },
+  { label: "Leaderboard", icon: "trophy", href: "/leaderboard" },
+];
 
 export default function HomeScreen() {
   const theme = useTheme();
   const reduceMotion = useReduceMotion();
   const router = useRouter();
   const { status: authStatus } = useAuthGate();
-  const [categories, setCategories] = useState<ChallengeCategoryDto[]>([]);
-  const [data, setData] = useState<PaginatedResult<ChallengeSummaryDto> | null>(
-    null,
-  );
+  const [challenges, setChallenges] = useState<ChallengeSummaryDto[]>([]);
   const [events, setEvents] = useState<EventSummaryDto[]>([]);
   const [me, setMe] = useState<LeaderboardMeDto | null>(null);
   const [badges, setBadges] = useState<number | null>(null);
-  const [expandLearning, setExpandLearning] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<
-    string | undefined
-  >();
-  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined,
-  );
-  const dataRef = useRef<PaginatedResult<ChallengeSummaryDto> | null>(null);
 
-  const load = useCallback(
-    async (category?: string, query?: string, append = false) => {
-      try {
-        setError(null);
-        if (!append) setLoading(true);
-        const page =
-          append && dataRef.current ? dataRef.current.meta.page + 1 : 1;
-        const result = await listChallenges({
-          page,
-          category,
-          search: query && query.trim().length >= 2 ? query.trim() : undefined,
-        });
-        const merged =
-          append && dataRef.current
-            ? { ...result, items: [...dataRef.current.items, ...result.items] }
-            : result;
-        dataRef.current = merged;
-        setData(merged);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load challenges",
-        );
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
-  );
+  const load = useCallback(async () => {
+    try {
+      setError(null);
+      setLoading(true);
+      const [challengeResult, eventList] = await Promise.all([
+        listChallenges({ page: 1 }),
+        listEvents().catch(() => []),
+      ]);
+      setChallenges(challengeResult.items);
+      setEvents(eventList);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    void listChallengeCategories()
-      .then(setCategories)
-      .catch(() => undefined);
-    void listEvents()
-      .then(setEvents)
-      .catch(() => undefined);
-  }, []);
+    void load();
+  }, [load]);
 
   useEffect(() => {
     if (authStatus !== "authenticated") {
@@ -139,29 +143,6 @@ export default function HomeScreen() {
       .catch(() => setBadges(null));
   }, [authStatus]);
 
-  useEffect(() => {
-    void load();
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [load]);
-
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      void load(selectedCategory, search);
-    }, 350);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [selectedCategory, search, load]);
-
-  useEffect(() => {
-    if (authStatus === "authenticated") void load(selectedCategory, search);
-  }, [authStatus, selectedCategory, search, load]);
-
-  const solvedCount = data?.items.filter((c) => c.solvedByMe).length ?? 0;
-
   const runningEvent = events.find((e) => e.status === "RUNNING") ?? null;
   const scheduledEvent =
     runningEvent ?? events.find((e) => e.status === "SCHEDULED") ?? null;
@@ -173,13 +154,10 @@ export default function HomeScreen() {
     ? new Date(heroEvent.startsAt).getTime() - Date.now()
     : 0;
   const level = Math.max(1, Math.floor((me?.score ?? 0) / 250) + 1);
-  const featured = (data?.items ?? []).slice(0, expandLearning ? 8 : 4);
-  const maxSolves = Math.max(
-    1,
-    ...(data?.items ?? []).map((c) => c.solvedCount),
-  );
+  const featured = challenges.slice(0, 4);
+  const maxSolves = Math.max(1, ...challenges.map((c) => c.solvedCount));
   const nextUnsolved =
-    data?.items.find((c) => !c.solvedByMe) ?? data?.items[0] ?? null;
+    challenges.find((c) => !c.solvedByMe) ?? challenges[0] ?? null;
   const missionDeadline = runningEvent
     ? new Date(runningEvent.endsAt).getTime() - Date.now()
     : 0;
@@ -195,134 +173,211 @@ export default function HomeScreen() {
     if (nextUnsolved) router.push(`/challenge/${nextUnsolved.id}`);
   };
 
-  const listHeader = (
-    <>
-      <View style={styles.headerRow}>
-        <ThemedText type="title" style={styles.brand}>
-          Mobile CTF
-        </ThemedText>
-        <View style={styles.levelChip}>
-          <ThemedText type="smallBold" style={styles.levelChipLabel}>
-            Lv. {level}
-          </ThemedText>
-        </View>
-      </View>
+  if (loading && challenges.length === 0) {
+    return (
+      <ScreenShell title="">
+        <ErrorState message="Loading home…" onRetry={() => void load()} />
+      </ScreenShell>
+    );
+  }
 
-      <View style={styles.pillRow}>
-        {HOME_PILLS.map((pill) => (
-          <View key={pill} style={[styles.pill, { borderColor: theme.border }]}>
+  return (
+    <ScreenShell title="">
+      {error ? (
+        <ErrorState message={error} onRetry={() => void load()} />
+      ) : null}
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContent}
+      >
+        <View style={styles.headerRow}>
+          <ThemedText type="title" style={styles.brand}>
+            Mobile CTF
+          </ThemedText>
+          <View style={styles.headerRight}>
+            <View style={styles.levelChip}>
+              <ThemedText type="smallBold" style={styles.levelChipLabel}>
+                Lv. {level}
+              </ThemedText>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.subHeaderRow}>
+          <View style={styles.pillRow}>
+            {HOME_PILLS.map((pill) => (
+              <View
+                key={pill}
+                style={[styles.pill, { borderColor: theme.borderStrong }]}
+              >
+                <ThemedText
+                  type="small"
+                  themeColor="textSecondary"
+                  style={styles.pillLabel}
+                >
+                  {pill}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+          <View style={styles.taglineStack}>
             <ThemedText
               type="small"
               themeColor="textSecondary"
-              style={styles.pillLabel}
+              style={styles.tagline}
             >
-              {pill}
+              Same Curiosity.
+            </ThemedText>
+            <ThemedText
+              type="small"
+              themeColor="textSecondary"
+              style={styles.tagline}
+            >
+              A Wider World.
             </ThemedText>
           </View>
-        ))}
-      </View>
+        </View>
 
-      {heroEvent ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Open event ${heroEvent.title}`}
-          onPress={heroCta}
-          style={({ pressed }) => [
-            styles.heroCard,
-            pressed && !reduceMotion && styles.cardPressed,
-          ]}
-        >
-          <View style={styles.heroTopRow}>
-            <View style={styles.heroLiveRow}>
-              <View style={styles.liveDot} />
-              <ThemedText type="small" style={styles.heroLiveText}>
-                {runningEvent ? "LIVE EVENT" : "UPCOMING EVENT"}
-              </ThemedText>
-            </View>
-            <ThemedText type="small" themeColor="textSecondary">
-              HACK · LEARN · GROW
-            </ThemedText>
-          </View>
-          <ThemedText type="title" style={styles.heroTitle} numberOfLines={2}>
-            {heroEvent.title}
-          </ThemedText>
-          <ThemedText
-            type="small"
-            themeColor="textSecondary"
-            numberOfLines={2}
-            style={styles.heroSub}
+        {heroEvent ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Open event ${heroEvent.title}`}
+            onPress={heroCta}
+            style={({ pressed }) => [
+              styles.heroCard,
+              pressed && !reduceMotion && styles.cardPressed,
+            ]}
           >
-            {heroEvent.description || "The ultimate hacking event."}
-          </ThemedText>
+            <View style={styles.heroTopRow}>
+              <View style={[styles.livePill, { backgroundColor: HOME_RED }]}>
+                <ThemedText type="small" style={styles.livePillLabel}>
+                  {runningEvent ? "LIVE EVENT" : "UPCOMING EVENT"}
+                </ThemedText>
+              </View>
+              <View style={styles.growStack}>
+                {["HACK", "LEARN", "GROW"].map((word) => (
+                  <ThemedText
+                    key={word}
+                    type="small"
+                    themeColor="textSecondary"
+                    style={styles.growWord}
+                  >
+                    {word}
+                  </ThemedText>
+                ))}
+              </View>
+            </View>
 
-          <View style={styles.heroStatsRow}>
-            <View style={styles.heroStat}>
-              <ThemedText type="smallBold" style={styles.heroStatValue}>
-                {heroEvent.participantCount.toLocaleString()}
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Players
-              </ThemedText>
-            </View>
-            <View style={styles.heroStat}>
-              <ThemedText type="smallBold" style={styles.heroStatValue}>
-                {heroEvent.teamCount.toLocaleString()}
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Teams
-              </ThemedText>
-            </View>
-            <View style={styles.heroStat}>
-              <ThemedText type="smallBold" style={styles.heroStatValue}>
-                {runningEvent
-                  ? formatRemaining(heroDeadline)
-                  : formatRemaining(heroStartIn)}
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                {runningEvent ? "Time Left" : "Starts In"}
-              </ThemedText>
-            </View>
-          </View>
-
-          <View style={[styles.joinBtn, { backgroundColor: HOME_INDIGO }]}>
-            <ThemedText style={styles.joinLabel}>
-              {heroEvent.joinedByMe ? "View Event" : "Join Event"}
+            <ThemedText type="subtitle" style={styles.heroTitle} numberOfLines={2}>
+              {heroEvent.title}
             </ThemedText>
-          </View>
-        </Pressable>
-      ) : null}
-
-      {featured.length > 0 ? (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <ThemedText type="smallBold">Continue Learning</ThemedText>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={
-                expandLearning ? "Show fewer challenges" : "See all challenges"
-              }
-              onPress={() => setExpandLearning((v) => !v)}
-              style={({ pressed }) => pressed && styles.textPillPressed}
+            <ThemedText
+              type="small"
+              themeColor="textSecondary"
+              numberOfLines={1}
+              style={styles.heroSub}
             >
-              <ThemedText type="small" style={{ color: theme.accent }}>
-                {expandLearning ? "Show less →" : "See All →"}
+              {heroEvent.description
+                ? stripLeadingTitle(
+                    cleanMarkdown(heroEvent.description),
+                    heroEvent.title,
+                  )
+                : "Solve challenges, earn points, and be the best!"}
+            </ThemedText>
+
+            <View style={styles.statsBar}>
+              <View style={styles.heroStat}>
+                <ThemedText type="smallBold" style={styles.heroStatValue}>
+                  {heroEvent.participantCount.toLocaleString()}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Players
+                </ThemedText>
+              </View>
+              <View style={styles.heroStat}>
+                <ThemedText type="smallBold" style={styles.heroStatValue}>
+                  {heroEvent.teamCount.toLocaleString()}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Teams
+                </ThemedText>
+              </View>
+              <View style={styles.heroStat}>
+                <ThemedText type="smallBold" style={styles.heroStatValue}>
+                  {runningEvent
+                    ? formatRemaining(heroDeadline)
+                    : formatRemaining(heroStartIn)}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {runningEvent ? "Time Left" : "Starts In"}
+                </ThemedText>
+              </View>
+            </View>
+
+            <View style={[styles.joinBtn, { backgroundColor: HOME_INDIGO }]}>
+              <ThemedText style={styles.joinLabel}>
+                {heroEvent.joinedByMe ? "View Event" : "Join Event"}
+              </ThemedText>
+            </View>
+          </Pressable>
+        ) : null}
+
+        <View style={styles.quickStrip}>
+          {QUICK_LINKS.map((link) => (
+            <Pressable
+              key={link.label}
+              accessibilityRole="button"
+              accessibilityLabel={`Go to ${link.label}`}
+              onPress={() => router.push(link.href)}
+              style={({ pressed }) => [
+                styles.quickTile,
+                pressed && !reduceMotion && styles.tilePressed,
+              ]}
+            >
+              <Ionicons name={link.icon} size={20} color={HOME_INDIGO} />
+              <ThemedText type="small" style={styles.quickLabel}>
+                {link.label}
               </ThemedText>
             </Pressable>
-          </View>
-          <View style={styles.grid}>
-            {featured.map((item) => {
-              const pct = Math.round((item.solvedCount / maxSolves) * 100);
-              return (
-                <Link key={item.id} href={`/challenge/${item.id}`} asChild>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Challenge ${item.title}, ${item.basePoints} points, ${difficultyLabel(item.difficulty)}`}
-                    style={({ pressed }) => [
-                      styles.gridCard,
-                      pressed && !reduceMotion && styles.cardPressed,
-                    ]}
-                  >
-                    <View style={styles.gridHeader}>
+          ))}
+        </View>
+
+        {featured.length > 0 ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <ThemedText type="smallBold">Continue Learning</ThemedText>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="See all challenges"
+                onPress={() => router.push("/challenges")}
+                style={({ pressed }) => pressed && styles.textPillPressed}
+              >
+                <ThemedText type="small" style={{ color: theme.accent }}>
+                  See All →
+                </ThemedText>
+              </Pressable>
+            </View>
+            <View style={styles.grid}>
+              {featured.map((item) => {
+                const pct = Math.round((item.solvedCount / maxSolves) * 100);
+                return (
+                  <Link key={item.id} href={`/challenge/${item.id}`} asChild>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Challenge ${item.title}, ${item.basePoints} points, ${difficultyLabel(item.difficulty)}`}
+                      style={({ pressed }) => [
+                        styles.gridCard,
+                        pressed && !reduceMotion && styles.cardPressed,
+                      ]}
+                    >
+                      <ThemedText
+                        type="small"
+                        style={styles.gridTitle}
+                        numberOfLines={2}
+                        >
+                        {item.title}
+                      </ThemedText>
                       <ThemedText
                         type="small"
                         themeColor="textSecondary"
@@ -333,78 +388,85 @@ export default function HomeScreen() {
                       </ThemedText>
                       <ThemedText
                         type="small"
-                        style={{
-                          color: difficultyColor(item.difficulty, theme),
-                        }}
+                        style={{ color: difficultyColor(item.difficulty, theme) }}
                       >
                         {difficultyLabel(item.difficulty)}
                       </ThemedText>
-                    </View>
-                    <ThemedText type="smallBold" numberOfLines={2} style={styles.gridTitle}>
-                      {item.title}
-                    </ThemedText>
-                    <View style={styles.progressRow}>
-                      <View style={styles.progressTrack}>
-                        <View style={[styles.progressFill, { flex: pct }]} />
-                        <View
-                          style={[
-                            styles.progressSpacer,
-                            { flex: Math.max(0, 100 - pct) },
-                          ]}
-                        />
+                      <View style={styles.progressRow}>
+                        <View style={styles.progressTrack}>
+                          <View style={[styles.progressFill, { flex: pct }]} />
+                          <View
+                            style={[
+                              styles.progressSpacer,
+                              { flex: Math.max(0, 100 - pct) },
+                            ]}
+                          />
+                        </View>
+                        <ThemedText type="small">{pct}%</ThemedText>
                       </View>
-                      <ThemedText type="small" themeColor="textSecondary" style={styles.progressPct}>
-                        {pct}%
-                      </ThemedText>
-                    </View>
-                  </Pressable>
-                </Link>
-              );
-            })}
+                    </Pressable>
+                  </Link>
+                );
+              })}
+            </View>
           </View>
-        </View>
-      ) : null}
+        ) : null}
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Open offline packs in the toolkit"
-        onPress={() => router.push("/toolkit")}
-        style={({ pressed }) => [
-          styles.tile,
-          pressed && !reduceMotion && styles.cardPressed,
-        ]}
-      >
-        <View style={styles.tileBody}>
-          <ThemedText type="smallBold">Offline Packs</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            Tools that work without a signal
-          </ThemedText>
-        </View>
-        <ThemedText type="small" style={{ color: theme.accent }}>→</ThemedText>
-      </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open offline packs in the toolkit"
+          onPress={() => router.push("/toolkit")}
+          style={({ pressed }) => [
+            styles.tile,
+            pressed && !reduceMotion && styles.cardPressed,
+          ]}
+        >
+          <View style={styles.tileBody}>
+            <ThemedText type="smallBold">Offline Packs</ThemedText>
+            <ThemedText
+              type="small"
+              themeColor="textSecondary"
+              numberOfLines={1}
+              style={styles.tileSub}
+            >
+              Download challenges and play anytime, anywhere.
+            </ThemedText>
+          </View>
+          <ThemedText type="small" style={{ color: theme.accent }}>→</ThemedText>
+        </Pressable>
 
-      {nextUnsolved ? (
-        <View style={styles.missionCard}>
-          <View style={styles.missionTopRow}>
-            <ThemedText type="smallBold">Daily Mission</ThemedText>
-            {runningEvent ? (
-              <ThemedText type="small" themeColor="textSecondary">
-                {formatCountdown(missionDeadline)}
+        {nextUnsolved ? (
+          <View style={styles.missionCard}>
+            <View style={styles.missionTopRow}>
+              <View style={styles.missionGroup}>
+                <ThemedText type="smallBold">Daily Mission</ThemedText>
+                {runningEvent ? (
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {formatCountdown(missionDeadline)}
+                  </ThemedText>
+                ) : null}
+              </View>
+              <View style={[styles.missionGroup, styles.missionGroupEnd]}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Your Progress
+                </ThemedText>
+                <ThemedText type="smallBold">Level {level}</ThemedText>
+              </View>
+            </View>
+
+            <View style={styles.missionTitleRow}>
+              <ThemedText
+                type="subtitle"
+                style={styles.missionTitle}
+                numberOfLines={2}
+              >
+                Can you find the flag?
               </ThemedText>
-            ) : null}
-          </View>
-          <View style={styles.missionSubRow}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Your Progress
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              Level {level}
-            </ThemedText>
-          </View>
-          <ThemedText type="subtitle" style={styles.missionTitle}>
-            Can you find the flag?
-          </ThemedText>
-          <View style={styles.xpRow}>
+              <ThemedText type="small" style={styles.xpValue}>
+                {(me?.score ?? 0).toLocaleString()}/{milestone.toLocaleString()} XP
+              </ThemedText>
+            </View>
+
             <View style={[styles.progressTrack, styles.xpTrack]}>
               <View
                 style={[
@@ -433,263 +495,125 @@ export default function HomeScreen() {
                 ]}
               />
             </View>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.xpLabel}>
-              {(me?.score ?? 0).toLocaleString()}/
-              {milestone.toLocaleString()} pts
-            </ThemedText>
-          </View>
-          <View style={styles.rewardRow}>
-            <View style={styles.rewardChip}>
-              <ThemedText type="small" style={{ color: theme.success }}>
-                +{nextUnsolved.basePoints} pts
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                Solve &ldquo;{nextUnsolved.title}&rdquo;
-              </ThemedText>
-            </View>
-            <View style={styles.rewardChip}>
-              <ThemedText type="small" style={{ color: theme.accent }}>
-                +{Math.max(10, Math.round(nextUnsolved.basePoints / 2))} Bonus
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                First attempt bonus
-              </ThemedText>
-            </View>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Start challenge ${nextUnsolved.title}`}
-            onPress={missionCta}
-            style={({ pressed }) => [
-              styles.missionCta,
-              pressed && !reduceMotion && styles.cardPressed,
-            ]}
-          >
-            <ThemedText type="small" style={{ color: theme.accent }}>
-              Start Challenge →
-            </ThemedText>
-          </Pressable>
-          <View style={styles.missionStatsRow}>
-            <View style={styles.missionStat}>
-              <ThemedText type="smallBold">{me?.solves ?? solvedCount}</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Solved
-              </ThemedText>
-            </View>
-            <View style={styles.missionStat}>
-              <ThemedText type="smallBold">—</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                First Bloods
-              </ThemedText>
-            </View>
-            <View style={styles.missionStat}>
-              <ThemedText type="smallBold">—</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Day Streak
-              </ThemedText>
-            </View>
-            <View style={styles.missionStat}>
-              <ThemedText type="smallBold">{badges ?? "—"}</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                Badges
-              </ThemedText>
-            </View>
-          </View>
-        </View>
-      ) : null}
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Open the cyber toolkit"
-        onPress={() => router.push("/toolkit")}
-        style={({ pressed }) => [
-          styles.tile,
-          pressed && !reduceMotion && styles.cardPressed,
-        ]}
-      >
-        <View style={styles.tileBody}>
-          <ThemedText type="smallBold">Cyber Toolkit</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            Powerful tools for every hacker.
-          </ThemedText>
-        </View>
-        <ThemedText type="small" style={{ color: theme.accent }}>→</ThemedText>
-      </Pressable>
+            <View style={styles.rewardRow}>
+              <View style={[styles.rewardChip, { borderColor: theme.borderStrong }]}>
+                <ThemedText type="small" style={{ color: theme.success }}>
+                  +{nextUnsolved.basePoints} XP
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                  Solve &ldquo;{nextUnsolved.title}&rdquo;
+                </ThemedText>
+              </View>
+              <View style={[styles.rewardChip, { borderColor: theme.borderStrong }]}>
+                <ThemedText type="small" style={{ color: theme.accent }}>
+                  +{Math.max(10, Math.round(nextUnsolved.basePoints / 2))} Bonus
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                  First attempt bonus
+                </ThemedText>
+              </View>
+            </View>
 
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <ThemedText type="smallBold">All Challenges</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {data ? `${data.items.length} on this page` : ""}
-          </ThemedText>
-        </View>
-      </View>
-
-      <Input
-        value={search}
-        onChangeText={setSearch}
-        placeholder="Search challenges…"
-        accessibilityLabel="Search challenges"
-        accessibilityRole="search"
-        autoCorrect={false}
-        containerStyle={styles.search}
-      />
-
-      <FlatList
-        horizontal
-        data={[
-          { slug: undefined, name: "All", icon: null, id: 0, sortOrder: -1 },
-          ...categories,
-        ]}
-        keyExtractor={(item) => item.slug ?? "all"}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          gap: Spacing.two,
-          paddingVertical: Spacing.one,
-        }}
-        renderItem={({ item }) => {
-          const active = selectedCategory === item.slug;
-          return (
-            <Pressable
-              onPress={() =>
-                setSelectedCategory(active ? undefined : item.slug)
-              }
-              accessibilityRole="button"
-              accessibilityLabel={`Filter by category ${item.name}`}
-              accessibilityState={{ selected: active }}
-              style={({ pressed }) => [
-                styles.categoryChip,
-                {
-                  backgroundColor: active ? theme.accent : theme.backgroundElement,
-                  borderColor: active ? theme.accent : theme.border,
-                },
-                pressed && !reduceMotion && styles.chipPressed,
-              ]}
-            >
-              <ThemedText
-                style={[
-                  styles.categoryChipLabel,
-                  { color: active ? theme.onAccent : theme.textSecondary },
-                ]}
-              >
-                {item.name}
-              </ThemedText>
-            </Pressable>
-          );
-        }}
-      />
-    </>
-  );
-
-  return (
-    <ScreenShell title="">
-      {error ? (
-        <ErrorState
-          message={error}
-          onRetry={() => void load(selectedCategory, search)}
-        />
-      ) : null}
-
-      {!data || (loading && !data) ? (
-        <ActivityIndicator style={{ marginTop: Spacing.five }} />
-      ) : (
-        <FlatList
-          ListHeaderComponent={listHeader}
-          data={data.items}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listContent}
-          onEndReached={() => {
-            if (dataRef.current?.meta.hasNext)
-              void load(selectedCategory, search, true);
-          }}
-          onEndReachedThreshold={0.4}
-          refreshControl={
-            <RefreshControl
-              refreshing={loading && !!data}
-              onRefresh={async () => {
-                try {
-                  await Promise.all([
-                    load(selectedCategory, search, false),
-                    listChallengeCategories().then(setCategories),
-                    listEvents().then(setEvents),
-                  ]);
-                } catch {
-                  // error surfaced via load()
-                }
-              }}
-              tintColor={theme.accent}
-            />
-          }
-          renderItem={({ item }) => (
-            <Link href={`/challenge/${item.id}`} asChild>
+            <View style={styles.missionCtaRow}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Challenge ${item.title}, ${item.basePoints} points, ${difficultyLabel(item.difficulty)}`}
+                accessibilityLabel={`Start challenge ${nextUnsolved.title}`}
+                onPress={missionCta}
                 style={({ pressed }) => [
-                  styles.card,
+                  styles.missionCta,
                   pressed && !reduceMotion && styles.cardPressed,
                 ]}
               >
-                <Surface
-                  style={styles.cardInner}
-                  radius={Radius.lg}
-                  variant={item.solvedByMe ? "selected" : "elevated"}
-                >
-                  <ThemedView
-                    style={[
-                      styles.difficultyDot,
-                      { backgroundColor: difficultyColor(item.difficulty, theme) },
-                    ]}
-                  />
-                  <ThemedView style={styles.cardBody}>
-                    <ThemedText
-                      type="small"
-                      themeColor="textSecondary"
-                      numberOfLines={1}
-                      style={styles.cardCategory}
-                    >
-                      {item.category.name}
-                    </ThemedText>
-                    <ThemedText type="smallBold" numberOfLines={1}>
-                      {item.title}
-                    </ThemedText>
-                    {item.solvedByMe ? (
-                      <ThemedText type="small" style={{ color: theme.success }}>
-                        Solved ✓
-                      </ThemedText>
-                    ) : (
-                      <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                        {item.solvedCount > 0 ? `${item.solvedCount} solves` : "Be the first to solve"}
-                      </ThemedText>
-                    )}
-                  </ThemedView>
-                  <ThemedView style={styles.pointsBox}>
-                    <ThemedText type="metric">
-                      {item.basePoints} pts
-                    </ThemedText>
-                  </ThemedView>
-                </Surface>
+                <ThemedText type="small" style={{ color: theme.accent }}>
+                  Start Challenge →
+                </ThemedText>
               </Pressable>
-            </Link>
-          )}
-          ListEmptyComponent={
-            <EmptyState message="No challenges match your filters." />
-          }
-        />
-      )}
+              <View style={styles.missionStatsRow}>
+                <View style={styles.missionStat}>
+                  <ThemedText type="small">{me?.solves ?? "—"}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Solved
+                  </ThemedText>
+                </View>
+                <View style={styles.missionStat}>
+                  <ThemedText type="small">—</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    First Bloods
+                  </ThemedText>
+                </View>
+                <View style={styles.missionStat}>
+                  <ThemedText type="small">—</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Day Streak
+                  </ThemedText>
+                </View>
+                <View style={styles.missionStat}>
+                  <ThemedText type="small">{badges ?? "—"}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Badges
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+          </View>
+        ) : null}
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open the cyber toolkit"
+          onPress={() => router.push("/toolkit")}
+          style={({ pressed }) => [
+            styles.tile,
+            pressed && !reduceMotion && styles.cardPressed,
+          ]}
+        >
+          <View style={styles.tileBody}>
+            <ThemedText type="smallBold">Cyber Toolkit</ThemedText>
+            <ThemedText
+              type="small"
+              themeColor="textSecondary"
+              numberOfLines={1}
+              style={styles.tileSub}
+            >
+              Powerful tools for every hacker.
+            </ThemedText>
+          </View>
+          <ThemedText type="small" style={{ color: theme.accent }}>→</ThemedText>
+        </Pressable>
+      </ScrollView>
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
+  listContent: {
+    gap: Spacing.two,
+    paddingBottom: Spacing.five,
+  },
   headerRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    paddingBottom: Spacing.one,
+    gap: Spacing.two,
   },
   brand: {
     fontWeight: "800",
+    flexShrink: 1,
+  },
+  headerRight: {
+    alignItems: "flex-end",
+  },
+  subHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Spacing.two,
+  },
+  taglineStack: {
+    alignItems: "flex-end",
+    gap: 0,
+    flexShrink: 0,
   },
   levelChip: {
     borderRadius: Radius.pill,
@@ -702,83 +626,123 @@ const styles = StyleSheet.create({
   levelChipLabel: {
     color: HOME_INDIGO,
   },
+  tagline: {
+    letterSpacing: 0.3,
+    fontSize: 10,
+    lineHeight: 13,
+  },
   pillRow: {
+    flex: 1,
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.two,
-    marginTop: Spacing.two,
+    flexWrap: "nowrap",
+    gap: Spacing.one,
+    alignItems: "center",
   },
   pill: {
     borderRadius: Radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.one + Spacing.half,
+    paddingVertical: Spacing.half + Spacing.half,
   },
   pillLabel: {
-    letterSpacing: 0.75,
-    fontWeight: "600",
+    letterSpacing: 1,
+    fontWeight: "700",
+    fontSize: 10,
+    lineHeight: 14,
   },
   heroCard: {
     backgroundColor: HOME_SURFACE,
     borderRadius: Radius.lg,
-    padding: Spacing.four,
-    marginTop: Spacing.three,
-    gap: Spacing.two,
+    padding: Spacing.three,
+    gap: Spacing.one + Spacing.half,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(220, 228, 240, 0.08)",
   },
   heroTopRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
   },
-  heroLiveRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.one,
+  livePill: {
+    borderRadius: Radius.pill,
+    paddingHorizontal: Spacing.two + Spacing.half,
+    paddingVertical: Spacing.one,
   },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#c9344f",
-  },
-  heroLiveText: {
-    color: "#c9344f",
+  livePillLabel: {
+    color: "#ffffff",
     fontWeight: "800",
-    letterSpacing: 1,
+    letterSpacing: 1.2,
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  growStack: {
+    alignItems: "flex-end",
+    gap: 2,
+  },
+  growWord: {
+    letterSpacing: 2,
+    fontWeight: "700",
+    opacity: 0.85,
+    fontSize: 10,
+    lineHeight: 14,
   },
   heroTitle: {
-    fontSize: 26,
     fontWeight: "800",
+    fontSize: 18,
+    lineHeight: 24,
   },
   heroSub: {
     opacity: 0.9,
+    fontSize: 10,
+    lineHeight: 14,
   },
-  heroStatsRow: {
+  statsBar: {
     flexDirection: "row",
+    alignItems: "flex-end",
     justifyContent: "space-between",
-    marginTop: Spacing.two,
+    marginTop: Spacing.one,
   },
   heroStat: {
-    gap: Spacing.half,
+    gap: 1,
   },
   heroStatValue: {
-    fontSize: 16,
+    fontSize: 13,
+    lineHeight: 18,
   },
   joinBtn: {
     borderRadius: Radius.md,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: Spacing.three,
-    marginTop: Spacing.one,
+    paddingVertical: Spacing.two,
+    marginTop: Spacing.one + Spacing.half,
+    alignSelf: "flex-start",
+    width: "42%",
   },
   joinLabel: {
     color: "#ffffff",
     fontWeight: "700",
   },
+  quickStrip: {
+    flexDirection: "row",
+    backgroundColor: HOME_SURFACE,
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.one,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(220, 228, 240, 0.08)",
+  },
+  quickTile: {
+    flex: 1,
+    alignItems: "center",
+    gap: Spacing.one,
+  },
+  quickLabel: {
+    textAlign: "center",
+  },
+  tilePressed: {
+    transform: [{ scale: 0.94 }],
+  },
   section: {
-    marginTop: Spacing.three,
     gap: Spacing.two,
   },
   sectionHeader: {
@@ -788,34 +752,31 @@ const styles = StyleSheet.create({
   },
   grid: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    flexWrap: "nowrap",
     gap: Spacing.two,
   },
   gridCard: {
     backgroundColor: HOME_SURFACE_HI,
-    borderRadius: Radius.lg,
-    padding: Spacing.three,
-    gap: Spacing.two,
-    width: "48%",
-  },
-  gridHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    borderRadius: Radius.md,
+    padding: Spacing.two,
     gap: Spacing.one,
-  },
-  gridCategory: {
     flex: 1,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
   },
   gridTitle: {
-    minHeight: 36,
+    fontWeight: "700",
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  gridCategory: {
+    fontSize: 10,
+    lineHeight: 13,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
   progressRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.two,
+    gap: Spacing.one,
   },
   progressTrack: {
     flex: 1,
@@ -831,9 +792,8 @@ const styles = StyleSheet.create({
   progressSpacer: {
     backgroundColor: "transparent",
   },
-  progressPct: {
-    minWidth: 30,
-    textAlign: "right",
+  textPillPressed: {
+    opacity: 0.7,
   },
   tile: {
     flexDirection: "row",
@@ -842,59 +802,73 @@ const styles = StyleSheet.create({
     backgroundColor: HOME_SURFACE_HI,
     borderRadius: Radius.lg,
     padding: Spacing.four,
-    marginTop: Spacing.three,
     gap: Spacing.two,
   },
   tileBody: {
     flex: 1,
     gap: Spacing.half,
   },
+  tileSub: {
+    fontSize: 10,
+    lineHeight: 15,
+  },
   missionCard: {
     backgroundColor: HOME_SURFACE,
     borderRadius: Radius.lg,
     padding: Spacing.four,
-    marginTop: Spacing.three,
-    gap: Spacing.two,
+    gap: Spacing.three,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(220, 228, 240, 0.08)",
   },
   missionTopRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
   },
-  missionSubRow: {
+  missionGroup: {
+    gap: Spacing.half,
+  },
+  missionGroupEnd: {
+    alignItems: "flex-end",
+  },
+  missionTitleRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     justifyContent: "space-between",
-    marginBottom: Spacing.one,
+    gap: Spacing.two,
   },
   missionTitle: {
+    flex: 1,
     fontWeight: "800",
+    fontSize: 15,
+    lineHeight: 20,
   },
-  xpRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.two,
+  xpValue: {
+    color: HOME_INDIGO,
+    fontWeight: "700",
   },
   xpTrack: {
     height: 6,
   },
-  xpLabel: {
-    minWidth: 90,
-    textAlign: "right",
-  },
   rewardRow: {
     flexDirection: "row",
     gap: Spacing.two,
-    marginTop: Spacing.one,
   },
   rewardChip: {
     flex: 1,
     backgroundColor: HOME_SURFACE_HI,
     borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.two + Spacing.half,
     gap: 2,
+  },
+  missionCtaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(220, 228, 240, 0.08)",
+    paddingTop: Spacing.three,
   },
   missionCta: {
     alignSelf: "flex-start",
@@ -902,68 +876,13 @@ const styles = StyleSheet.create({
   },
   missionStatsRow: {
     flexDirection: "row",
-    marginTop: Spacing.one,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(220, 228, 240, 0.08)",
-    paddingTop: Spacing.three,
+    gap: Spacing.three,
   },
   missionStat: {
-    flex: 1,
     alignItems: "center",
-    gap: 2,
-  },
-  textPillPressed: {
-    opacity: 0.7,
-  },
-  cardCategory: {
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  search: {
-    width: "100%",
-    marginTop: Spacing.two,
-  },
-  categoryChip: {
-    borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    minHeight: TouchTarget.Android,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  categoryChipLabel: {
-    fontWeight: "600",
-  },
-  chipPressed: {
-    transform: [{ scale: 0.96 }],
-  },
-  card: {
-    width: "100%",
-  },
-  listContent: {
-    gap: Spacing.two,
-    paddingBottom: Spacing.five,
+    gap: 1,
   },
   cardPressed: {
     transform: [{ scale: 0.98 }],
-  },
-  cardInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: Spacing.three,
-    gap: Spacing.three,
-  },
-  difficultyDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  cardBody: {
-    flex: 1,
-    gap: Spacing.half,
-  },
-  pointsBox: {
-    alignItems: "flex-end",
   },
 });

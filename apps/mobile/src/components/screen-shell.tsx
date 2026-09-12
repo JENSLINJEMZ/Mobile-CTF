@@ -18,16 +18,25 @@ export function ScreenShell({
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <SafeAreaView style={styles.safeArea} accessibilityRole="header">
-        <View
-          style={[
-            styles.headerBar,
-            { backgroundColor: theme.header.bg, borderBottomColor: theme.header.border },
-          ]}
-        >
-          <ThemedText type="subtitle" accessibilityRole="header" style={styles.header}>
-            {title}
-          </ThemedText>
-        </View>
+        {title ? (
+          <View
+            style={[
+              styles.headerBar,
+              {
+                backgroundColor: theme.header.bg,
+                borderBottomColor: theme.header.border,
+              },
+            ]}
+          >
+            <ThemedText
+              type="subtitle"
+              accessibilityRole="header"
+              style={styles.header}
+            >
+              {title}
+            </ThemedText>
+          </View>
+        ) : null}
         <View style={styles.content}>{children}</View>
       </SafeAreaView>
     </View>

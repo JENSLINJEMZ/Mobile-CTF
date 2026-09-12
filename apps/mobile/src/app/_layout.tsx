@@ -59,23 +59,20 @@ export default function RootLayout() {
         <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: theme.accent,
+          tabBarActiveTintColor: "#6a4afb",
           tabBarInactiveTintColor: theme.textSecondary,
           tabBarShowLabel: true,
           tabBarStyle: [
             styles.tabBar,
             {
-              backgroundColor: theme.tabBar.bg,
-              borderTopColor: theme.tabBar.border,
-              height: 60 + insets.bottom,
+              backgroundColor: "#0d1826",
+              borderTopColor: "rgba(220, 228, 240, 0.10)",
+              height: 64 + insets.bottom,
               paddingBottom: insets.bottom,
               paddingTop: 8,
             },
           ],
-          tabBarLabelStyle: [
-            styles.tabBarLabel,
-            { color: theme.textSecondary },
-          ],
+          tabBarLabelStyle: styles.tabBarLabel,
           tabBarIconStyle: styles.tabBarIcon,
           sceneStyle: [styles.scene, { backgroundColor: theme.background }],
         }}
@@ -90,11 +87,11 @@ export default function RootLayout() {
           }}
         />
         <Tabs.Screen
-          name="terminal"
+          name="challenges"
           options={{
-            title: "Terminal",
+            title: "Challenges",
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="terminal" size={size} color={color} />
+              <Ionicons name="list" size={size} color={color} />
             ),
           }}
         />
@@ -108,9 +105,38 @@ export default function RootLayout() {
           }}
         />
         <Tabs.Screen
+          name="terminal"
+          options={{
+            title: "Terminal",
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="terminal" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: "Profile",
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="person" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="toolkit"
+          options={{
+            title: "Toolkit",
+            href: null,
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="construct" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="leaderboard"
           options={{
             title: "Leaderboard",
+            href: null,
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="trophy" size={size} color={color} />
             ),
@@ -120,17 +146,9 @@ export default function RootLayout() {
           name="notes"
           options={{
             title: "Notes",
+            href: null,
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="document-text" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="toolkit"
-          options={{
-            title: "Toolkit",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="construct" size={size} color={color} />
             ),
           }}
         />
@@ -138,6 +156,7 @@ export default function RootLayout() {
           name="notifications"
           options={{
             title: "Notifications",
+            href: null,
             tabBarIcon: ({ color, size }) => (
               <View style={styles.badgeWrap}>
                 <Ionicons name="notifications" size={size} color={color} />
@@ -155,15 +174,6 @@ export default function RootLayout() {
                   </Text>
                 ) : null}
               </View>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: "Profile",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="person" size={size} color={color} />
             ),
           }}
         />
