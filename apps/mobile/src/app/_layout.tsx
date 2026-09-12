@@ -1,12 +1,12 @@
-import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { StyleSheet, Text, View, useColorScheme } from "react-native";
+import { StyleSheet, Text, View, useColorScheme, type ColorValue } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { LucideIcon, type LucideName } from "@/components/lucide-icon";
 import { ToastProvider } from "@/components/toast";
 import { useAuthStore } from "@/store/auth-store";
 import { useNotificationStore } from "@/store/notification-store";
@@ -18,6 +18,23 @@ import { startSubmissionGateway } from "@/services/offline-submissions";
 import { useTheme } from "@/hooks/use-theme";
 
 SplashScreen.preventAutoHideAsync();
+
+function TabIcon({
+  icon,
+  color,
+  focused,
+}: {
+  icon: LucideName;
+  color: ColorValue;
+  focused: boolean;
+}) {
+  return (
+    <View style={styles.iconWrap}>
+      {focused ? <View style={styles.activeBar} /> : null}
+      <LucideIcon name={icon} size={19} color={color as string} />
+    </View>
+  );
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -59,30 +76,30 @@ export default function RootLayout() {
         <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: "#6a4afb",
-          tabBarInactiveTintColor: theme.textSecondary,
+          tabBarActiveTintColor: "#a78bfa",
+          tabBarInactiveTintColor: "#7a7699",
           tabBarShowLabel: true,
           tabBarStyle: [
             styles.tabBar,
             {
-              backgroundColor: "#0d1826",
-              borderTopColor: "rgba(220, 228, 240, 0.10)",
-              height: 64 + insets.bottom,
+              backgroundColor: "#0b0a16",
+              borderTopColor: "rgba(255, 255, 255, 0.07)",
+              height: 60 + insets.bottom,
               paddingBottom: insets.bottom,
-              paddingTop: 8,
+              paddingTop: 4,
             },
           ],
           tabBarLabelStyle: styles.tabBarLabel,
           tabBarIconStyle: styles.tabBarIcon,
-          sceneStyle: [styles.scene, { backgroundColor: theme.background }],
+          sceneStyle: [styles.scene, { backgroundColor: "#07070f" }],
         }}
       >
         <Tabs.Screen
           name="index"
           options={{
             title: "Home",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="flag" size={size} color={color} />
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon icon="home" color={color} focused={focused} />
             ),
           }}
         />
@@ -90,8 +107,8 @@ export default function RootLayout() {
           name="challenges"
           options={{
             title: "Challenges",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="list" size={size} color={color} />
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon icon="shield" color={color} focused={focused} />
             ),
           }}
         />
@@ -99,8 +116,8 @@ export default function RootLayout() {
           name="events"
           options={{
             title: "Events",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="calendar" size={size} color={color} />
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon icon="calendar" color={color} focused={focused} />
             ),
           }}
         />
@@ -108,8 +125,8 @@ export default function RootLayout() {
           name="terminal"
           options={{
             title: "Terminal",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="terminal" size={size} color={color} />
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon icon="terminal" color={color} focused={focused} />
             ),
           }}
         />
@@ -117,8 +134,8 @@ export default function RootLayout() {
           name="profile"
           options={{
             title: "Profile",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="person" size={size} color={color} />
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon icon="user" color={color} focused={focused} />
             ),
           }}
         />
@@ -127,8 +144,8 @@ export default function RootLayout() {
           options={{
             title: "Toolkit",
             href: null,
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="construct" size={size} color={color} />
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon icon="briefcase" color={color} focused={focused} />
             ),
           }}
         />
@@ -137,8 +154,8 @@ export default function RootLayout() {
           options={{
             title: "Leaderboard",
             href: null,
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="trophy" size={size} color={color} />
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon icon="bars" color={color} focused={focused} />
             ),
           }}
         />
@@ -147,8 +164,8 @@ export default function RootLayout() {
           options={{
             title: "Notes",
             href: null,
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="document-text" size={size} color={color} />
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon icon="notes" color={color} focused={focused} />
             ),
           }}
         />
@@ -157,9 +174,10 @@ export default function RootLayout() {
           options={{
             title: "Notifications",
             href: null,
-            tabBarIcon: ({ color, size }) => (
+            tabBarIcon: ({ color, focused }) => (
               <View style={styles.badgeWrap}>
-                <Ionicons name="notifications" size={size} color={color} />
+                <LucideIcon name="bell" size={19} color={color as string} />
+                {focused ? <View style={styles.activeBar} /> : null}
                 {unreadCount > 0 ? (
                   <Text
                     style={[
@@ -222,12 +240,27 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   tabBarLabel: {
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 8.5,
+    lineHeight: 10,
     fontWeight: "600",
   },
   tabBarIcon: {
     marginVertical: 2,
+  },
+  iconWrap: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 2,
+  },
+  activeBar: {
+    position: "absolute",
+    top: -6,
+    width: 18,
+    height: 2.5,
+    borderRadius: 1.25,
+    backgroundColor: "#a78bfa",
   },
   badgeWrap: {
     width: 28,

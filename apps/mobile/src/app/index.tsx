@@ -1,33 +1,96 @@
-import { Ionicons } from "@expo/vector-icons";
-import type {
-  ChallengeSummaryDto,
-  EventSummaryDto,
-  LeaderboardMeDto,
-} from "@ctf/shared";
-import { Link, useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Path, Stop } from "react-native-svg";
 
+import { HeroArt } from "@/components/hero-art";
+import { LucideIcon, type LucideName } from "@/components/lucide-icon";
 import { ErrorState } from "@/components/state-views";
-import { ScreenShell } from "@/components/screen-shell";
-import { ThemedText } from "@/components/themed-text";
-import {
-  difficultyColor,
-  Radius,
-  Spacing,
-} from "@/constants/theme";
+import { difficultyColor } from "@/constants/theme";
 import { listChallenges } from "@/services/challenges";
 import { listEvents, joinEvent } from "@/services/events";
 import { getAchievements } from "@/services/achievements";
 import { getLeaderboard } from "@/services/leaderboard";
 import { useAuthGate } from "@/hooks/use-auth-gate";
-import { useReduceMotion } from "@/hooks/use-reduce-motion";
 import { useTheme } from "@/hooks/use-theme";
+import type {
+  ChallengeSummaryDto,
+  EventSummaryDto,
+  LeaderboardMeDto,
+} from "@ctf/shared";
+
+/* ------------------------------------------------------------
+   Design tokens (ported from /home/jemzi/Developement/UI)
+   ------------------------------------------------------------ */
+const C = {
+  bgPrimary: "#07070f",
+  bgSecondary: "#0b0a16",
+  surface: "#12101f",
+  surface2: "#181530",
+  purple: "#8b5cf6",
+  purpleLight: "#a78bfa",
+  purpleDeep: "#6d28d9",
+  blue: "#60a5fa",
+  cyan: "#22d3ee",
+  pink: "#ec4899",
+  green: "#34d399",
+  orange: "#f59e0b",
+  red: "#f43f5e",
+  rose: "#fb7185",
+  gold: "#fbbf24",
+  textPrimary: "#f2f0fb",
+  textSecondary: "#b0abc9",
+  textMuted: "#7a7699",
+  border: "rgba(255, 255, 255, 0.07)",
+  borderStrong: "rgba(255, 255, 255, 0.13)",
+};
+
+type Accent = { color: string; soft: string; line: string; glow: string };
+
+const ACCENTS: Record<string, Accent> = {
+  purple: { color: "#a78bfa", soft: "rgba(167,139,250,.12)", line: "rgba(167,139,250,.32)", glow: "rgba(167,139,250,.28)" },
+  red: { color: "#f87171", soft: "rgba(248,113,113,.12)", line: "rgba(248,113,113,.32)", glow: "rgba(248,113,113,.28)" },
+  green: { color: "#34d399", soft: "rgba(52,211,153,.12)", line: "rgba(52,211,153,.32)", glow: "rgba(52,211,153,.28)" },
+  orange: { color: "#f59e0b", soft: "rgba(245,158,11,.12)", line: "rgba(245,158,11,.32)", glow: "rgba(245,158,11,.28)" },
+  blue: { color: "#60a5fa", soft: "rgba(96,165,250,.12)", line: "rgba(96,165,250,.32)", glow: "rgba(96,165,250,.28)" },
+  pink: { color: "#ec4899", soft: "rgba(236,72,153,.12)", line: "rgba(236,72,153,.32)", glow: "rgba(236,72,153,.28)" },
+  cyan: { color: "#22d3ee", soft: "rgba(34,211,238,.12)", line: "rgba(34,211,238,.32)", glow: "rgba(34,211,238,.28)" },
+};
+
+const ACCENT_ORDER = ["green", "orange", "blue", "pink", "cyan", "purple", "red"];
+
+const CATEGORY_ICON: Record<string, LucideName> = {
+  cryptography: "lock",
+  forensics: "file",
+  "mobile security": "bug",
+  "web exploitation": "globe",
+  "reverse engineering": "cpu",
+  network: "activity",
+  hardware: "logic",
+  osint: "search",
+  web: "globe",
+  recon: "radar",
+};
+
+export function categoryIcon(category: string): LucideName {
+  return CATEGORY_ICON[String(category ?? "").toLowerCase()] ?? "cube";
+}
+
+function withAlpha(hex: string, alpha: number): string {
+  const m = hex.replace("#", "");
+  const r = parseInt(m.slice(0, 2), 16);
+  const g = parseInt(m.slice(2, 4), 16);
+  const b = parseInt(m.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 function difficultyLabel(value: string): string {
   return value.charAt(0) + value.slice(1).toLowerCase();
@@ -69,36 +132,394 @@ function stripLeadingTitle(value: string, title: string): string {
   const clean = value.trim();
   const prefix = title.trim();
   if (clean.startsWith(prefix)) {
-    const rest = clean.slice(prefix.length).replace(/^\s*[-–—:.]?\s*/, "").trim();
+    const rest = clean
+      .slice(prefix.length)
+      .replace(/^\s*[-–—:.]?\s*/, "")
+      .trim();
     if (rest) return rest;
   }
   return clean;
 }
 
-const HOME_INDIGO = "#6a4afb";
-const HOME_RED = "#c9344f";
-const HOME_SURFACE = "#0a1a2c";
-const HOME_SURFACE_HI = "#102031";
-const HOME_PILLS = ["LEARN", "HACK", "COMPETE", "ANYWHERE"] as const;
+/* ------------------------------------------------------------
+   Header
+   ------------------------------------------------------------ */
+function Header({
+  level,
+  onSearch,
+  onBell,
+  onAvatar,
+}: {
+  level: number;
+  onSearch: () => void;
+  onBell: () => void;
+  onAvatar: () => void;
+}) {
+  return (
+    <View style={styles.header}>
+      <View style={styles.headerTop}>
+        <View style={styles.brand}>
+          <Svg width={26} height={19} viewBox="0 0 40 28">
+            <Defs>
+              <SvgLinearGradient id="brandGrad" x1="0" y1="0" x2="1" y2="1">
+                <Stop offset="0%" stopColor="#c4b5fd" />
+                <Stop offset="55%" stopColor="#8b5cf6" />
+                <Stop offset="100%" stopColor="#6d28d9" />
+              </SvgLinearGradient>
+            </Defs>
+            <Path
+              d="M2 26 L12 2 L20 13.5 L28 2 L38 26 L29 26 L24.5 15.5 L20 22 L15.5 15.5 L11 26 Z"
+              fill="url(#brandGrad)"
+            />
+          </Svg>
+          <Text style={styles.brandName}>
+            Mobile <Text style={styles.brandCtf}>CTF</Text>
+          </Text>
+        </View>
 
+        <View style={styles.headerActions}>
+          <Pressable onPress={onSearch} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Search challenges">
+            <LucideIcon name="search" size={17} color={C.textSecondary} />
+          </Pressable>
+          <Pressable onPress={onBell} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Notifications">
+            <View style={styles.notifDot} />
+            <LucideIcon name="bell" size={17} color={C.textSecondary} />
+          </Pressable>
+          <Pressable onPress={onAvatar} style={styles.avatar} accessibilityRole="button" accessibilityLabel="Profile">
+            <LinearGradient
+              colors={["#2c1c52", "#0e0919"]}
+              style={styles.avatarFill}
+            >
+              <View style={styles.avatarFace} />
+              <View style={styles.avatarBody} />
+            </LinearGradient>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.headerBottom}>
+        <Text style={styles.tagline}>Learn · Hack · Compete · Anywhere</Text>
+        <View style={styles.headerMeta}>
+          <Text style={styles.quote}>“Same Curiosity,{`\n`}A Wider World.”</Text>
+          <Text style={styles.levelTag}>Lv. {level}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------
+   Hero event card
+   ------------------------------------------------------------ */
+function HeroCard({
+  event,
+  running,
+  onPress,
+}: {
+  event: EventSummaryDto;
+  running: boolean;
+  onPress: () => void;
+}) {
+  const deadline = new Date(event.endsAt).getTime() - Date.now();
+  const [joined, setJoined] = useState(event.joinedByMe);
+
+  useEffect(() => {
+    setJoined(event.joinedByMe);
+  }, [event.joinedByMe]);
+
+  const handlePress = () => {
+    if (!joined) void joinEvent(event.id).catch(() => undefined);
+    onPress();
+  };
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Open event ${event.title}`}
+      onPress={handlePress}
+      style={styles.heroCard}
+    >
+      <View style={styles.heroBg}>
+        <HeroArt />
+      </View>
+      <LinearGradient
+        colors={["rgba(6,5,12,.96)", "rgba(8,6,16,.88)", "rgba(10,7,20,.5)", "rgba(10,7,20,.12)"]}
+        start={{ x: 0, y: 1 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.heroScrim}
+      />
+      <LinearGradient
+        colors={["rgba(6,5,12,.82)", "rgba(6,5,12,0)"]}
+        start={{ x: 0, y: 1 }}
+        end={{ x: 0, y: 0 }}
+        style={styles.heroScrim}
+      />
+
+      <View style={styles.heroContent}>
+        <View style={styles.liveBadge}>
+          <View style={styles.liveDot} />
+          <Text style={styles.liveBadgeLabel}>
+            {running ? "Live Event" : "Upcoming Event"}
+          </Text>
+        </View>
+
+        <Text style={styles.heroTitle} numberOfLines={2}>
+          {event.title}
+        </Text>
+        <Text style={styles.heroDesc} numberOfLines={1}>
+          {event.description
+            ? stripLeadingTitle(cleanMarkdown(event.description), event.title)
+            : "Solve challenges, earn points, and be the best!"}
+        </Text>
+
+        <View style={styles.heroStats}>
+          <View style={styles.heroStat}>
+            <View style={styles.hsTop}>
+              <LucideIcon name="users" size={11} color={C.purpleLight} />
+              <Text style={styles.hsTopValue}>
+                {event.participantCount.toLocaleString()}
+              </Text>
+            </View>
+            <Text style={styles.hsLabel}>Players</Text>
+          </View>
+          <View style={styles.heroStat}>
+            <View style={styles.hsTop}>
+              <LucideIcon name="users" size={11} color={C.purpleLight} />
+              <Text style={styles.hsTopValue}>
+                {event.teamCount.toLocaleString()}
+              </Text>
+            </View>
+            <Text style={styles.hsLabel}>Teams</Text>
+          </View>
+          <View style={styles.heroStat}>
+            <View style={styles.hsTop}>
+              <LucideIcon name="clock" size={11} color={C.purpleLight} />
+              <Text style={styles.hsTopValue}>{formatRemaining(deadline)}</Text>
+            </View>
+            <Text style={styles.hsLabel}>{running ? "Time Left" : "Starts In"}</Text>
+          </View>
+        </View>
+
+        <LinearGradient
+          colors={joined ? ["#059669", "#047857"] : ["#8b5cf6", "#7c3aed", "#6d28d9"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.joinBtn}
+        >
+          <Text style={styles.joinLabel}>
+            {joined ? "Joined" : "Join Event"}
+          </Text>
+          <LucideIcon name={joined ? "check" : "arrow"} size={14} color="#ffffff" />
+        </LinearGradient>
+      </View>
+
+      <View style={styles.heroDeco} pointerEvents="none">
+        <Text style={styles.decoScript}>HACK{`\n`}LEARN{`\n`}GROW</Text>
+        <Svg width={33} height={7} viewBox="0 0 44 8" style={styles.decoUnderline}>
+          <Path
+            d="M1.5 5.5 Q 22 -1.5 42.5 5"
+            stroke="rgba(196,181,253,.75)"
+            fill="none"
+            strokeWidth={1.6}
+            strokeLinecap="round"
+          />
+        </Svg>
+        <Text style={styles.decoBottom}>Different Skills{`\n`}Same Passion</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+/* ------------------------------------------------------------
+   Quick nav
+   ------------------------------------------------------------ */
 type QuickLink = {
   label: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: LucideName;
+  accent: string;
   href: `/challenges` | `/events` | `/terminal` | `/toolkit` | `/teams` | `/leaderboard`;
 };
 
 const QUICK_LINKS: QuickLink[] = [
-  { label: "Challenges", icon: "flag", href: "/challenges" },
-  { label: "Events", icon: "calendar", href: "/events" },
-  { label: "Terminal", icon: "terminal", href: "/terminal" },
-  { label: "Tools", icon: "construct", href: "/toolkit" },
-  { label: "Teams", icon: "people", href: "/teams" },
-  { label: "Leaderboard", icon: "trophy", href: "/leaderboard" },
+  { label: "Challenges", icon: "shield", accent: "purple", href: "/challenges" },
+  { label: "Events", icon: "calendar", accent: "red", href: "/events" },
+  { label: "Terminal", icon: "terminal", accent: "green", href: "/terminal" },
+  { label: "Tools", icon: "briefcase", accent: "orange", href: "/toolkit" },
+  { label: "Teams", icon: "users", accent: "blue", href: "/teams" },
+  { label: "Leaderboard", icon: "bars", accent: "pink", href: "/leaderboard" },
 ];
 
-export default function HomeScreen() {
+function QuickNav() {
+  const router = useRouter();
+  return (
+    <View style={styles.quickNav}>
+      {QUICK_LINKS.map((link) => {
+        const acc = ACCENTS[link.accent];
+        return (
+          <Pressable
+            key={link.label}
+            accessibilityRole="button"
+            accessibilityLabel={`Go to ${link.label}`}
+            onPress={() => router.push(link.href)}
+            style={styles.qnItem}
+          >
+            <LinearGradient
+              colors={[acc.soft, "rgba(18,16,31,.92)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.qnIcon, { borderColor: acc.line }]}
+            >
+              <LucideIcon name={link.icon} size={18} color={acc.color} />
+            </LinearGradient>
+            <Text style={styles.qnLabel}>{link.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------
+   Learning grid
+   ------------------------------------------------------------ */
+function LearnCard({ item, index }: { item: ChallengeSummaryDto; index: number }) {
   const theme = useTheme();
-  const reduceMotion = useReduceMotion();
+  const acc = ACCENTS[ACCENT_ORDER[index % ACCENT_ORDER.length]];
+  const pct = Math.round((item.solvedCount / Math.max(1, item.solvedCount)) * 100);
+  const diffColor = difficultyColor(item.difficulty, theme);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Challenge ${item.title}`}
+      style={styles.learnCard}
+    >
+      <LinearGradient
+        colors={[acc.soft, "rgba(16,14,28,.95)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.learnCardBg}
+      >
+        <View style={styles.learnIcon}>
+          <LucideIcon name={categoryIcon(item.category.name)} size={18} color={acc.color} />
+        </View>
+        <Text style={styles.learnTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <Text style={styles.learnCat} numberOfLines={1}>
+          {item.category.name}
+        </Text>
+        <View
+          style={[
+            styles.diff,
+            { backgroundColor: withAlpha(diffColor, 0.14), borderColor: withAlpha(diffColor, 0.3) },
+          ]}
+        >
+          <Text style={[styles.diffText, { color: diffColor }]}>
+            {difficultyLabel(item.difficulty)}
+          </Text>
+        </View>
+        <View style={styles.learnProgress}>
+          <View style={styles.lpBar}>
+            <LinearGradient
+              colors={[acc.color, acc.glow]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.lpFill, { width: `${pct}%` }]}
+            />
+          </View>
+          <Text style={styles.lpPct}>{pct}%</Text>
+        </View>
+      </LinearGradient>
+    </Pressable>
+  );
+}
+
+/* ------------------------------------------------------------
+   Offline packs / toolkit rows
+   ------------------------------------------------------------ */
+function LinkTile({
+  icon,
+  iconColor,
+  iconBg,
+  iconBorder,
+  title,
+  subtitle,
+  chips,
+  onPress,
+}: {
+  icon: LucideName;
+  iconColor: string;
+  iconBg: string;
+  iconBorder: string;
+  title: string;
+  subtitle: string;
+  chips?: LucideName[];
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      onPress={onPress}
+      style={styles.linkTile}
+    >
+      <LinearGradient
+        colors={[C.surface2, "rgba(14,12,24,.92)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={[styles.linkIcon, { backgroundColor: iconBg, borderColor: iconBorder }]}>
+        <LucideIcon name={icon} size={17} color={iconColor} />
+      </View>
+      <View style={styles.linkText}>
+        <Text style={styles.linkTitle}>{title}</Text>
+        <Text style={styles.linkSub} numberOfLines={1}>
+          {subtitle}
+        </Text>
+      </View>
+      {chips ? (
+        <View style={styles.toolChips}>
+          {chips.map((chip) => (
+            <View key={chip} style={styles.toolChip}>
+              <LucideIcon name={chip} size={12} color={C.textSecondary} />
+            </View>
+          ))}
+        </View>
+      ) : null}
+      <LucideIcon name="chevron" size={14} color={C.textMuted} />
+    </Pressable>
+  );
+}
+
+/* ------------------------------------------------------------
+   Stat tile (progress card)
+   ------------------------------------------------------------ */
+function Stat({ value, label, icon, tone }: { value: string; label: string; icon: LucideName; tone: string }) {
+  const tones: Record<string, { color: string; border: string; bg: string }> = {
+    gold: { color: C.gold, border: "rgba(251,191,36,.28)", bg: "rgba(251,191,36,.10)" },
+    blue: { color: "#60a5fa", border: "rgba(96,165,250,.28)", bg: "rgba(96,165,250,.10)" },
+    red: { color: "#f87171", border: "rgba(248,113,113,.28)", bg: "rgba(248,113,113,.10)" },
+    pink: { color: "#f472b6", border: "rgba(244,114,182,.28)", bg: "rgba(244,114,182,.10)" },
+  };
+  const t = tones[tone];
+  return (
+    <View style={styles.stat}>
+      <View style={[styles.statIc, { borderColor: t.border, backgroundColor: t.bg }]}>
+        <LucideIcon name={icon} size={12} color={t.color} />
+      </View>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------
+   Screen
+   ------------------------------------------------------------ */
+export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { status: authStatus } = useAuthGate();
   const [challenges, setChallenges] = useState<ChallengeSummaryDto[]>([]);
@@ -144,745 +565,799 @@ export default function HomeScreen() {
   }, [authStatus]);
 
   const runningEvent = events.find((e) => e.status === "RUNNING") ?? null;
-  const scheduledEvent =
-    runningEvent ?? events.find((e) => e.status === "SCHEDULED") ?? null;
+  const scheduledEvent = runningEvent ?? events.find((e) => e.status === "SCHEDULED") ?? null;
   const heroEvent = scheduledEvent;
-  const heroDeadline = heroEvent
-    ? new Date(heroEvent.endsAt).getTime() - Date.now()
-    : 0;
-  const heroStartIn = heroEvent
-    ? new Date(heroEvent.startsAt).getTime() - Date.now()
-    : 0;
+
   const level = Math.max(1, Math.floor((me?.score ?? 0) / 250) + 1);
   const featured = challenges.slice(0, 4);
-  const maxSolves = Math.max(1, ...challenges.map((c) => c.solvedCount));
-  const nextUnsolved =
-    challenges.find((c) => !c.solvedByMe) ?? challenges[0] ?? null;
-  const missionDeadline = runningEvent
-    ? new Date(runningEvent.endsAt).getTime() - Date.now()
-    : 0;
+  const nextUnsolved = challenges.find((c) => !c.solvedByMe) ?? challenges[0] ?? null;
+  const missionDeadline = runningEvent ? new Date(runningEvent.endsAt).getTime() - Date.now() : 0;
   const milestone = Math.max(500, Math.ceil((me?.score ?? 0) / 500) * 500);
+  const xpPct = Math.min(100, Math.round(((me?.score ?? 0) / milestone) * 100));
 
   const heroCta = () => {
-    if (!heroEvent) return;
-    if (!heroEvent.joinedByMe) void joinEvent(heroEvent.id).catch(() => undefined);
-    router.push(`/event/${heroEvent.id}`);
+    if (heroEvent) router.push(`/event/${heroEvent.id}`);
   };
 
   const missionCta = () => {
     if (nextUnsolved) router.push(`/challenge/${nextUnsolved.id}`);
   };
 
-  if (loading && challenges.length === 0) {
-    return (
-      <ScreenShell title="">
-        <ErrorState message="Loading home…" onRetry={() => void load()} />
-      </ScreenShell>
-    );
-  }
-
   return (
-    <ScreenShell title="">
-      {error ? (
-        <ErrorState message={error} onRetry={() => void load()} />
-      ) : null}
+    <View style={styles.root}>
+      <LinearGradient
+        colors={["#0a0913", "#07070f", "#06060d"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={["rgba(109,40,217,.22)", "transparent"]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={styles.topGlow}
+      />
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-      >
-        <View style={styles.headerRow}>
-          <ThemedText type="title" style={styles.brand}>
-            Mobile CTF
-          </ThemedText>
-          <View style={styles.headerRight}>
-            <View style={styles.levelChip}>
-              <ThemedText type="smallBold" style={styles.levelChipLabel}>
-                Lv. {level}
-              </ThemedText>
-            </View>
-          </View>
+      {loading && challenges.length === 0 ? (
+        <View style={styles.centerWrap}>
+          <ErrorState message="Loading home…" onRetry={() => void load()} />
         </View>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingTop: insets.top + 12, paddingBottom: 40 + insets.bottom },
+          ]}
+        >
+          <Header
+            level={level}
+            onSearch={() => router.push("/challenges")}
+            onBell={() => router.push("/notifications")}
+            onAvatar={() => router.push("/profile")}
+          />
 
-        <View style={styles.subHeaderRow}>
-          <View style={styles.pillRow}>
-            {HOME_PILLS.map((pill) => (
-              <View
-                key={pill}
-                style={[styles.pill, { borderColor: theme.borderStrong }]}
-              >
-                <ThemedText
-                  type="small"
-                  themeColor="textSecondary"
-                  style={styles.pillLabel}
+          {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
+
+          {heroEvent ? (
+            <HeroCard event={heroEvent} running={Boolean(runningEvent)} onPress={heroCta} />
+          ) : null}
+
+          <QuickNav />
+
+          {featured.length > 0 ? (
+            <View style={styles.section}>
+              <View style={styles.sectionHead}>
+                <Text style={styles.sectionTitle}>Continue Learning</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="See all challenges"
+                  onPress={() => router.push("/challenges")}
                 >
-                  {pill}
-                </ThemedText>
+                  <View style={styles.linkBtn}>
+                    <Text style={styles.linkBtnText}>See All</Text>
+                    <Text style={styles.linkBtnText}>→</Text>
+                  </View>
+                </Pressable>
               </View>
-            ))}
-          </View>
-          <View style={styles.taglineStack}>
-            <ThemedText
-              type="small"
-              themeColor="textSecondary"
-              style={styles.tagline}
-            >
-              Same Curiosity.
-            </ThemedText>
-            <ThemedText
-              type="small"
-              themeColor="textSecondary"
-              style={styles.tagline}
-            >
-              A Wider World.
-            </ThemedText>
-          </View>
-        </View>
-
-        {heroEvent ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Open event ${heroEvent.title}`}
-            onPress={heroCta}
-            style={({ pressed }) => [
-              styles.heroCard,
-              pressed && !reduceMotion && styles.cardPressed,
-            ]}
-          >
-            <View style={styles.heroTopRow}>
-              <View style={[styles.livePill, { backgroundColor: HOME_RED }]}>
-                <ThemedText type="small" style={styles.livePillLabel}>
-                  {runningEvent ? "LIVE EVENT" : "UPCOMING EVENT"}
-                </ThemedText>
-              </View>
-              <View style={styles.growStack}>
-                {["HACK", "LEARN", "GROW"].map((word) => (
-                  <ThemedText
-                    key={word}
-                    type="small"
-                    themeColor="textSecondary"
-                    style={styles.growWord}
-                  >
-                    {word}
-                  </ThemedText>
+              <View style={styles.learningGrid}>
+                {featured.map((item, index) => (
+                  <LearnCard key={item.id} item={item} index={index} />
                 ))}
               </View>
             </View>
+          ) : null}
 
-            <ThemedText type="subtitle" style={styles.heroTitle} numberOfLines={2}>
-              {heroEvent.title}
-            </ThemedText>
-            <ThemedText
-              type="small"
-              themeColor="textSecondary"
-              numberOfLines={1}
-              style={styles.heroSub}
-            >
-              {heroEvent.description
-                ? stripLeadingTitle(
-                    cleanMarkdown(heroEvent.description),
-                    heroEvent.title,
-                  )
-                : "Solve challenges, earn points, and be the best!"}
-            </ThemedText>
+          <LinkTile
+            icon="download"
+            iconColor="#60a5fa"
+            iconBg="rgba(59,130,246,.13)"
+            iconBorder="rgba(59,130,246,.30)"
+            title="Offline Packs"
+            subtitle="Download challenges and play anytime, anywhere."
+            onPress={() => router.push("/toolkit")}
+          />
 
-            <View style={styles.statsBar}>
-              <View style={styles.heroStat}>
-                <ThemedText type="smallBold" style={styles.heroStatValue}>
-                  {heroEvent.participantCount.toLocaleString()}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Players
-                </ThemedText>
+          <View style={styles.statsRow}>
+            <View style={[styles.card, styles.missionCard]}>
+              <View style={styles.cardHead}>
+                <View style={styles.chTitle}>
+                  <LucideIcon name="radar" size={13} color={C.purpleLight} />
+                  <Text style={styles.chTitleText}>Daily Mission</Text>
+                </View>
+                <View style={styles.chMeta}>
+                  <LucideIcon name="clock" size={10} color={C.textMuted} />
+                  <Text style={styles.chMetaText}>
+                    {runningEvent ? formatCountdown(missionDeadline) : "24:00:00"}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.heroStat}>
-                <ThemedText type="smallBold" style={styles.heroStatValue}>
-                  {heroEvent.teamCount.toLocaleString()}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Teams
-                </ThemedText>
+
+              <Text style={styles.missionQ}>Can you find the flag?</Text>
+
+              <View style={styles.pillRow}>
+                <View style={styles.pill}>
+                  <LucideIcon name="star" size={9} color={C.gold} />
+                  <Text style={styles.pillText}>+{nextUnsolved?.basePoints ?? 100} XP</Text>
+                </View>
+                <View style={styles.pill}>
+                  <LucideIcon name="heart" size={9} color="#f87171" />
+                  <Text style={styles.pillText}>
+                    +{Math.max(10, Math.round((nextUnsolved?.basePoints ?? 100) / 2))} Bonus
+                  </Text>
+                </View>
               </View>
-              <View style={styles.heroStat}>
-                <ThemedText type="smallBold" style={styles.heroStatValue}>
-                  {runningEvent
-                    ? formatRemaining(heroDeadline)
-                    : formatRemaining(heroStartIn)}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {runningEvent ? "Time Left" : "Starts In"}
-                </ThemedText>
-              </View>
-            </View>
 
-            <View style={[styles.joinBtn, { backgroundColor: HOME_INDIGO }]}>
-              <ThemedText style={styles.joinLabel}>
-                {heroEvent.joinedByMe ? "View Event" : "Join Event"}
-              </ThemedText>
-            </View>
-          </Pressable>
-        ) : null}
-
-        <View style={styles.quickStrip}>
-          {QUICK_LINKS.map((link) => (
-            <Pressable
-              key={link.label}
-              accessibilityRole="button"
-              accessibilityLabel={`Go to ${link.label}`}
-              onPress={() => router.push(link.href)}
-              style={({ pressed }) => [
-                styles.quickTile,
-                pressed && !reduceMotion && styles.tilePressed,
-              ]}
-            >
-              <Ionicons name={link.icon} size={20} color={HOME_INDIGO} />
-              <ThemedText type="small" style={styles.quickLabel}>
-                {link.label}
-              </ThemedText>
-            </Pressable>
-          ))}
-        </View>
-
-        {featured.length > 0 ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <ThemedText type="smallBold">Continue Learning</ThemedText>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="See all challenges"
-                onPress={() => router.push("/challenges")}
-                style={({ pressed }) => pressed && styles.textPillPressed}
+              <LinearGradient
+                colors={["#8b5cf6", "#7c3aed", "#6d28d9"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.startBtn}
               >
-                <ThemedText type="small" style={{ color: theme.accent }}>
-                  See All →
-                </ThemedText>
-              </Pressable>
-            </View>
-            <View style={styles.grid}>
-              {featured.map((item) => {
-                const pct = Math.round((item.solvedCount / maxSolves) * 100);
-                return (
-                  <Link key={item.id} href={`/challenge/${item.id}`} asChild>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Challenge ${item.title}, ${item.basePoints} points, ${difficultyLabel(item.difficulty)}`}
-                      style={({ pressed }) => [
-                        styles.gridCard,
-                        pressed && !reduceMotion && styles.cardPressed,
-                      ]}
-                    >
-                      <ThemedText
-                        type="small"
-                        style={styles.gridTitle}
-                        numberOfLines={2}
-                        >
-                        {item.title}
-                      </ThemedText>
-                      <ThemedText
-                        type="small"
-                        themeColor="textSecondary"
-                        numberOfLines={1}
-                        style={styles.gridCategory}
-                      >
-                        {item.category.name}
-                      </ThemedText>
-                      <ThemedText
-                        type="small"
-                        style={{ color: difficultyColor(item.difficulty, theme) }}
-                      >
-                        {difficultyLabel(item.difficulty)}
-                      </ThemedText>
-                      <View style={styles.progressRow}>
-                        <View style={styles.progressTrack}>
-                          <View style={[styles.progressFill, { flex: pct }]} />
-                          <View
-                            style={[
-                              styles.progressSpacer,
-                              { flex: Math.max(0, 100 - pct) },
-                            ]}
-                          />
-                        </View>
-                        <ThemedText type="small">{pct}%</ThemedText>
-                      </View>
-                    </Pressable>
-                  </Link>
-                );
-              })}
-            </View>
-          </View>
-        ) : null}
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open offline packs in the toolkit"
-          onPress={() => router.push("/toolkit")}
-          style={({ pressed }) => [
-            styles.tile,
-            pressed && !reduceMotion && styles.cardPressed,
-          ]}
-        >
-          <View style={styles.tileBody}>
-            <ThemedText type="smallBold">Offline Packs</ThemedText>
-            <ThemedText
-              type="small"
-              themeColor="textSecondary"
-              numberOfLines={1}
-              style={styles.tileSub}
-            >
-              Download challenges and play anytime, anywhere.
-            </ThemedText>
-          </View>
-          <ThemedText type="small" style={{ color: theme.accent }}>→</ThemedText>
-        </Pressable>
-
-        {nextUnsolved ? (
-          <View style={styles.missionCard}>
-            <View style={styles.missionTopRow}>
-              <View style={styles.missionGroup}>
-                <ThemedText type="smallBold">Daily Mission</ThemedText>
-                {runningEvent ? (
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {formatCountdown(missionDeadline)}
-                  </ThemedText>
-                ) : null}
-              </View>
-              <View style={[styles.missionGroup, styles.missionGroupEnd]}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Your Progress
-                </ThemedText>
-                <ThemedText type="smallBold">Level {level}</ThemedText>
-              </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Start Challenge"
+                  onPress={missionCta}
+                  style={styles.startBtnFill}
+                >
+                  <Text style={styles.startBtnLabel}>Start Challenge</Text>
+                  <LucideIcon name="arrow" size={12} color="#ffffff" />
+                </Pressable>
+              </LinearGradient>
             </View>
 
-            <View style={styles.missionTitleRow}>
-              <ThemedText
-                type="subtitle"
-                style={styles.missionTitle}
-                numberOfLines={2}
-              >
-                Can you find the flag?
-              </ThemedText>
-              <ThemedText type="small" style={styles.xpValue}>
-                {(me?.score ?? 0).toLocaleString()}/{milestone.toLocaleString()} XP
-              </ThemedText>
-            </View>
-
-            <View style={[styles.progressTrack, styles.xpTrack]}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    flex: Math.min(
-                      100,
-                      Math.round(((me?.score ?? 0) / milestone) * 100),
-                    ),
-                  },
-                ]}
-              />
-              <View
-                style={[
-                  styles.progressSpacer,
-                  {
-                    flex: Math.max(
-                      0,
-                      100 -
-                        Math.min(
-                          100,
-                          Math.round(((me?.score ?? 0) / milestone) * 100),
-                        ),
-                    ),
-                  },
-                ]}
-              />
-            </View>
-
-            <View style={styles.rewardRow}>
-              <View style={[styles.rewardChip, { borderColor: theme.borderStrong }]}>
-                <ThemedText type="small" style={{ color: theme.success }}>
-                  +{nextUnsolved.basePoints} XP
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                  Solve &ldquo;{nextUnsolved.title}&rdquo;
-                </ThemedText>
-              </View>
-              <View style={[styles.rewardChip, { borderColor: theme.borderStrong }]}>
-                <ThemedText type="small" style={{ color: theme.accent }}>
-                  +{Math.max(10, Math.round(nextUnsolved.basePoints / 2))} Bonus
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                  First attempt bonus
-                </ThemedText>
-              </View>
-            </View>
-
-            <View style={styles.missionCtaRow}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Start challenge ${nextUnsolved.title}`}
-                onPress={missionCta}
-                style={({ pressed }) => [
-                  styles.missionCta,
-                  pressed && !reduceMotion && styles.cardPressed,
-                ]}
-              >
-                <ThemedText type="small" style={{ color: theme.accent }}>
-                  Start Challenge →
-                </ThemedText>
-              </Pressable>
-              <View style={styles.missionStatsRow}>
-                <View style={styles.missionStat}>
-                  <ThemedText type="small">{me?.solves ?? "—"}</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Solved
-                  </ThemedText>
+            <View style={styles.card}>
+              <View style={styles.cardHead}>
+                <View style={styles.chTitle}>
+                  <LucideIcon name="bars" size={13} color="#f472b6" />
+                  <Text style={styles.chTitleText}>Your Progress</Text>
                 </View>
-                <View style={styles.missionStat}>
-                  <ThemedText type="small">—</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    First Bloods
-                  </ThemedText>
+                <View style={styles.chMeta}>
+                  <Text style={styles.chMetaText}>Level {level}</Text>
                 </View>
-                <View style={styles.missionStat}>
-                  <ThemedText type="small">—</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Day Streak
-                  </ThemedText>
-                </View>
-                <View style={styles.missionStat}>
-                  <ThemedText type="small">{badges ?? "—"}</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Badges
-                  </ThemedText>
-                </View>
+              </View>
+
+              <View style={styles.xpRow}>
+                <Text style={styles.xpText}>
+                  {(me?.score ?? 0).toLocaleString()} / {milestone.toLocaleString()} XP
+                </Text>
+              </View>
+              <View style={styles.xpBar}>
+                <LinearGradient
+                  colors={["#7c3aed", "#a78bfa", "#c4b5fd"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.xpFill, { width: `${xpPct}%` }]}
+                />
+              </View>
+              <View style={styles.statGrid}>
+                <Stat value={String(me?.solves ?? "—")} label="Solved" icon="trophy" tone="gold" />
+                <Stat value="—" label="First Blood" icon="flag" tone="blue" />
+                <Stat value="—" label="Day Streak" icon="flame" tone="red" />
+                <Stat value={String(badges ?? "—")} label="Badges" icon="medal" tone="pink" />
               </View>
             </View>
           </View>
-        ) : null}
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open the cyber toolkit"
-          onPress={() => router.push("/toolkit")}
-          style={({ pressed }) => [
-            styles.tile,
-            pressed && !reduceMotion && styles.cardPressed,
-          ]}
-        >
-          <View style={styles.tileBody}>
-            <ThemedText type="smallBold">Cyber Toolkit</ThemedText>
-            <ThemedText
-              type="small"
-              themeColor="textSecondary"
-              numberOfLines={1}
-              style={styles.tileSub}
-            >
-              Powerful tools for every hacker.
-            </ThemedText>
-          </View>
-          <ThemedText type="small" style={{ color: theme.accent }}>→</ThemedText>
-        </Pressable>
-      </ScrollView>
-    </ScreenShell>
+          <LinkTile
+            icon="wrench"
+            iconColor={C.cyan}
+            iconBg="rgba(34,211,238,.12)"
+            iconBorder="rgba(34,211,238,.30)"
+            title="Cyber Toolkit"
+            subtitle="Powerful tools for every hacker."
+            chips={["terminal", "hash", "search", "image", "doc"]}
+            onPress={() => router.push("/toolkit")}
+          />
+        </ScrollView>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  listContent: {
-    gap: Spacing.two,
-    paddingBottom: Spacing.five,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: Spacing.two,
-  },
-  brand: {
-    fontWeight: "800",
-    flexShrink: 1,
-  },
-  headerRight: {
-    alignItems: "flex-end",
-  },
-  subHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: Spacing.two,
-  },
-  taglineStack: {
-    alignItems: "flex-end",
-    gap: 0,
-    flexShrink: 0,
-  },
-  levelChip: {
-    borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(220, 228, 240, 0.18)",
-    backgroundColor: HOME_SURFACE,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-  },
-  levelChipLabel: {
-    color: HOME_INDIGO,
-  },
-  tagline: {
-    letterSpacing: 0.3,
-    fontSize: 10,
-    lineHeight: 13,
-  },
-  pillRow: {
+  root: {
     flex: 1,
-    flexDirection: "row",
-    flexWrap: "nowrap",
-    gap: Spacing.one,
-    alignItems: "center",
+    backgroundColor: C.bgPrimary,
   },
-  pill: {
-    borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.one + Spacing.half,
-    paddingVertical: Spacing.half + Spacing.half,
+  topGlow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 200,
   },
-  pillLabel: {
-    letterSpacing: 1,
-    fontWeight: "700",
-    fontSize: 10,
-    lineHeight: 14,
-  },
-  heroCard: {
-    backgroundColor: HOME_SURFACE,
-    borderRadius: Radius.lg,
-    padding: Spacing.three,
-    gap: Spacing.one + Spacing.half,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(220, 228, 240, 0.08)",
-  },
-  heroTopRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-  },
-  livePill: {
-    borderRadius: Radius.pill,
-    paddingHorizontal: Spacing.two + Spacing.half,
-    paddingVertical: Spacing.one,
-  },
-  livePillLabel: {
-    color: "#ffffff",
-    fontWeight: "800",
-    letterSpacing: 1.2,
-    fontSize: 10,
-    lineHeight: 14,
-  },
-  growStack: {
-    alignItems: "flex-end",
-    gap: 2,
-  },
-  growWord: {
-    letterSpacing: 2,
-    fontWeight: "700",
-    opacity: 0.85,
-    fontSize: 10,
-    lineHeight: 14,
-  },
-  heroTitle: {
-    fontWeight: "800",
-    fontSize: 18,
-    lineHeight: 24,
-  },
-  heroSub: {
-    opacity: 0.9,
-    fontSize: 10,
-    lineHeight: 14,
-  },
-  statsBar: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    marginTop: Spacing.one,
-  },
-  heroStat: {
-    gap: 1,
-  },
-  heroStatValue: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  joinBtn: {
-    borderRadius: Radius.md,
+  centerWrap: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: Spacing.two,
-    marginTop: Spacing.one + Spacing.half,
-    alignSelf: "flex-start",
-    width: "42%",
   },
-  joinLabel: {
-    color: "#ffffff",
-    fontWeight: "700",
+  listContent: {
+    paddingHorizontal: 14,
+    gap: 0,
   },
-  quickStrip: {
+
+  /* header */
+  header: {
+    paddingVertical: 6,
+  },
+  headerTop: {
     flexDirection: "row",
-    backgroundColor: HOME_SURFACE,
-    borderRadius: Radius.lg,
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.one,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(220, 228, 240, 0.08)",
-  },
-  quickTile: {
-    flex: 1,
     alignItems: "center",
-    gap: Spacing.one,
-  },
-  quickLabel: {
-    textAlign: "center",
-  },
-  tilePressed: {
-    transform: [{ scale: 0.94 }],
-  },
-  section: {
-    gap: Spacing.two,
-  },
-  sectionHeader: {
-    flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    gap: 8,
   },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "nowrap",
-    gap: Spacing.two,
-  },
-  gridCard: {
-    backgroundColor: HOME_SURFACE_HI,
-    borderRadius: Radius.md,
-    padding: Spacing.two,
-    gap: Spacing.one,
-    flex: 1,
-  },
-  gridTitle: {
-    fontWeight: "700",
-    fontSize: 11,
-    lineHeight: 14,
-  },
-  gridCategory: {
-    fontSize: 10,
-    lineHeight: 13,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-  },
-  progressRow: {
+  brand: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.one,
+    gap: 7,
+    minWidth: 0,
   },
-  progressTrack: {
-    flex: 1,
+  brandName: {
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+    color: C.textPrimary,
+  },
+  brandCtf: {
+    color: C.purple,
+  },
+  headerActions: {
     flexDirection: "row",
-    height: 4,
-    borderRadius: 2,
+    alignItems: "center",
+    gap: 2,
+  },
+  iconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notifDot: {
+    position: "absolute",
+    top: 6,
+    right: 7,
+    width: 6.5,
+    height: 6.5,
+    borderRadius: 3.25,
+    backgroundColor: C.red,
+  },
+  avatar: {
+    width: 29,
+    height: 29,
+    borderRadius: 15,
+    marginLeft: 3,
+    borderWidth: 1.2,
+    borderColor: "rgba(167,139,250,.45)",
     overflow: "hidden",
-    backgroundColor: "rgba(220, 228, 240, 0.10)",
   },
-  progressFill: {
-    backgroundColor: HOME_INDIGO,
-  },
-  progressSpacer: {
-    backgroundColor: "transparent",
-  },
-  textPillPressed: {
-    opacity: 0.7,
-  },
-  tile: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: HOME_SURFACE_HI,
-    borderRadius: Radius.lg,
-    padding: Spacing.four,
-    gap: Spacing.two,
-  },
-  tileBody: {
+  avatarFill: {
     flex: 1,
-    gap: Spacing.half,
   },
-  tileSub: {
-    fontSize: 10,
-    lineHeight: 15,
+  avatarFace: {
+    position: "absolute",
+    top: 7,
+    left: 8.5,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#e9c9a6",
   },
-  missionCard: {
-    backgroundColor: HOME_SURFACE,
-    borderRadius: Radius.lg,
-    padding: Spacing.four,
-    gap: Spacing.three,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(220, 228, 240, 0.08)",
+  avatarBody: {
+    position: "absolute",
+    bottom: -2,
+    left: 3,
+    width: 23,
+    height: 12,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    backgroundColor: "#1a1130",
   },
-  missionTopRow: {
+  headerBottom: {
+    marginTop: 5,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
+    gap: 10,
   },
-  missionGroup: {
-    gap: Spacing.half,
+  tagline: {
+    fontSize: 7.5,
+    fontWeight: "600",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    color: C.textMuted,
+    paddingTop: 4,
   },
-  missionGroupEnd: {
-    alignItems: "flex-end",
-  },
-  missionTitleRow: {
+  headerMeta: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: Spacing.two,
+    alignItems: "flex-start",
+    gap: 7,
   },
-  missionTitle: {
-    flex: 1,
+  quote: {
+    fontSize: 8,
+    lineHeight: 10.5,
+    fontStyle: "italic",
+    textAlign: "right",
+    color: "rgba(176,171,201,.68)",
+  },
+  levelTag: {
+    fontSize: 8,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+    color: C.purpleLight,
+    backgroundColor: "rgba(139,92,246,.14)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,.3)",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    overflow: "hidden",
+  },
+
+  /* hero */
+  heroCard: {
+    marginTop: 4,
+    borderRadius: 18,
+    minHeight: 228,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,.22)",
+    shadowColor: "#000",
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+  },
+  heroBg: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  heroScrim: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  heroContent: {
+    padding: 15,
+  },
+  liveBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 5,
+    backgroundColor: "rgba(244,63,94,.13)",
+    borderWidth: 1,
+    borderColor: "rgba(244,63,94,.38)",
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  liveDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: C.red,
+  },
+  liveBadgeLabel: {
+    fontSize: 7.5,
+    fontWeight: "700",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+    color: C.rose,
+  },
+  heroTitle: {
+    marginTop: 9,
+    fontSize: 21,
     fontWeight: "800",
-    fontSize: 15,
-    lineHeight: 20,
+    letterSpacing: -0.6,
+    lineHeight: 23,
+    color: C.textPrimary,
+    maxWidth: "88%",
   },
-  xpValue: {
-    color: HOME_INDIGO,
+  heroDesc: {
+    marginTop: 7,
+    fontSize: 10,
+    lineHeight: 15,
+    color: "rgba(226,222,245,.78)",
+    maxWidth: "78%",
+  },
+  heroStats: {
+    flexDirection: "row",
+    gap: 15,
+    marginTop: 12,
+  },
+  heroStat: {
+    flexDirection: "column",
+    gap: 3,
+  },
+  hsTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  hsTopValue: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: "#ece9fb",
+  },
+  hsLabel: {
+    fontSize: 7.5,
+    color: "rgba(176,171,201,.7)",
+  },
+  joinBtn: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    height: 38,
+    borderRadius: 11,
+    paddingHorizontal: 15,
+    alignSelf: "flex-start",
+    maxWidth: "62%",
+  },
+  joinLabel: {
+    color: "#fff",
+    fontSize: 12,
     fontWeight: "700",
   },
-  xpTrack: {
-    height: 6,
+  heroDeco: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
-  rewardRow: {
+  decoScript: {
+    position: "absolute",
+    top: 12,
+    right: 13,
+    fontSize: 16,
+    lineHeight: 16,
+    fontWeight: "600",
+    fontStyle: "italic",
+    textAlign: "right",
+    color: "rgba(233,227,255,.82)",
+    transform: [{ rotate: "-4deg" }],
+  },
+  decoUnderline: {
+    position: "absolute",
+    top: 62,
+    right: 14,
+    transform: [{ rotate: "-4deg" }],
+  },
+  decoBottom: {
+    position: "absolute",
+    right: 13,
+    bottom: 13,
+    fontSize: 7,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    textAlign: "right",
+    lineHeight: 10.5,
+    color: "rgba(233,227,255,.55)",
+  },
+
+  /* quick nav */
+  quickNav: {
     flexDirection: "row",
-    gap: Spacing.two,
+    gap: 6,
+    marginTop: 14,
   },
-  rewardChip: {
+  qnItem: {
     flex: 1,
-    backgroundColor: HOME_SURFACE_HI,
-    borderRadius: Radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: Spacing.two + Spacing.half,
-    gap: 2,
+    alignItems: "center",
+    gap: 6,
   },
-  missionCtaRow: {
+  qnIcon: {
+    width: 45,
+    height: 45,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  qnLabel: {
+    fontSize: 7.5,
+    fontWeight: "600",
+    color: C.textSecondary,
+    textAlign: "center",
+    lineHeight: 9,
+  },
+
+  /* continue learning */
+  section: {
+    marginTop: 16,
+  },
+  sectionHead: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(220, 228, 240, 0.08)",
-    paddingTop: Spacing.three,
+    marginHorizontal: 2,
+    marginBottom: 9,
   },
-  missionCta: {
-    alignSelf: "flex-start",
-    paddingVertical: Spacing.one,
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+    color: C.textPrimary,
   },
-  missionStatsRow: {
+  linkBtn: {
     flexDirection: "row",
-    gap: Spacing.three,
-  },
-  missionStat: {
     alignItems: "center",
-    gap: 1,
+    gap: 4,
   },
-  cardPressed: {
-    transform: [{ scale: 0.98 }],
+  linkBtnText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: C.purpleLight,
+  },
+  learningGrid: {
+    flexDirection: "row",
+    gap: 7,
+  },
+  learnCard: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  learnCardBg: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 7,
+    gap: 5,
+  },
+  learnIcon: {
+    marginBottom: 1,
+  },
+  learnTitle: {
+    fontSize: 9,
+    fontWeight: "700",
+    lineHeight: 11.5,
+    letterSpacing: -0.1,
+    color: "#f0eefb",
+    minHeight: 23,
+  },
+  learnCat: {
+    fontSize: 7,
+    color: C.textMuted,
+    lineHeight: 9.5,
+    letterSpacing: 0.1,
+  },
+  diff: {
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderRadius: 5,
+    paddingHorizontal: 5.5,
+    paddingVertical: 1.5,
+  },
+  diffText: {
+    fontSize: 7,
+    fontWeight: "700",
+    letterSpacing: 0.4,
+  },
+  learnProgress: {
+    marginTop: "auto",
+    paddingTop: 2,
+  },
+  lpBar: {
+    height: 3.5,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,.08)",
+    overflow: "hidden",
+  },
+  lpFill: {
+    height: "100%",
+    borderRadius: 2,
+  },
+  lpPct: {
+    marginTop: 3,
+    fontSize: 7,
+    fontWeight: "600",
+    color: C.textMuted,
+    textAlign: "right",
+  },
+
+  /* offline / toolkit tiles */
+  linkTile: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 15,
+    padding: 11,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: C.border,
+    overflow: "hidden",
+  },
+  linkIcon: {
+    width: 33,
+    height: 33,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  linkText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  linkTitle: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: C.textPrimary,
+  },
+  linkSub: {
+    fontSize: 9.5,
+    color: C.textMuted,
+    lineHeight: 12,
+  },
+  toolChips: {
+    flexDirection: "row",
+    gap: 4,
+    marginRight: 6,
+  },
+  toolChip: {
+    width: 23,
+    height: 23,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,.05)",
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+
+  /* mission + progress */
+  statsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 10,
+  },
+  card: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 13,
+    backgroundColor: "rgba(24,21,44,.9)",
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  missionCard: {
+    borderColor: "rgba(139,92,246,.22)",
+  },
+  cardHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 6,
+    marginBottom: 10,
+  },
+  chTitle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    minWidth: 0,
+  },
+  chTitleText: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: C.textPrimary,
+  },
+  chMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  chMetaText: {
+    fontSize: 8.5,
+    fontWeight: "600",
+    color: C.textMuted,
+  },
+  missionQ: {
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 14,
+    color: C.textPrimary,
+    marginBottom: 10,
+  },
+  pillRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+    marginBottom: 12,
+  },
+  pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(255,255,255,.05)",
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 7,
+    paddingVertical: 4,
+    paddingHorizontal: 7,
+  },
+  pillText: {
+    fontSize: 8,
+    fontWeight: "700",
+    color: C.textSecondary,
+  },
+  startBtn: {
+    marginTop: "auto",
+    overflow: "hidden",
+    height: 33,
+    borderRadius: 10,
+  },
+  startBtnFill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  startBtnLabel: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  xpRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginBottom: 5,
+  },
+  xpText: {
+    fontSize: 8.5,
+    fontWeight: "600",
+    color: C.textMuted,
+  },
+  xpBar: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,.08)",
+    overflow: "hidden",
+    marginBottom: 12,
+  },
+  xpFill: {
+    height: "100%",
+    borderRadius: 2,
+  },
+  statGrid: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  stat: {
+    flex: 1,
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 4,
+    textAlign: "center",
+  },
+  statIc: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  statValue: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: C.textPrimary,
+  },
+  statLabel: {
+    fontSize: 6.8,
+    color: C.textMuted,
+    lineHeight: 8,
+    textAlign: "center",
   },
 });
