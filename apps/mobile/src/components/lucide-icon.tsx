@@ -78,6 +78,10 @@ const ICON_PATHS: Record<string, string> = {
   chart: '<path d="M6 20v-6.5M12 20V5M18 20v-9.5"/>',
   external:
     '<path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M19 14v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"/>',
+  share:
+    '<path d="M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M18 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
+  verified:
+    '<path d="m12 2 2.2 2.4 3.2-.4 1 3.1 2.9 1.4-.9 3.1.9 3.1-2.9 1.4-1 3.1-3.2-.4L12 22l-2.2-2.4-3.2.4-1-3.1-2.9-1.4.9-3.1-.9-3.1L5.6 7.9l1-3.1 3.2.4z"/><path d="m9 12 2.2 2.2L15.5 10"/>',
 };
 
 function parseNodes(source: string): SvgNode[] {

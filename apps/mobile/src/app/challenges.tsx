@@ -170,7 +170,7 @@ function AppHeader({
             accessibilityLabel="Search"
             style={({ pressed }) => [styles.iconBtn, pressed && styles.pressedDim]}
           >
-            <LucideIcon name="search" size={18} color={C.textSecondary} />
+            <LucideIcon name="search" size={20} color={C.textSecondary} />
           </Pressable>
           <Pressable
             onPress={onOpenFilter}
@@ -181,7 +181,7 @@ function AppHeader({
           >
             <LucideIcon
               name="filter"
-              size={18}
+              size={20}
               color={filterActive ? C.purpleLight : C.textSecondary}
             />
             {filterActive ? <View style={styles.filterDot} /> : null}
@@ -1217,6 +1217,8 @@ const styles = StyleSheet.create({
   /* header */
   headerShell: {
     paddingBottom: 2,
+    paddingTop: 4,
+    backgroundColor: "rgba(7,7,15,.72)",
   },
   appHeader: {
     flexDirection: "row",
@@ -1235,7 +1237,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   brandName: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: "800",
     letterSpacing: -0.4,
     color: C.textPrimary,
@@ -1244,7 +1246,7 @@ const styles = StyleSheet.create({
     color: C.purple,
   },
   brandTagline: {
-    fontSize: 6.8,
+    fontSize: 8.5,
     fontWeight: "600",
     letterSpacing: 1.4,
     textTransform: "uppercase",
@@ -1254,11 +1256,11 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
+    gap: 0,
   },
   iconBtn: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1267,8 +1269,8 @@ const styles = StyleSheet.create({
   },
   filterDot: {
     position: "absolute",
-    top: 6,
-    right: 6,
+    top: 8,
+    right: 8,
     width: 8,
     height: 8,
     borderRadius: 4,
@@ -1280,18 +1282,18 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     alignItems: "center",
     gap: 2,
-    marginLeft: 3,
+    marginLeft: 4,
   },
   avatarBox: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     overflow: "hidden",
     borderWidth: 1.5,
     borderColor: "rgba(167,139,250,.5)",
   },
   avatarLv: {
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: "700",
     color: C.textSecondary,
   },
@@ -1310,16 +1312,16 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   pageTitle: {
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: "900",
     letterSpacing: -1,
-    lineHeight: 32,
+    lineHeight: 36,
     color: C.textPrimary,
   },
   pageSub: {
-    fontSize: 11.5,
+    fontSize: 13,
     color: C.textSecondary,
-    lineHeight: 16,
+    lineHeight: 18,
     maxWidth: 230,
     marginTop: 6,
   },

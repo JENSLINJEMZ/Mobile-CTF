@@ -13,6 +13,7 @@ import { cacheGet, cacheRemove, cacheSet } from "./cache";
 
 export interface ChallengeListParams {
   page?: number;
+  limit?: number;
   category?: string;
   difficulty?: string;
   search?: string;
@@ -24,6 +25,7 @@ export async function listChallenges(
 ): Promise<PaginatedResult<ChallengeSummaryDto>> {
   const query = new URLSearchParams();
   if (params.page) query.set("page", String(params.page));
+  if (params.limit) query.set("limit", String(params.limit));
   if (params.category) query.set("category", params.category);
   if (params.difficulty) query.set("difficulty", params.difficulty);
   if (params.search) query.set("search", params.search);

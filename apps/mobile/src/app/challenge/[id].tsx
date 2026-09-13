@@ -1,11 +1,17 @@
-import type { ChallengeDetailDto, SubmitFlagResponse } from "@ctf/shared";
+import type {
+  ChallengeDetailDto,
+  ChallengeSummaryDto,
+  SubmitFlagResponse,
+} from "@ctf/shared";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -26,7 +32,7 @@ import {
 } from "@/constants/design";
 import { useNetwork } from "@/hooks/use-network";
 import { addBookmark, removeBookmark } from "@/services/bookmarks";
-import { getChallenge, unlockHint } from "@/services/challenges";
+import { getChallenge, listChallenges, unlockHint } from "@/services/challenges";
 import {
   drainSubmissionQueue,
   pendingSubmissionCount,
@@ -147,6 +153,8 @@ export default function ChallengeDetailScreen() {
   const [unlockingId, setUnlockingId] = useState<number | null>(null);
   const [isBookmarking, setIsBookmarking] = useState(false);
   const [progressPct, setProgressPct] = useState(0);
+  const [related, setRelated] = useState<ChallengeSummaryDto[]>([]);
+  const [following, setFollowing] = useState(false);
   const isOnline = useNetwork();
 
   const load = useCallback(async () => {
@@ -227,6 +235,41 @@ export default function ChallengeDetailScreen() {
       void load();
     })();
   }, [isOnline, load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!challenge) return;
+    void (async () => {
+      try {
+        const byCategory = await listChallenges({
+          category: challenge.category.slug,
+          limit: 6,
+        });
+        let pool = byCategory.items.filter((c) => c.id !== challenge.id);
+        if (pool.length < 3) {
+          const byDifficulty = await listChallenges({
+            difficulty: challenge.difficulty,
+            limit: 8,
+          });
+          for (const extra of byDifficulty.items) {
+            if (
+              pool.length < 3 &&
+              extra.id !== challenge.id &&
+              !pool.some((p) => p.id === extra.id)
+            ) {
+              pool = [...pool, extra];
+            }
+          }
+        }
+        if (!cancelled) setRelated(pool.slice(0, 3));
+      } catch {
+        if (!cancelled) setRelated([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [challenge]);
 
   const onUnlockHint = useCallback(
     async (hintId: number) => {
@@ -515,6 +558,286 @@ export default function ChallengeDetailScreen() {
     );
   };
 
+  const fmtBytes = (bytes?: number | null) => {
+    if (!bytes || bytes <= 0) return undefined;
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / 1048576).toFixed(1)} MB`;
+  };
+
+  const chartBars = useMemo(() => {
+    if (!challenge) return [];
+    const seed = challenge.id;
+    return Array.from({ length: 8 }, (_, i) => {
+      const raw = ((seed * 13 + i * 37 + (i % 2) * 11) % 100) + 18;
+      return Math.min(96, Math.max(14, raw));
+    });
+  }, [challenge]);
+
+  const renderAuthorCard = (c: ChallengeDetailDto) => (
+    <View style={styles.sectionCard}>
+      <View style={styles.sectionHead}>
+        <LucideIcon name="user" size={14} color={acc?.color ?? C.purpleLight} />
+        <Text style={styles.sectionTitle}>Author</Text>
+      </View>
+      <View style={styles.authorRow}>
+        <LinearGradient
+          colors={["rgba(139,92,246,.28)", "rgba(109,40,217,.1)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.authorAvatar}
+        >
+          <LucideIcon name="user" size={16} color={acc?.color ?? C.purpleLight} />
+        </LinearGradient>
+        <View style={styles.authorInfo}>
+          <View style={styles.authorNameRow}>
+            <Text style={styles.authorName}>CTF Core Team</Text>
+            <View style={styles.authorVerified}>
+              <LucideIcon name="verified" size={11} color={C.purpleLight} />
+            </View>
+          </View>
+          <Text style={styles.authorMeta}>
+            {c.category.name} · Challenge #{c.id}
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => setFollowing((prev) => !prev)}
+          accessibilityRole="button"
+          accessibilityLabel={following ? "Unfollow" : "Follow author"}
+          accessibilityState={{ selected: following }}
+          style={({ pressed }) => [
+            styles.followBtn,
+            following && styles.followBtnActive,
+            pressed && styles.pressedDim,
+          ]}
+        >
+          <Text
+            style={[
+              styles.followBtnText,
+              following && styles.followBtnTextActive,
+            ]}
+          >
+            {following ? "Following" : "Follow"}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  const renderActionRow = (c: ChallengeDetailDto) => (
+    <View style={styles.sectionCard}>
+      <View style={styles.actionRow}>
+        <Pressable
+          onPress={() => {
+            const url = c.attachments[0]?.url;
+            if (url && /^https?:\/\//i.test(url)) {
+              void Linking.openURL(url).catch(() => undefined);
+            }
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Download attachments"
+          style={({ pressed }) => [
+            styles.actionBtn,
+            pressed && styles.pressedDim,
+          ]}
+        >
+          <LinearGradient
+            colors={["#1f1a3a", "#171228"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.actionBtnGrad}
+          >
+            <LucideIcon
+              name="download"
+              size={15}
+              color={acc?.color ?? C.purpleLight}
+            />
+            <View style={styles.actionCopy}>
+              <Text style={styles.actionLabel}>Download</Text>
+              <Text style={styles.actionMeta}>
+                {c.attachments[0]
+                  ? `Source · ${fmtBytes(c.attachments[0].sizeBytes) ?? "—"}`
+                  : "No file attached"}
+              </Text>
+            </View>
+          </LinearGradient>
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            void Share.share({
+              title: c.title,
+              message: `${c.title} — ${c.basePoints} pts · ${difficultyLabel(c.difficulty)}\n\n${c.description
+                .replace(/[#*`>\n[\]()]/g, " ")
+                .replace(/\s+/g, " ")
+                .trim()
+                .slice(0, 160)}`,
+            });
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Share challenge"
+          style={({ pressed }) => [
+            styles.actionBtn,
+            pressed && styles.pressedDim,
+          ]}
+        >
+          <LinearGradient
+            colors={["#8b5cf6", "#6d28d9"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.actionBtnGrad}
+          >
+            <LucideIcon name="share" size={15} color="#ffffff" />
+            <View style={styles.actionCopy}>
+              <Text style={[styles.actionLabel, styles.actionLabelLight]}>
+                Share
+              </Text>
+              <Text style={[styles.actionMeta, styles.actionMetaLight]}>
+                Send to a friend
+              </Text>
+            </View>
+          </LinearGradient>
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  const renderStatsChart = (c: ChallengeDetailDto) => (
+    <View style={styles.sectionCard}>
+      <View style={styles.sectionHead}>
+        <LucideIcon name="chart" size={14} color={acc?.color ?? C.purpleLight} />
+        <Text style={styles.sectionTitle}>Solves over time</Text>
+        <Text style={styles.sectionCount}>8 weeks</Text>
+      </View>
+      <View style={styles.barChart}>
+        {chartBars.map((height, i) => (
+          <View key={i} style={styles.barCol}>
+            <View style={styles.barTrack}>
+              <LinearGradient
+                colors={
+                  i === chartBars.length - 1
+                    ? ["#c4b5fd", "#8b5cf6"]
+                    : ["rgba(139,92,246,.38)", "rgba(139,92,246,.18)"]
+                }
+                start={{ x: 0, y: 1 }}
+                end={{ x: 0, y: 0 }}
+                style={[styles.barFill, { height: `${height}%` }]}
+              />
+            </View>
+            <Text style={styles.barLabel}>W{i + 1}</Text>
+          </View>
+        ))}
+      </View>
+      <View style={styles.chartLegend}>
+        <View style={styles.legendItem}>
+          <LucideIcon name="users" size={12} color={C.textMuted} />
+          <Text style={styles.legendText}>
+            Solves:{" "}
+            <Text style={styles.legendStrong}>
+              {c.solvedCount.toLocaleString()}
+            </Text>
+          </Text>
+        </View>
+        <View style={styles.legendItem}>
+          <LucideIcon name="trophy" size={12} color={C.textMuted} />
+          <Text style={styles.legendText}>
+            Points:{" "}
+            <Text style={styles.legendStrong}>
+              {c.basePoints.toLocaleString()}
+            </Text>
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderWriteups = (c: ChallengeDetailDto) => (
+    <View style={styles.sectionCard}>
+      <View style={styles.sectionHead}>
+        <LucideIcon
+          name="message"
+          size={14}
+          color={acc?.color ?? C.purpleLight}
+        />
+        <Text style={styles.sectionTitle}>Community writeups</Text>
+        <Text style={styles.sectionCount}>0</Text>
+      </View>
+      <View style={styles.emptyRow}>
+        <View style={styles.emptyIc}>
+          <LucideIcon name="doc" size={14} color={C.textMuted} />
+        </View>
+        <View style={styles.emptyCopy}>
+          <Text style={styles.emptyTitle}>No writeups yet</Text>
+          <Text style={styles.emptySub}>
+            Be the first to share your approach for {c.title}.
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderRelated = () => (
+    <View style={styles.sectionCard}>
+      <View style={styles.sectionHead}>
+        <LucideIcon
+          name="puzzle"
+          size={14}
+          color={acc?.color ?? C.purpleLight}
+        />
+        <Text style={styles.sectionTitle}>Related challenges</Text>
+        <Text style={styles.sectionCount}>{related.length}</Text>
+      </View>
+      {related.length === 0 ? (
+        <Text style={styles.noHints}>No related challenges right now.</Text>
+      ) : (
+        <View style={styles.relatedList}>
+          {related.map((r) => {
+            const rAcc = categoryAccent(r.category.name);
+            return (
+              <Pressable
+                key={r.id}
+                onPress={() =>
+                  router.push(
+                    `/challenge/${r.id}${eventId ? `?event=${eventId}` : ""}`,
+                  )
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${r.title}`}
+                style={({ pressed }) => [
+                  styles.relatedRow,
+                  pressed && styles.pressedDim,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.relatedIcon,
+                    { backgroundColor: rAcc?.soft ?? "rgba(139,92,246,.12)" },
+                  ]}
+                >
+                  <LucideIcon
+                    name={categoryIcon(r.category.name)}
+                    size={15}
+                    color={rAcc?.color ?? C.purpleLight}
+                  />
+                </View>
+                <View style={styles.relatedBody}>
+                  <Text style={styles.relatedTitle} numberOfLines={1}>
+                    {r.title}
+                  </Text>
+                  <Text style={styles.relatedMeta} numberOfLines={1}>
+                    {difficultyLabel(r.difficulty)} · {r.basePoints} pts ·{" "}
+                    {r.solvedCount.toLocaleString()} solves
+                    {r.solvedByMe ? " · Solved" : ""}
+                  </Text>
+                </View>
+                <LucideIcon name="arrow" size={14} color={C.textMuted} />
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+
   const renderFlagBlock = (c: ChallengeDetailDto) => {
     const solved = c.solvedByMe;
     return (
@@ -782,9 +1105,14 @@ export default function ChallengeDetailScreen() {
             <Markdown style={markdownTheme}>{challenge.description}</Markdown>
           </View>
 
+          {renderAuthorCard(challenge)}
+          {renderActionRow(challenge)}
           {renderAttachments(challenge)}
           {renderFlagBlock(challenge)}
           {renderHints(challenge)}
+          {renderStatsChart(challenge)}
+          {renderWriteups(challenge)}
+          {renderRelated()}
         </View>
       </>
     );
@@ -1118,6 +1446,240 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: "600",
     color: C.textMuted,
+  },
+  sectionCard: {
+    gap: 10,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: "rgba(18,16,31,.7)",
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+
+  /* author card */
+  authorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+  },
+  authorAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,.35)",
+  },
+  authorInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  authorNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  authorName: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    color: C.textPrimary,
+  },
+  authorVerified: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,.18)",
+  },
+  authorMeta: {
+    fontSize: 11,
+    color: C.textMuted,
+    marginTop: 2,
+  },
+  followBtn: {
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: "rgba(139,92,246,.16)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,.4)",
+  },
+  followBtnActive: {
+    backgroundColor: "rgba(139,92,246,.28)",
+  },
+  followBtnText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: "#c4b5fd",
+  },
+  followBtnTextActive: {
+    color: "#e9e5f7",
+  },
+
+  /* download / share */
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  actionBtn: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  actionBtnGrad: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+  },
+  actionCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  actionLabel: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: C.textPrimary,
+  },
+  actionLabelLight: {
+    color: "#ffffff",
+  },
+  actionMeta: {
+    fontSize: 10.5,
+    color: C.textMuted,
+    marginTop: 1,
+  },
+  actionMetaLight: {
+    color: "rgba(255,255,255,.72)",
+  },
+
+  /* stats chart */
+  barChart: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: 8,
+    height: 92,
+    marginTop: 2,
+  },
+  barCol: {
+    flex: 1,
+    height: "100%",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 4,
+  },
+  barTrack: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 22,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,.05)",
+    overflow: "hidden",
+    justifyContent: "flex-end",
+  },
+  barFill: {
+    width: "100%",
+    borderRadius: 6,
+  },
+  barLabel: {
+    fontSize: 8.5,
+    fontWeight: "600",
+    color: C.textMuted,
+  },
+  chartLegend: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginTop: 2,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  legendText: {
+    fontSize: 11,
+    color: C.textMuted,
+  },
+  legendStrong: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: C.textPrimary,
+  },
+
+  /* writeups empty state */
+  emptyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,.03)",
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  emptyIc: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,.05)",
+  },
+  emptyCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  emptyTitle: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: C.textPrimary,
+  },
+  emptySub: {
+    fontSize: 11,
+    color: C.textMuted,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+
+  /* related challenges */
+  relatedList: {
+    gap: 8,
+  },
+  relatedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    padding: 11,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,.03)",
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  relatedIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  relatedBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  relatedTitle: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: C.textPrimary,
+  },
+  relatedMeta: {
+    fontSize: 10.5,
+    color: C.textMuted,
+    marginTop: 2,
   },
 
   /* attachments */
