@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -462,7 +463,6 @@ export default function TerminalScreen() {
 
   const [lines, setLines] = useState<Line[]>([]);
   const [buffer, setBuffer] = useState("");
-  const [shiftOn, setShiftOn] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [hostLabel, setHostLabel] = useState("ctf@challenge:~");
@@ -584,7 +584,6 @@ export default function TerminalScreen() {
     setExitNote(null);
     setCrashNote(null);
     setBuffer("");
-    setShiftOn(false);
     setConnected(true);
     setActiveId(session.id);
     setExpiresAt(session.expiresAt);
@@ -700,7 +699,6 @@ export default function TerminalScreen() {
     const command = buffer.trim();
     if (!command || !connected) return;
     setBuffer("");
-    setShiftOn(false);
     lastCommandRef.current = command;
     setLines((prev) => [
       ...prev,
@@ -714,33 +712,21 @@ export default function TerminalScreen() {
     });
   }, [buffer, connected]);
 
-  const pressKey = useCallback(
-    (key: string) => {
-      if (!connected) return;
-      if (key === "shift") {
-        setShiftOn((s) => !s);
-        return;
-      }
-      if (key === "backspace") {
-        setBuffer((b) => b.slice(0, -1));
-        return;
-      }
-      if (key === "enter") {
-        submitInput();
-        return;
-      }
-      if (key === "space") {
-        setBuffer((b) => b + " ");
-        return;
-      }
-      if (key === "num" || key === "globe" || key === "tab") return;
-      if (key.length === 1) {
-        setBuffer((b) => b + (shiftOn ? key.toUpperCase() : key));
-        setShiftOn(false);
-      }
-    },
-    [connected, shiftOn, submitInput],
-  );
+  const pasteBuffer = useCallback(() => {
+    if (!connected) return;
+    void Clipboard.getStringAsync()
+      .then((text) => {
+        const pasted = (text ?? "").trim();
+        if (!pasted) {
+          toast.show({ title: "Clipboard empty", body: "Copy a command first.", tone: "default" });
+          return;
+        }
+        setBuffer((b) => (b ? `${b} ${pasted}` : pasted));
+      })
+      .catch(() =>
+        toast.show({ title: "Paste failed", body: "Could not read the clipboard.", tone: "error" }),
+      );
+  }, [connected]);
 
   const clearOutput = useCallback(() => {
     setLines([]);
@@ -911,11 +897,11 @@ export default function TerminalScreen() {
           ) : null}
         </ScrollView>
       ) : (
-        <View style={styles.cliWrap}>
+        <View style={[styles.cliWrap, { paddingBottom: tabBarPad }]}>
           <ScrollView
             showsVerticalScrollIndicator={false}
             style={styles.termScroll}
-            contentContainerStyle={[styles.cliScrollContent, { paddingBottom: tabBarPad + 220 }]}
+            contentContainerStyle={styles.cliScrollContent}
           >
             <PageHead
               title="Terminal"
@@ -1043,18 +1029,22 @@ export default function TerminalScreen() {
             ) : null}
           </ScrollView>
 
-          <View style={[styles.actionRow, { bottom: tabBarPad + 148 }]}>
-            <Pressable onPress={() => undefined} accessibilityRole="button" style={({ pressed }) => [styles.actBtn, pressed && styles.scaled]}>
+          <View style={styles.actionRow}>
+            <Pressable onPress={() => toast.show({ title: "Modifier", body: "Ctrl is coming soon.", tone: "default" })} accessibilityRole="button" style={({ pressed }) => [styles.actBtn, pressed && styles.scaled]}>
               <Text style={styles.actBtnText}>Ctrl</Text>
             </Pressable>
-            <Pressable onPress={() => undefined} accessibilityRole="button" style={({ pressed }) => [styles.actBtn, pressed && styles.scaled]}>
+            <Pressable onPress={() => toast.show({ title: "Modifier", body: "Alt is coming soon.", tone: "default" })} accessibilityRole="button" style={({ pressed }) => [styles.actBtn, pressed && styles.scaled]}>
               <Text style={styles.actBtnText}>Alt</Text>
             </Pressable>
-            <Pressable onPress={() => pressKey("tab")} accessibilityRole="button" style={({ pressed }) => [styles.actBtn, pressed && styles.scaled]}>
+            <Pressable onPress={() => toast.show({ title: "Tab", body: "Tab completion is coming soon.", tone: "default" })} accessibilityRole="button" style={({ pressed }) => [styles.actBtn, pressed && styles.scaled]}>
               <Text style={styles.actBtnText}>Tab</Text>
             </Pressable>
             <Pressable onPress={clearOutput} accessibilityRole="button" style={({ pressed }) => [styles.actBtn, styles.actBtnClear, pressed && styles.scaled]}>
               <Text style={styles.actBtnClearText}>Clear</Text>
+            </Pressable>
+            <Pressable onPress={pasteBuffer} accessibilityRole="button" style={({ pressed }) => [styles.actBtn, styles.actBtnPaste, pressed && styles.scaled]}>
+              <LucideIcon name="clipboard" size={13} color="#a5b4fc" />
+              <Text style={styles.actBtnPasteText}>Paste</Text>
             </Pressable>
             <Pressable
               onPress={() => toast.show({ title: "Upload File", body: "File upload is coming soon.", tone: "default" })}
@@ -1066,83 +1056,32 @@ export default function TerminalScreen() {
             </Pressable>
           </View>
 
-          {/* Virtual keyboard */}
-          <View style={[styles.kb, { bottom: tabBarPad + 4 }]}>
-            <KeyboardRow keys={["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"]} onKey={pressKey} />
-            <KeyboardRow keys={["a", "s", "d", "f", "g", "h", "j", "k", "l"]} onKey={pressKey} />
-            <View style={styles.kbRow}>
-              <KeyBtn flex={1.4} keyLabel="shift" onKey={pressKey} icon="shift" />
-              {["z", "x", "c", "v", "b", "n", "m"].map((k) => (
-                <KeyBtn key={k} flex={1} keyLabel={k} onKey={pressKey} />
-              ))}
-              <KeyBtn flex={1.4} keyLabel="backspace" onKey={pressKey} icon="backspace" />
-            </View>
-            <View style={styles.kbRow}>
-              <KeyBtn flex={1.4} keyLabel="num" onKey={pressKey} text="?123" mod />
-              <KeyBtn flex={1} keyLabel="globe" onKey={pressKey} icon="globe" mod />
-              <KeyBtn flex={4} keyLabel="space" onKey={pressKey} text="English" space />
-              <KeyBtn flex={1.6} keyLabel="enter" onKey={pressKey} text="Enter" enter />
-            </View>
+          <View style={styles.inputBar}>
+            <Text style={styles.inputPrompt} numberOfLines={1}>
+              ctf@challenge:~$
+            </Text>
+            <TextInput
+              style={styles.termInput}
+              value={buffer}
+              onChangeText={setBuffer}
+              onSubmitEditing={submitInput}
+              placeholder="Type a command"
+              placeholderTextColor={C.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="off"
+              spellCheck={false}
+              returnKeyType="send"
+              blurOnSubmit={false}
+              editable={connected}
+              accessibilityLabel="Terminal command input"
+            />
           </View>
         </View>
       )}
     </View>
   );
 }
-
-function KeyboardRow({ keys, onKey }: { keys: string[]; onKey: (k: string) => void }) {
-  return (
-    <View style={styles.kbRow}>
-      {keys.map((k) => (
-        <KeyBtn key={k} flex={1} keyLabel={k} onKey={onKey} />
-      ))}
-    </View>
-  );
-}
-
-function KeyBtn({
-  flex,
-  keyLabel,
-  onKey,
-  text,
-  icon,
-  mod,
-  space,
-  enter,
-}: {
-  flex: number;
-  keyLabel: string;
-  onKey: (k: string) => void;
-  text?: string;
-  icon?: LucideName;
-  mod?: boolean;
-  space?: boolean;
-  enter?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={() => onKey(keyLabel)}
-      accessibilityRole="button"
-      accessibilityLabel={keyLabel}
-      style={({ pressed }) => [
-        styles.key,
-        { flex },
-        mod && styles.keyMods,
-        space && styles.keySpace,
-        enter && styles.keyEnter,
-        pressed && styles.keyPressed,
-      ]}
-    >
-      {icon ? (
-        <LucideIcon name={icon} size={15} color={enter || keyLabel === "backspace" ? "#e2e8f0" : C.textSecondary} />
-      ) : (
-        <Text style={[styles.keyText, enter && styles.keyEnterText, mod && styles.keyModText]}>{text ?? keyLabel}</Text>
-      )}
-    </Pressable>
-  );
-}
-
-
 
 const styles = StyleSheet.create({
   root: {
@@ -1657,7 +1596,7 @@ const styles = StyleSheet.create({
   cliScrollContent: {
     paddingHorizontal: 14,
     paddingTop: 6,
-    paddingBottom: 220,
+    paddingBottom: 12,
     flexGrow: 1,
   },
   termScroll: {
@@ -1840,12 +1779,10 @@ const styles = StyleSheet.create({
   },
 
   actionRow: {
-    position: "absolute",
-    left: 14,
-    right: 14,
-    bottom: 148,
     flexDirection: "row",
     gap: 6,
+    paddingHorizontal: 12,
+    marginBottom: 8,
   },
   actBtn: {
     flex: 1,
@@ -1884,62 +1821,41 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#fff",
   },
+  actBtnPaste: {
+    backgroundColor: "rgba(30,27,76,.9)",
+    borderColor: "rgba(129,140,248,.5)",
+  },
+  actBtnPasteText: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: "#a5b4fc",
+  },
 
-  kb: {
-    position: "absolute",
-    left: 10,
-    right: 10,
-    bottom: 4,
-    height: 140,
-    paddingHorizontal: 8,
-    borderRadius: 14,
+  inputBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 12,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 2,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: "rgba(139,92,246,.35)",
     backgroundColor: "rgba(14,12,26,.96)",
   },
-  kbRow: {
-    flex: 1,
-    flexDirection: "row",
-    gap: 5,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 3,
-  },
-  key: {
-    flex: 1,
-    height: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 8,
-    backgroundColor: "#2f2f39",
-  },
-  keyText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: C.monoCmd,
-  },
-  keyMods: {
-    backgroundColor: "rgba(38,37,46,.9)",
-  },
-  keySpace: {
-    backgroundColor: "rgba(38,37,46,.9)",
-  },
-  keyEnter: {
-    backgroundColor: "transparent",
-  },
-  keyEnterText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 12,
-  },
-  keyModText: {
+  inputPrompt: {
+    fontFamily: Fonts.mono,
     fontSize: 12,
     fontWeight: "600",
-    color: C.monoOut,
+    color: C.green,
   },
-  keyPressed: {
-    opacity: 0.7,
-    transform: [{ translateY: 1 }],
+  termInput: {
+    flex: 1,
+    fontFamily: Fonts.mono,
+    fontSize: 13,
+    color: C.monoCmd,
+    paddingVertical: 9,
   },
 
   dot: {
