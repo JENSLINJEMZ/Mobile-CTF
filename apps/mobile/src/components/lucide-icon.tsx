@@ -67,6 +67,17 @@ const ICON_PATHS: Record<string, string> = {
   folder: '<path d="M3 7.5a2 2 0 0 1 2-2h3.5l2 2H19a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   server: '<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',
   history: '<path d="M3.5 12a8.5 8.5 0 1 0 2.5-6.1L3.5 8.6"/><path d="M4 3.5v5h5"/><path d="M12 8v4l2.5 2"/>',
+  back: '<path d="M19 12H6"/><path d="m12 6-6 6 6 6"/>',
+  bookmark:
+    '<path d="M6.5 3.5h11a1 1 0 0 1 1 1V20l-6.5-4.8L5.5 20V4.5a1 1 0 0 1 1-1Z"/><path d="M11 8.5a1.5 1.5 0 0 0 2 1.4"/>',
+  filter:
+    '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+  sort:
+    '<path d="M7 4v16M7 4 4 7M7 4l3 3"/><path d="M17 20V4M17 20l-3-3M17 20l3-3"/>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1.8"/><rect x="14" y="3" width="7" height="7" rx="1.8"/><rect x="3" y="14" width="7" height="7" rx="1.8"/><rect x="14" y="14" width="7" height="7" rx="1.8"/>',
+  chart: '<path d="M6 20v-6.5M12 20V5M18 20v-9.5"/>',
+  external:
+    '<path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M19 14v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"/>',
 };
 
 function parseNodes(source: string): SvgNode[] {

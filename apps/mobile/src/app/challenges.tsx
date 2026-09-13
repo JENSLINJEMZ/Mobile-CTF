@@ -4,11 +4,13 @@ import type {
   PaginatedResult,
 } from "@ctf/shared";
 import { LinearGradient } from "expo-linear-gradient";
-import { Link, useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -22,6 +24,7 @@ import Svg, {
   Circle,
   Defs,
   Ellipse,
+  G,
   LinearGradient as SvgLinearGradient,
   Path,
   Rect,
@@ -29,21 +32,56 @@ import Svg, {
 } from "react-native-svg";
 
 import { LucideIcon, type LucideName } from "@/components/lucide-icon";
-import { DIFF_COLORS, C, categoryAccent, categoryIcon, difficultyLabel, withAlpha } from "@/constants/design";
+import {
+  C,
+  categoryAccent,
+  categoryIcon,
+  difficultyLabel,
+  withAlpha,
+} from "@/constants/design";
 import {
   listChallengeCategories,
   listChallenges,
 } from "@/services/challenges";
+import { addBookmark, listBookmarks, removeBookmark } from "@/services/bookmarks";
 import { getLeaderboard } from "@/services/leaderboard";
 import { useAuthGate } from "@/hooks/use-auth-gate";
 import { useReduceMotion } from "@/hooks/use-reduce-motion";
+
+/* ------------------------------------------------------------
+   Palettes (ported from /home/jemzi/Developement/UI/2/challenge.html)
+   ------------------------------------------------------------ */
+const DIFF_RAMP: Record<string, { colors: [string, string]; fg: string }> = {
+  EASY: { colors: ["#22c55e", "#15803d"], fg: "#ffffff" },
+  MEDIUM: { colors: ["#fbbf24", "#f59e0b"], fg: "#1a0f00" },
+  HARD: { colors: ["#ef4444", "#b91c1c"], fg: "#ffffff" },
+  EXPERT: { colors: ["#f43f5e", "#9f1239"], fg: "#ffffff" },
+};
+
+const DIFF_GLOW: Record<string, string> = {
+  EASY: "rgba(34,197,94,.16)",
+  MEDIUM: "rgba(251,191,36,.16)",
+  HARD: "rgba(239,68,68,.16)",
+  EXPERT: "rgba(244,63,94,.16)",
+};
+
+type SortKey = "newest" | "popular" | "easiest" | "hardest";
+
+const SORT_OPTIONS: { id: SortKey; label: string }[] = [
+  { id: "newest", label: "Newest" },
+  { id: "popular", label: "Most Solves" },
+  { id: "easiest", label: "Easiest First" },
+  { id: "hardest", label: "Hardest First" },
+];
+
+const TAG_TONES = ["blue", "purple", "pink", "cyan", "gold", "green"] as const;
 
 /* ------------------------------------------------------------
    Header
    ------------------------------------------------------------ */
 function BrandMark() {
   return (
-    <Svg width={26} height={19} viewBox="0 0 40 28">
+    <Svg width={30} height={21} viewBox="0 0 40 28">
       <Defs>
         <SvgLinearGradient id="brandGrad" x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0%" stopColor="#c4b5fd" />
@@ -82,57 +120,148 @@ function MiniAvatar() {
   );
 }
 
-function AppHeader({ level }: { level: number }) {
-  const router = useRouter();
+function ScriptDeco() {
+  return (
+    <View style={styles.scriptDeco}>
+      <Text style={styles.scriptText}>
+        Solve{"\n"}Learn{"\n"}Repeat
+      </Text>
+      <Svg width={44} height={9} viewBox="0 0 58 9" style={styles.scriptUnderline}>
+        <Path
+          d="M1.5 6 Q 28 -1.5 56.5 6"
+          stroke="rgba(196,181,253,.7)"
+          fill="none"
+          strokeWidth={1.6}
+          strokeLinecap="round"
+        />
+      </Svg>
+    </View>
+  );
+}
+
+function AppHeader({
+  level,
+  filterActive,
+  onOpenFilter,
+  onSearch,
+}: {
+  level: number;
+  filterActive: boolean;
+  onOpenFilter: () => void;
+  onSearch: () => void;
+}) {
   return (
     <View style={styles.headerShell}>
       <View style={styles.appHeader}>
         <View style={styles.brand}>
           <BrandMark />
-          <View>
+          <View style={styles.brandBlock}>
             <Text style={styles.brandName}>
               Mobile <Text style={styles.brandCtf}>CTF</Text>
             </Text>
-            <Text style={styles.brandTagline}>Learn · Hack · Compete</Text>
+            <Text style={styles.brandTagline}>Play · Learn · Hack · Grow</Text>
           </View>
         </View>
+
         <View style={styles.headerActions}>
           <Pressable
-            onPress={() => router.push("/notifications")}
+            onPress={onSearch}
             accessibilityRole="button"
-            accessibilityLabel="Notifications"
-            style={styles.iconBtn}
+            accessibilityLabel="Search"
+            style={({ pressed }) => [styles.iconBtn, pressed && styles.pressedDim]}
           >
-            <LucideIcon name="bell" size={17} color={C.textSecondary} />
+            <LucideIcon name="search" size={18} color={C.textSecondary} />
           </Pressable>
           <Pressable
-            onPress={() => router.push("/profile")}
+            onPress={onOpenFilter}
             accessibilityRole="button"
-            accessibilityLabel="Profile"
-            style={styles.avatarWrap}
+            accessibilityLabel="Filter"
+            accessibilityState={{ selected: filterActive }}
+            style={({ pressed }) => [styles.iconBtn, styles.iconBtnFilter, pressed && styles.pressedDim]}
           >
-            <View style={styles.avatarBox}>
-              <MiniAvatar />
-            </View>
-            <Text style={styles.avatarLv}>Lv. {level}</Text>
+            <LucideIcon
+              name="filter"
+              size={18}
+              color={filterActive ? C.purpleLight : C.textSecondary}
+            />
+            {filterActive ? <View style={styles.filterDot} /> : null}
           </Pressable>
+          <Link href="/profile" asChild>
+            <Pressable accessibilityRole="button" style={styles.avatarWrap}>
+              <View style={styles.avatarBox}>
+                <MiniAvatar />
+              </View>
+              <Text style={styles.avatarLv}>Lv. {level}</Text>
+            </Pressable>
+          </Link>
         </View>
       </View>
 
       <View style={styles.pageHead}>
         <View style={styles.pageHeadCopy}>
           <Text style={styles.pageTitle}>Challenges</Text>
-          <Text style={styles.pageSub}>
-            Browse the battleground. Pick a flag and break it.
-          </Text>
+          <Text style={styles.pageSub}>Real problems. Real skills. On your device.</Text>
         </View>
-        <View style={styles.scriptDeco}>
-          <Text style={styles.scriptText}>
-            FIND{"\n"}THE{"\n"}FLAG
+        <ScriptDeco />
+      </View>
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------
+   Progress card
+   ------------------------------------------------------------ */
+function ProgressRing({ pct }: { pct: number }) {
+  const circumference = 2 * Math.PI * 26;
+  const offset = circumference * (1 - Math.max(0, Math.min(100, pct)) / 100);
+  return (
+    <View style={styles.ringWrap}>
+      <Svg width={66} height={66} viewBox="0 0 60 60">
+        <Defs>
+          <SvgLinearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0%" stopColor="#a78bfa" />
+            <Stop offset="100%" stopColor="#7c3aed" />
+          </SvgLinearGradient>
+        </Defs>
+        <G rotation={-90} origin="30, 30">
+          <Circle cx="30" cy="30" r="26" stroke="rgba(255,255,255,.08)" strokeWidth={5} fill="none" />
+          <Circle
+            cx="30"
+            cy="30"
+            r="26"
+            stroke="url(#ringGrad)"
+            strokeWidth={5}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            fill="none"
+          />
+        </G>
+      </Svg>
+      <Text style={styles.ringVal}>{pct}%</Text>
+    </View>
+  );
+}
+
+function ProgressCard({ solved, total }: { solved: number; total: number }) {
+  const pct = total > 0 ? Math.round((solved / total) * 100) : 0;
+  return (
+    <View style={styles.progressCard}>
+      <View style={styles.progressGlow} />
+      <View style={styles.progressInner}>
+        <View style={styles.progLeft}>
+          <View style={styles.progLeftTop}>
+            <LucideIcon name="chart" size={15} color={C.purpleLight} />
+            <Text style={styles.progLeftTopText}>Your Progress</Text>
+          </View>
+          <Text style={styles.progNum}>
+            {solved} / {total}
           </Text>
-          <Svg width={34} height={7} viewBox="0 0 52 9" style={styles.scriptUnderline}>
-            <Path d="M1.5 6 Q 26 -1.5 50.5 6" stroke="rgba(196,181,253,.7)" fill="none" strokeWidth={1.6} strokeLinecap="round" />
-          </Svg>
+          <Text style={styles.progLabel}>Challenges Solved</Text>
+        </View>
+        <ProgressRing pct={pct} />
+        <View style={styles.progRight}>
+          <Text style={styles.quote}>“A small step today, a hacker tomorrow.”</Text>
         </View>
       </View>
     </View>
@@ -140,156 +269,296 @@ function AppHeader({ level }: { level: number }) {
 }
 
 /* ------------------------------------------------------------
-   Small primitives
+   Pills
    ------------------------------------------------------------ */
-function ErrBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+function ActivePills({
+  categoryLabel,
+  difficulty,
+  search,
+  onClearCat,
+  onClearDiff,
+  onClearSearch,
+  onClearAll,
+}: {
+  categoryLabel?: string;
+  difficulty?: string;
+  search: string;
+  onClearCat: () => void;
+  onClearDiff: () => void;
+  onClearSearch: () => void;
+  onClearAll: () => void;
+}) {
+  const count = Number(Boolean(categoryLabel)) + Number(Boolean(difficulty)) + Number(Boolean(search));
+  if (count === 0) return null;
   return (
-    <Pressable
-      onPress={onRetry}
-      accessibilityRole="button"
-      style={styles.errBanner}
-    >
-      <LucideIcon name="radar" size={13} color={C.red} />
-      <Text style={styles.errText} numberOfLines={2}>
-        {message}. Tap to retry.
-      </Text>
-    </Pressable>
+    <View style={styles.pillsRow}>
+      {categoryLabel ? (
+        <View style={styles.pill}>
+          <LucideIcon name="grid" size={10} color={C.purpleLight} />
+          <Text style={styles.pillText}>{categoryLabel}</Text>
+          <Pressable
+            onPress={onClearCat}
+            accessibilityRole="button"
+            accessibilityLabel="Remove category filter"
+            style={styles.pillX}
+          >
+            <LucideIcon name="x" size={10} color={C.purpleLight} />
+          </Pressable>
+        </View>
+      ) : null}
+      {difficulty ? (
+        <View style={styles.pill}>
+          <Text style={styles.pillText}>{difficulty}</Text>
+          <Pressable
+            onPress={onClearDiff}
+            accessibilityRole="button"
+            accessibilityLabel="Remove difficulty filter"
+            style={styles.pillX}
+          >
+            <LucideIcon name="x" size={10} color={C.purpleLight} />
+          </Pressable>
+        </View>
+      ) : null}
+      {search ? (
+        <View style={styles.pill}>
+          <Text style={styles.pillText}>“{search}”</Text>
+          <Pressable
+            onPress={onClearSearch}
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+            style={styles.pillX}
+          >
+            <LucideIcon name="x" size={10} color={C.purpleLight} />
+          </Pressable>
+        </View>
+      ) : null}
+      {count > 1 ? (
+        <Pressable
+          onPress={onClearAll}
+          accessibilityRole="button"
+          style={styles.pillClear}
+        >
+          <Text style={styles.pillClearText}>Clear all</Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
-function SectionHead({ total, shown }: { total: number; shown: number }) {
+/* ------------------------------------------------------------
+   Challenge card (2/ reference design)
+   ------------------------------------------------------------ */
+function CardThumb({ item }: { item: ChallengeSummaryDto }) {
+  const acc = categoryAccent(item.category.name);
+  const icon: LucideName = categoryIcon(item.category.name);
+  const locked = Boolean(item.locked);
   return (
-    <View style={styles.sectionHead}>
-      <Text style={styles.sectionTitle}>All Challenges</Text>
-      <Text style={styles.sectionHintText}>
-        {total > 0 ? `${shown.toLocaleString()} of ${total.toLocaleString()}` : "Explore the board"}
+    <View style={[styles.thumb, { borderColor: withAlpha(acc.color, 0.18) }]}>
+      <LinearGradient
+        colors={["#0b0a16", "#0b0818", "#04030a"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={["transparent", withAlpha(acc.color, 0.16)]}
+        start={{ x: 0, y: 0.4 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={[styles.thumbHalo, { backgroundColor: acc.glow }]} />
+      <View style={styles.thumbIcon}>
+        <LucideIcon
+          name={locked ? "lock" : icon}
+          size={26}
+          color={locked ? C.textMuted : acc.color}
+        />
+      </View>
+      <LinearGradient
+        colors={["transparent", "rgba(4,3,9,.82)"]}
+        start={{ x: 0, y: 0.35 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <Text style={styles.thumbCat} numberOfLines={1}>
+        {locked ? "Locked" : String(item.category.name).toUpperCase()}
       </Text>
     </View>
   );
 }
 
-const DIFF_FILTERS: { key?: string; label: string; tone: string }[] = [
-  { label: "All", tone: "#a78bfa" },
-  { key: "EASY", label: "Easy", tone: DIFF_COLORS.EASY },
-  { key: "MEDIUM", label: "Medium", tone: DIFF_COLORS.MEDIUM },
-  { key: "HARD", label: "Hard", tone: DIFF_COLORS.HARD },
-  { key: "EXPERT", label: "Expert", tone: DIFF_COLORS.EXPERT },
-];
+function TagPill({ name }: { name: string }) {
+  const tone = TAG_TONES[name.length % TAG_TONES.length];
+  const palette = {
+    blue: { color: "#93c5fd", bg: "rgba(59,130,246,.14)", line: "rgba(59,130,246,.28)" },
+    purple: { color: "#c4b5fd", bg: "rgba(139,92,246,.14)", line: "rgba(139,92,246,.28)" },
+    pink: { color: "#f9a8d4", bg: "rgba(236,72,153,.14)", line: "rgba(236,72,153,.28)" },
+    cyan: { color: "#67e8f9", bg: "rgba(34,211,238,.14)", line: "rgba(34,211,238,.28)" },
+    gold: { color: "#fcd34d", bg: "rgba(251,191,36,.14)", line: "rgba(251,191,36,.28)" },
+    green: { color: "#86efac", bg: "rgba(34,197,94,.14)", line: "rgba(34,197,94,.28)" },
+  }[tone];
+  return (
+    <View style={[styles.tag, { backgroundColor: palette.bg, borderColor: palette.line }]}>
+      <Text style={[styles.tagText, { color: palette.color }]} numberOfLines={1}>
+        {name}
+      </Text>
+    </View>
+  );
+}
 
-/* ------------------------------------------------------------
-   Challenge card
-   ------------------------------------------------------------ */
-function ChallengeCard({ item }: { item: ChallengeSummaryDto }) {
-  const acc = categoryAccent(item.category.name);
-  const diffColor = DIFF_COLORS[item.difficulty] ?? withAlpha(C.purpleLight, 1);
+function DifficultyPill({ difficulty }: { difficulty: string }) {
+  const ramp = DIFF_RAMP[difficulty] ?? DIFF_RAMP.EASY;
+  return (
+    <LinearGradient colors={ramp.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.diffPill}>
+      <Text style={[styles.diffPillText, { color: ramp.fg }]}>{difficultyLabel(difficulty)}</Text>
+    </LinearGradient>
+  );
+}
+
+function ChallengeCard({
+  item,
+  bookmarked,
+  onBookmark,
+}: {
+  item: ChallengeSummaryDto;
+  bookmarked: boolean;
+  onBookmark: (id: number) => void;
+}) {
   const solved = item.solvedByMe;
   const locked = Boolean(item.locked);
-  const icon: LucideName = categoryIcon(item.category.name);
+  const glow = DIFF_GLOW[item.difficulty] ?? "transparent";
 
   return (
-    <Link href={`/challenge/${item.id}`} asChild>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Challenge ${item.title}, ${item.basePoints} points, ${difficultyLabel(item.difficulty)}`}
-        style={({ pressed }) => [styles.cardOuter, pressed && styles.cardPressed]}
-      >
-        <LinearGradient
-          colors={[acc.soft, "rgba(16,14,28,.95)"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.cardBg}
-        />
-        <View style={[styles.cardRail, { backgroundColor: acc.color }]} />
-
-        <View style={[styles.catIcon, { backgroundColor: acc.soft, borderColor: acc.line }]}>
-          {locked ? (
-            <LucideIcon name="lock" size={15} color={C.textSecondary} />
-          ) : (
-            <LucideIcon name={icon} size={15} color={acc.color} />
-          )}
+    <View style={[styles.card, solved && styles.cardSolved]}>
+      <View style={[styles.cardGlow, { backgroundColor: glow }]} />
+      {solved ? (
+        <View style={styles.cardSolvedRibbon}>
+          <LucideIcon name="check" size={9} color="#ffffff" />
+          <Text style={styles.cardSolvedText}>SOLVED</Text>
         </View>
+      ) : null}
 
-        <View style={[styles.cardBody, locked && styles.cardBodyDim]}>
-          <View style={styles.cardTop}>
-            <Text style={[styles.cardCat, { color: acc.color }]}>
-              {String(item.category.name).toUpperCase()}
-            </Text>
-            {solved ? (
-              <View style={styles.solvedPill}>
-                <LucideIcon name="check" size={9} color={C.green} />
-                <Text style={styles.solvedText}>solved</Text>
-              </View>
-            ) : null}
-          </View>
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {item.title}
-          </Text>
-          <View style={styles.cardMetaRow}>
-            <View
-              style={[
-                styles.diffPill,
-                {
-                  backgroundColor: withAlpha(diffColor, 0.13),
-                  borderColor: withAlpha(diffColor, 0.32),
-                },
-              ]}
-            >
-              <Text style={[styles.diffText, { color: diffColor }]}>
-                {difficultyLabel(item.difficulty)}
-              </Text>
-            </View>
-            <View style={styles.solvesRow}>
-              <LucideIcon name="users" size={10} color={C.textMuted} />
-              <Text style={styles.solvesText} numberOfLines={1}>
-                {item.solvedCount > 0
-                  ? `${item.solvedCount.toLocaleString()} solves`
-                  : "Be the first to solve"}
-              </Text>
-            </View>
+      <CardThumb item={item} />
+
+      <View style={styles.cardBody}>
+        <View style={styles.cardTop}>
+          <DifficultyPill difficulty={item.difficulty} />
+          <View style={styles.ptsPill}>
+            <LucideIcon name="star" size={10} color={C.gold} />
+            <Text style={styles.ptsPillText}>{item.basePoints}</Text>
           </View>
         </View>
 
-        <View style={styles.cardRight}>
-          <Text style={styles.cardPts}>{item.basePoints}</Text>
-          <Text style={styles.cardPtsLabel}>PTS</Text>
+        <Pressable
+          onPress={() => onBookmark(item.id)}
+          accessibilityRole="button"
+          accessibilityLabel={bookmarked ? "Remove bookmark" : "Bookmark"}
+          accessibilityState={{ selected: bookmarked }}
+          hitSlop={6}
+          style={({ pressed }) => [
+            styles.bookmarkBtn,
+            pressed && styles.pressedDim,
+          ]}
+        >
           <LucideIcon
-            name={solved ? "check" : "chevron"}
-            size={12}
-            color={solved ? C.green : C.textMuted}
+            name="bookmark"
+            size={16}
+            color={bookmarked ? C.purpleLight : C.textMuted}
           />
+        </Pressable>
+
+        <Text style={styles.cardTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+
+        <Text style={styles.cardCategory} numberOfLines={1}>
+          {locked
+            ? (item.lockedReason ?? "Locked challenge")
+            : String(item.category.name)}
+        </Text>
+
+        <View style={styles.cardTags}>
+          {(item.tags ?? []).slice(0, 3).map((tag) => (
+            <TagPill key={tag.id} name={tag.name} />
+          ))}
         </View>
-      </Pressable>
-    </Link>
+
+        <View style={styles.cardStats}>
+          <View style={styles.stat}>
+            <LucideIcon name="users" size={12} color={C.textMuted} />
+            <Text style={styles.statText}>
+              {item.solvedCount > 0 ? item.solvedCount.toLocaleString() : "0"} solves
+            </Text>
+          </View>
+          <View style={styles.stat}>
+            <LucideIcon
+              name={locked ? "lock" : solved ? "check" : "shield"}
+              size={12}
+              color={locked ? C.textMuted : solved ? C.green : C.textMuted}
+            />
+            <Text style={[styles.statText, solved && { color: C.green }]}>
+              {locked ? "Locked" : solved ? "Solved" : "Open"}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <Link href={`/challenge/${item.id}`} asChild>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${item.title}`}
+          style={styles.cardArrow}
+        >
+          <LucideIcon name="arrow" size={16} color="#ffffff" strokeWidth={2.4} />
+        </Pressable>
+      </Link>
+    </View>
   );
 }
 
 /* ------------------------------------------------------------
-   Skeleton
+   Filter sheet
    ------------------------------------------------------------ */
-function SkeletonCard({ reduce }: { reduce: boolean }) {
-  const value = useRef(new Animated.Value(0.45)).current;
-  useEffect(() => {
-    if (reduce) return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(value, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(value, { toValue: 0.45, duration: 700, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [reduce, value]);
-
+function DesignSheet({
+  visible,
+  onClose,
+  children,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <Animated.View style={[styles.skCard, { opacity: value }]}>
-      <View style={styles.skIcon} />
-      <View style={styles.skBody}>
-        <View style={styles.skLineWide} />
-        <View style={styles.skLine} />
-        <View style={styles.skLineShort} />
+    <Modal transparent visible={visible} animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+      <View style={styles.sheetRoot}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss sheet"
+          style={styles.sheetScrim}
+          onPress={onClose}
+        />
+        <View style={styles.sheetPanel}>
+          <View style={styles.sheetGrab} />
+          {children}
+        </View>
       </View>
-      <View style={styles.skPts} />
-    </Animated.View>
+    </Modal>
+  );
+}
+
+function SheetHead({ title, onClose }: { title: string; onClose: () => void }) {
+  return (
+    <View style={styles.sheetHead}>
+      <Text style={styles.sheetHeadText}>{title}</Text>
+      <Pressable
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Close"
+        style={({ pressed }) => [styles.sheetClose, pressed && styles.pressedDim]}
+      >
+        <LucideIcon name="x" size={15} color={C.textSecondary} />
+      </Pressable>
+    </View>
   );
 }
 
@@ -300,26 +569,42 @@ export default function ChallengesScreen() {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotion();
   const { status: authStatus } = useAuthGate();
-  const [level, setLevel] = useState(1);
-  const [categories, setCategories] = useState<ChallengeCategoryDto[]>([]);
-  const [data, setData] = useState<PaginatedResult<ChallengeSummaryDto> | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
-  const [selectedDiff, setSelectedDiff] = useState<string | undefined>();
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const searchRef = useRef<TextInput | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dataRef = useRef<PaginatedResult<ChallengeSummaryDto> | null>(null);
 
+  const [level, setLevel] = useState(1);
+  const [categories, setCategories] = useState<ChallengeCategoryDto[]>([]);
+  const [data, setData] = useState<PaginatedResult<ChallengeSummaryDto> | null>(null);
+  const [progress, setProgress] = useState<{ solved: number; total: number }>({ solved: 0, total: 0 });
+
+  const [category, setCategory] = useState<string | undefined>();
+  const [difficulty, setDifficulty] = useState<string | undefined>();
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortKey>("newest");
+  const [sheet, setSheet] = useState<"filter" | "sort" | null>(null);
+  const [pendingCategory, setPendingCategory] = useState<string | undefined>();
+  const [pendingDifficulty, setPendingDifficulty] = useState<string | undefined>();
+
+  const [bookmarks, setBookmarks] = useState<Set<number>>(new Set());
+  const [bookmarkBusy, setBookmarkBusy] = useState<Set<number>>(new Set());
+
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const filterCount = Number(Boolean(category)) + Number(Boolean(difficulty));
+
   const load = useCallback(
-    async (category?: string, diff?: string, query?: string, append = false) => {
+    async (cat?: string, diff?: string, query?: string, append = false) => {
       try {
         setError(null);
-        if (!append) setLoading(true);
+        if (append) setLoadingMore(true);
+        else setLoading(true);
         const page = append && dataRef.current ? dataRef.current.meta.page + 1 : 1;
         const result = await listChallenges({
           page,
-          category,
+          category: cat,
           difficulty: diff,
           search: query && query.trim().length >= 2 ? query.trim() : undefined,
         });
@@ -333,6 +618,7 @@ export default function ChallengesScreen() {
         setError(err instanceof Error ? err.message : "Failed to load challenges");
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     },
     [],
@@ -345,20 +631,19 @@ export default function ChallengesScreen() {
   }, []);
 
   useEffect(() => {
-    if (authStatus === "authenticated") {
-      void load(selectedCategory, selectedDiff, search);
-    }
-  }, [authStatus, selectedCategory, selectedDiff, search, load]);
+    if (authStatus !== "authenticated") return;
+    void load(category, difficulty, search);
+  }, [authStatus, category, difficulty, load, search]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      void load(selectedCategory, selectedDiff, search);
+      void load(category, difficulty, search);
     }, 350);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [selectedCategory, selectedDiff, search, load]);
+  }, [category, difficulty, search, load]);
 
   useEffect(() => {
     if (authStatus !== "authenticated") return;
@@ -366,6 +651,88 @@ export default function ChallengesScreen() {
       .then((result) => setLevel(Math.max(1, Math.floor((result.me?.score ?? 0) / 250) + 1)))
       .catch(() => undefined);
   }, [authStatus]);
+
+  useEffect(() => {
+    if (authStatus !== "authenticated") return;
+    void (async () => {
+      try {
+        const [agg, solvedRes, bm] = await Promise.all([
+          listChallenges({ page: 1 }),
+          listChallenges({ page: 1, solved: "solved" }),
+          listBookmarks(),
+        ]);
+        setProgress({ total: agg.meta.total, solved: solvedRes.meta.total });
+        setBookmarks(new Set(bm.items.map((b) => b.challengeId)));
+      } catch {
+        // non-critical decorations — ignore
+      }
+    })();
+  }, [authStatus]);
+
+  const onToggleBookmark = useCallback(
+    async (id: number) => {
+      if (bookmarkBusy.has(id)) return;
+      setBookmarkBusy((prev) => new Set(prev).add(id));
+      const was = bookmarks.has(id);
+      setBookmarks((prev) => {
+        const next = new Set(prev);
+        if (was) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+      try {
+        if (was) await removeBookmark(id);
+        else await addBookmark(id);
+      } catch {
+        setBookmarks((prev) => {
+          const next = new Set(prev);
+          if (was) next.add(id);
+          else next.delete(id);
+          return next;
+        });
+      } finally {
+        setBookmarkBusy((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
+    },
+    [bookmarks, bookmarkBusy],
+  );
+
+  const sortedItems = useMemo(() => {
+    const items = [...(data?.items ?? [])];
+    const diffOrder = { EASY: 1, MEDIUM: 2, HARD: 3, EXPERT: 4 };
+    switch (sort) {
+      case "popular":
+        items.sort((a, b) => b.solvedCount - a.solvedCount);
+        break;
+      case "easiest":
+        items.sort((a, b) => (diffOrder[a.difficulty] ?? 9) - (diffOrder[b.difficulty] ?? 9));
+        break;
+      case "hardest":
+        items.sort((a, b) => (diffOrder[b.difficulty] ?? 0) - (diffOrder[a.difficulty] ?? 0));
+        break;
+      default:
+        break;
+    }
+    return items;
+  }, [data, sort]);
+
+  const hasFilters = Boolean(category || difficulty || search.trim().length >= 2);
+
+  const openFilterSheet = useCallback(() => {
+    setPendingCategory(category);
+    setPendingDifficulty(difficulty);
+    setSheet("filter");
+  }, [category, difficulty]);
+
+  const applyFilters = useCallback(() => {
+    setCategory(pendingCategory);
+    setDifficulty(pendingDifficulty);
+    setSheet(null);
+  }, [pendingCategory, pendingDifficulty]);
 
   if (authStatus !== "authenticated") {
     return (
@@ -384,20 +751,18 @@ export default function ChallengesScreen() {
         />
         <View style={styles.centerWrap}>
           <View style={styles.infoCard}>
-            <View style={[styles.infoIc, { borderColor: "rgba(96,165,250,.30)", backgroundColor: "rgba(96,165,250,.10)" }]}>
-              <LucideIcon name="shield" size={17} color="#60a5fa" />
+            <View style={styles.infoIc}>
+              <LucideIcon name="shield" size={17} color={C.purpleLight} />
             </View>
             <View style={styles.infoBody}>
               <Text style={styles.infoTitle}>Sign in required</Text>
-              <Text style={styles.infoDesc}>
-                Sign in to browse challenges and start earning points.
-              </Text>
+              <Text style={styles.infoDesc}>Sign in to browse challenges and start earning points.</Text>
             </View>
           </View>
           <Link href="/auth/login" asChild>
             <Pressable
               accessibilityRole="button"
-              style={({ pressed }) => [styles.signInButton, pressed && styles.cardPressed]}
+              style={({ pressed }) => [styles.signInButton, pressed && styles.pressedDim]}
             >
               <Text style={styles.signInLabel}>Sign in to view challenges</Text>
             </Pressable>
@@ -407,97 +772,127 @@ export default function ChallengesScreen() {
     );
   }
 
+  const catCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of data?.items ?? []) {
+      map.set(item.category.name, (map.get(item.category.name) ?? 0) + 1);
+    }
+    return map;
+  }, [data]);
+
   const ListHeader = (
     <View>
-      <AppHeader level={level} />
+      <AppHeader
+        level={level}
+        filterActive={filterCount > 0}
+        onOpenFilter={openFilterSheet}
+        onSearch={() => searchRef.current?.focus()}
+      />
 
-      {error ? <ErrBanner message={error} onRetry={() => void load(selectedCategory, selectedDiff, search)} /> : null}
-
-      <View style={styles.searchWrap}>
-        <LucideIcon name="search" size={15} color={C.textMuted} />
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search challenges…"
-          placeholderTextColor={C.textMuted}
-          accessibilityLabel="Search challenges"
-          accessibilityRole="search"
-          autoCorrect={false}
-          autoCapitalize="none"
-          style={styles.searchInput}
-        />
-        {search.length > 0 ? (
-          <Pressable
-            onPress={() => setSearch("")}
-            accessibilityRole="button"
-            accessibilityLabel="Clear search"
-            style={styles.searchClear}
-          >
-            <LucideIcon name="x" size={13} color={C.textMuted} />
-          </Pressable>
-        ) : null}
-      </View>
-
-      {!reduceMotion ? (
-        <View style={styles.diffRow}>
-          {DIFF_FILTERS.map((f) => {
-            const active = selectedDiff === f.key;
-            return (
-              <Pressable
-                key={f.label}
-                onPress={() => setSelectedDiff(active ? undefined : f.key)}
-                accessibilityRole="button"
-                accessibilityLabel={`Filter by difficulty ${f.label}`}
-                accessibilityState={{ selected: active }}
-                style={({ pressed }) => [
-                  styles.diffChip,
-                  {
-                    borderColor: active ? f.tone : C.border,
-                    backgroundColor: active ? withAlpha(f.tone, 0.13) : "rgba(18,16,31,.9)",
-                  },
-                  pressed && styles.chipPressed,
-                ]}
-              >
-                <Text style={[styles.diffChipText, { color: active ? f.tone : C.textSecondary }]}>
-                  {f.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+      {error ? (
+        <Pressable
+          onPress={() => void load(category, difficulty, search)}
+          accessibilityRole="button"
+          style={styles.errBanner}
+        >
+          <LucideIcon name="radar" size={13} color={C.red} />
+          <Text style={styles.errText} numberOfLines={2}>
+            {error}. Tap to retry.
+          </Text>
+        </Pressable>
       ) : null}
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.catRow}
-      >
-        {[{ slug: undefined, name: "All", id: 0, sortOrder: -1 }, ...categories].map((item) => {
-          const active = selectedCategory === item.slug;
-          const acc = item.slug ? categoryAccent(item.name) : ACCENT_ALL;
-          return (
+      <View style={styles.toolbar}>
+        <View style={styles.searchField}>
+          <LucideIcon name="search" size={16} color={C.textMuted} />
+          <TextInput
+            ref={searchRef}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search challenges…"
+            placeholderTextColor={C.textMuted}
+            accessibilityLabel="Search challenges"
+            accessibilityRole="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+            style={styles.searchInput}
+            returnKeyType="search"
+          />
+          {search.length > 0 ? (
             <Pressable
-              key={item.slug ?? "all"}
-              onPress={() => setSelectedCategory(active ? undefined : item.slug)}
+              onPress={() => setSearch("")}
               accessibilityRole="button"
-              accessibilityLabel={`Filter by category ${item.name}`}
-              accessibilityState={{ selected: active }}
-              style={({ pressed }) => [
-                styles.catChip,
-                { borderColor: active ? acc.line : C.border, backgroundColor: active ? acc.soft : "rgba(18,16,31,.9)" },
-                pressed && styles.chipPressed,
-              ]}
+              accessibilityLabel="Clear search"
+              style={styles.searchClear}
             >
-              <LucideIcon name={item.slug ? categoryIcon(item.name) : "shield"} size={12} color={active ? acc.color : C.textMuted} />
-              <Text style={[styles.catChipText, { color: active ? C.textPrimary : C.textSecondary }]}>
-                {item.name}
-              </Text>
+              <LucideIcon name="x" size={12} color={C.textMuted} />
             </Pressable>
-          );
-        })}
-      </ScrollView>
+          ) : null}
+        </View>
 
-      <SectionHead total={data?.meta.total ?? 0} shown={data?.items.length ?? 0} />
+        <Pressable
+          onPress={openFilterSheet}
+          accessibilityRole="button"
+          accessibilityLabel="Open filters"
+          style={({ pressed }) => [
+            styles.toolBtn,
+            filterCount > 0 && styles.toolBtnActive,
+            pressed && styles.pressedDim,
+          ]}
+        >
+          <LucideIcon name="filter" size={16} color={filterCount > 0 ? C.purpleLight : C.textPrimary} />
+          <Text style={[styles.toolBtnLabel, filterCount > 0 && styles.toolBtnLabelActive]}>
+            Filter
+          </Text>
+          {filterCount > 0 ? (
+            <View style={styles.toolBtnCount}>
+              <Text style={styles.toolBtnCountText}>{filterCount}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+
+        <Pressable
+          onPress={() => setSheet("sort")}
+          accessibilityRole="button"
+          accessibilityLabel="Sort"
+          style={({ pressed }) => [styles.toolBtn, pressed && styles.pressedDim]}
+        >
+          <LucideIcon name="sort" size={16} color={C.textPrimary} />
+          <Text style={styles.toolBtnLabel}>Sort</Text>
+        </Pressable>
+      </View>
+
+      <ActivePills
+        categoryLabel={
+          category
+            ? (categories.find((x) => x.slug === category)?.name ??
+              (categoryAccent(category).color && category))
+            : undefined
+        }
+        difficulty={difficulty ? difficultyLabel(difficulty) : undefined}
+        search={search.trim().length >= 2 ? search : ""}
+        onClearCat={() => setCategory(undefined)}
+        onClearDiff={() => setDifficulty(undefined)}
+        onClearSearch={() => setSearch("")}
+        onClearAll={() => {
+          setCategory(undefined);
+          setDifficulty(undefined);
+          setSearch("");
+        }}
+      />
+
+      <ProgressCard solved={progress.solved} total={progress.total} />
+
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionTitle}>
+          {hasFilters ? `${(data?.items.length ?? 0)} Result${data?.items.length === 1 ? "" : "s"}` : "Recommended"}
+        </Text>
+        {!hasFilters ? (
+          <Text style={styles.sectionCount}>
+            {sortedItems.length.toLocaleString()} of {data?.meta.total ?? 0}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 
@@ -530,23 +925,22 @@ export default function ChallengesScreen() {
         </ScrollView>
       ) : (
         <FlatList
-          data={data.items}
+          data={sortedItems}
           keyExtractor={(item) => String(item.id)}
           ListHeaderComponent={ListHeader}
           contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 10, paddingBottom: 60 + insets.bottom }]}
           onEndReached={() => {
-            if (dataRef.current?.meta.hasNext && !loading)
-              void load(selectedCategory, selectedDiff, search, true);
+            if (dataRef.current?.meta.hasNext && !loading && !loadingMore)
+              void load(category, difficulty, search, true);
           }}
           onEndReachedThreshold={0.4}
-          refreshing={loading && !!data}
           refreshControl={
             <RefreshControl
               refreshing={loading && !!data}
               onRefresh={async () => {
                 try {
                   await Promise.all([
-                    load(selectedCategory, selectedDiff, search, false),
+                    load(category, difficulty, search, false),
                     listChallengeCategories().then(setCategories),
                   ]);
                 } catch {
@@ -560,38 +954,239 @@ export default function ChallengesScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
-              <View style={[styles.emptyIc, { backgroundColor: "rgba(139,92,246,.12)", borderColor: "rgba(139,92,246,.30)" }]}>
+              <View style={styles.emptyIc}>
                 <LucideIcon name="flag" size={18} color={C.purpleLight} />
               </View>
               <Text style={styles.emptyTitle}>No challenges found</Text>
               <Text style={styles.emptyText}>
-                {search || selectedCategory || selectedDiff
-                  ? "Try changing your filters or search."
-                  : "Challenges will appear here once they're published."}
+                Try a different category, difficulty or search term.
               </Text>
             </View>
           }
           renderItem={({ item }) => (
-            <View style={styles.cardList}>
-              <ChallengeCard item={item} />
-            </View>
+            <ChallengeCard
+              item={item}
+              bookmarked={bookmarks.has(item.id)}
+              onBookmark={(id) => void onToggleBookmark(id)}
+            />
           )}
           ListFooterComponent={
             dataRef.current?.meta.hasNext ? (
               <View style={styles.footer}>
-                <View style={styles.footerDot} />
-                <Text style={styles.footerText}>Loading more…</Text>
-                <View style={styles.footerDot} />
+                {loadingMore ? (
+                  <ActivityIndicator size="small" color={C.purpleLight} />
+                ) : (
+                  <>
+                    <View style={styles.footerDot} />
+                    <Text style={styles.footerText}>Keep scrolling…</Text>
+                    <View style={styles.footerDot} />
+                  </>
+                )}
               </View>
             ) : null
           }
         />
       )}
+
+      {/* filter sheet */}
+      <DesignSheet visible={sheet === "filter"} onClose={() => setSheet(null)}>
+        <SheetHead title="Filter Challenges" onClose={() => setSheet(null)} />
+        <ScrollView style={styles.sheetBody} showsVerticalScrollIndicator={false}>
+          <View style={styles.filterGroup}>
+            <View style={styles.filterGroupHead}>
+              <LucideIcon name="grid" size={12} color={C.textMuted} />
+              <Text style={styles.filterGroupTitle}>Category</Text>
+            </View>
+            <View style={styles.catGrid}>
+              <Pressable
+                onPress={() => setPendingCategory(undefined)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: pendingCategory === undefined }}
+                style={({ pressed }) => [
+                  styles.catBtn,
+                  pendingCategory === undefined && styles.catBtnActive,
+                  pressed && styles.pressedDim,
+                ]}
+              >
+                <LucideIcon
+                  name="grid"
+                  size={16}
+                  color={pendingCategory === undefined ? "#ffffff" : C.textSecondary}
+                />
+                <Text style={pendingCategory === undefined ? styles.catBtnActiveText : styles.catBtnText}>
+                  All
+                </Text>
+                <View style={styles.catCount}>
+                  <Text style={styles.catCountText}>{data?.meta.total ?? 0}</Text>
+                </View>
+              </Pressable>
+              {categories.map((item) => {
+                const active = pendingCategory === item.slug;
+                return (
+                  <Pressable
+                    key={item.slug}
+                    onPress={() => setPendingCategory(active ? undefined : item.slug)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    style={({ pressed }) => [
+                      styles.catBtn,
+                      active && styles.catBtnActive,
+                      pressed && styles.pressedDim,
+                    ]}
+                  >
+                    <LucideIcon
+                      name={categoryIcon(item.name)}
+                      size={16}
+                      color={active ? "#ffffff" : C.textSecondary}
+                    />
+                    <Text style={active ? styles.catBtnActiveText : styles.catBtnText} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <View style={styles.catCount}>
+                      <Text style={styles.catCountText}>{catCounts.get(item.name) ?? 0}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.filterGroup}>
+            <View style={styles.filterGroupHead}>
+              <LucideIcon name="chart" size={12} color={C.textMuted} />
+              <Text style={styles.filterGroupTitle}>Difficulty</Text>
+            </View>
+            <View style={styles.diffRow}>
+              {(["EASY", "MEDIUM", "HARD", "EXPERT"] as const).map((key) => {
+                const active = pendingDifficulty === key;
+                const ramp = DIFF_RAMP[key];
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => setPendingDifficulty(active ? undefined : key)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    style={({ pressed }) => [
+                      styles.diffBtn,
+                      active && { backgroundColor: ramp.colors[0], borderColor: "transparent" },
+                      pressed && styles.pressedDim,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.diffBtnText,
+                        active && { color: ramp.fg },
+                      ]}
+                    >
+                      {difficultyLabel(key)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </ScrollView>
+        <View style={styles.sheetFoot}>
+          <Pressable
+            onPress={() => {
+              setPendingCategory(undefined);
+              setPendingDifficulty(undefined);
+            }}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.btnGhost, pressed && styles.pressedDim]}
+          >
+            <Text style={styles.btnGhostText}>Reset</Text>
+          </Pressable>
+          <Pressable
+            onPress={applyFilters}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDim]}
+          >
+            <Text style={styles.btnPrimaryText}>Show results</Text>
+            <LucideIcon name="arrow" size={15} color="#ffffff" strokeWidth={2.2} />
+          </Pressable>
+        </View>
+      </DesignSheet>
+
+      {/* sort sheet */}
+      <DesignSheet visible={sheet === "sort"} onClose={() => setSheet(null)}>
+        <SheetHead title="Sort" onClose={() => setSheet(null)} />
+        <View style={styles.sheetBody}>
+          <View style={styles.filterGroup}>
+            <View style={styles.filterGroupHead}>
+              <LucideIcon name="chart" size={12} color={C.textMuted} />
+              <Text style={styles.filterGroupTitle}>Sort by</Text>
+            </View>
+            <View style={styles.catGridOne}>
+              {SORT_OPTIONS.map((opt) => {
+                const active = sort === opt.id;
+                return (
+                  <Pressable
+                    key={opt.id}
+                    onPress={() => setSort(opt.id)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    style={({ pressed }) => [
+                      styles.catBtn,
+                      active && styles.catBtnActive,
+                      pressed && styles.pressedDim,
+                    ]}
+                  >
+                    <LucideIcon
+                      name={opt.id === "newest" ? "clock" : opt.id === "popular" ? "users" : "chart"}
+                      size={16}
+                      color={active ? "#ffffff" : C.textSecondary}
+                    />
+                    <Text style={active ? styles.catBtnActiveText : styles.catBtnText}>{opt.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+        <View style={styles.sheetFoot}>
+          <Pressable
+            onPress={() => setSheet(null)}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressedDim]}
+          >
+            <Text style={styles.btnPrimaryText}>Apply</Text>
+          </Pressable>
+        </View>
+      </DesignSheet>
     </View>
   );
 }
 
-const ACCENT_ALL = categoryAccent("all");
+/* ------------------------------------------------------------
+   Skeleton
+   ------------------------------------------------------------ */
+function SkeletonCard({ reduce }: { reduce: boolean }) {
+  const value = useRef(new Animated.Value(0.45)).current;
+  useEffect(() => {
+    if (reduce) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(value, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(value, { toValue: 0.45, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [reduce, value]);
+
+  return (
+    <Animated.View style={[styles.skCard, { opacity: value }]}>
+      <View style={styles.skThumb} />
+      <View style={styles.skBody}>
+        <View style={styles.skLineWide} />
+        <View style={styles.skLine} />
+        <View style={styles.skLineShort} />
+      </View>
+      <View style={styles.skPts} />
+    </Animated.View>
+  );
+}
 
 const styles = StyleSheet.create({
   root: {
@@ -615,6 +1210,9 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 14,
   },
+  pressedDim: {
+    opacity: 0.75,
+  },
 
   /* header */
   headerShell: {
@@ -631,9 +1229,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     minWidth: 0,
+    flexShrink: 1,
+  },
+  brandBlock: {
+    minWidth: 0,
   },
   brandName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
     letterSpacing: -0.4,
     color: C.textPrimary,
@@ -647,7 +1249,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
     textTransform: "uppercase",
     color: C.textMuted,
-    marginTop: 2,
+    marginTop: 3,
   },
   headerActions: {
     flexDirection: "row",
@@ -659,6 +1261,20 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems: "center",
     justifyContent: "center",
+  },
+  iconBtnFilter: {
+    position: "relative",
+  },
+  filterDot: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: C.purpleLight,
+    borderWidth: 1.5,
+    borderColor: C.bgPrimary,
   },
   avatarWrap: {
     flexDirection: "column",
@@ -687,47 +1303,276 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 14,
     marginTop: 14,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   pageHeadCopy: {
     flex: 1,
     minWidth: 0,
   },
   pageTitle: {
-    fontSize: 27,
-    fontWeight: "800",
-    letterSpacing: -0.8,
-    lineHeight: 29,
+    fontSize: 30,
+    fontWeight: "900",
+    letterSpacing: -1,
+    lineHeight: 32,
     color: C.textPrimary,
   },
   pageSub: {
-    fontSize: 11,
+    fontSize: 11.5,
     color: C.textSecondary,
     lineHeight: 16,
-    maxWidth: 205,
-    marginTop: 5,
+    maxWidth: 230,
+    marginTop: 6,
   },
   scriptDeco: {
     position: "relative",
-    paddingTop: 2,
+    paddingTop: 4,
+    flexShrink: 0,
   },
   scriptText: {
-    fontSize: 14,
-    lineHeight: 14,
+    fontSize: 17,
+    lineHeight: 16,
     fontWeight: "600",
     fontStyle: "italic",
     textAlign: "right",
-    color: "rgba(196,181,253,.9)",
+    color: "rgba(196,181,253,.95)",
     transform: [{ rotate: "-4deg" }],
   },
   scriptUnderline: {
     position: "absolute",
     bottom: -6,
     right: 0,
-    transform: [{ rotate: "-4deg" }],
   },
 
-  /* error + search */
+  /* toolbar */
+  toolbar: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 10,
+  },
+  searchField: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    height: 46,
+    paddingHorizontal: 14,
+    minWidth: 0,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: C.borderStrong,
+    backgroundColor: "rgba(18,16,31,.9)",
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    color: C.textPrimary,
+    paddingVertical: 0,
+  },
+  searchClear: {
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,.06)",
+  },
+  toolBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 46,
+    paddingHorizontal: 12,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: C.borderStrong,
+    backgroundColor: "rgba(18,16,31,.9)",
+  },
+  toolBtnActive: {
+    borderColor: "rgba(167,139,250,.5)",
+    backgroundColor: "rgba(139,92,246,.16)",
+  },
+  toolBtnLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.textPrimary,
+  },
+  toolBtnLabelActive: {
+    color: C.purpleLight,
+  },
+  toolBtnCount: {
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,.9)",
+  },
+  toolBtnCountText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#ffffff",
+  },
+
+  /* pills */
+  pillsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 14,
+  },
+  pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingLeft: 11,
+    paddingRight: 8,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: "rgba(139,92,246,.13)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,.3)",
+  },
+  pillText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: C.purpleLight,
+  },
+  pillX: {
+    width: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 5,
+  },
+  pillClear: {
+    height: 28,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 9,
+    backgroundColor: "rgba(255,255,255,.05)",
+    borderWidth: 1,
+    borderColor: C.borderStrong,
+  },
+  pillClearText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: C.textSecondary,
+  },
+
+  /* progress card */
+  progressCard: {
+    position: "relative",
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,.24)",
+    backgroundColor: "#0a0814",
+  },
+  progressGlow: {
+    position: "absolute",
+    top: -60,
+    right: -40,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: "rgba(139,92,246,.22)",
+  },
+  progressInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 16,
+    minHeight: 118,
+  },
+  progLeft: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+  },
+  progLeftTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  progLeftTopText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.purpleLight,
+  },
+  progNum: {
+    fontSize: 26,
+    fontWeight: "900",
+    letterSpacing: -0.8,
+    lineHeight: 30,
+    color: "#ffffff",
+  },
+  progLabel: {
+    fontSize: 10,
+    color: C.textMuted,
+  },
+  ringWrap: {
+    width: 66,
+    height: 66,
+    position: "relative",
+    flexShrink: 0,
+  },
+  ringVal: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    textAlign: "center",
+    textAlignVertical: "center",
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#ffffff",
+  },
+  progRight: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: "flex-end",
+    justifyContent: "flex-end",
+    paddingLeft: 6,
+  },
+  quote: {
+    fontSize: 14,
+    lineHeight: 15,
+    fontWeight: "600",
+    fontStyle: "italic",
+    textAlign: "right",
+    color: "rgba(233,227,255,.95)",
+    transform: [{ rotate: "-2deg" }],
+    maxWidth: 128,
+    textShadowColor: "rgba(0,0,0,.9)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 12,
+  },
+
+  /* section head */
+  sectionHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: 2,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 19,
+    fontWeight: "800",
+    letterSpacing: -0.4,
+    color: C.textPrimary,
+  },
+  sectionCount: {
+    fontSize: 10.5,
+    color: C.textMuted,
+  },
+
+  /* error banner */
   errBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -745,292 +1590,263 @@ const styles = StyleSheet.create({
     color: C.rose,
     lineHeight: 14,
   },
-  searchWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    height: 42,
-    paddingHorizontal: 13,
-    marginBottom: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: "rgba(18,16,31,.92)",
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 12,
-    color: C.textPrimary,
-    paddingVertical: 0,
-  },
-  searchClear: {
-    width: 22,
-    height: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 11,
-    backgroundColor: "rgba(255,255,255,.06)",
-  },
 
-  /* difficulty + category filters */
-  diffRow: {
-    flexDirection: "row",
-    gap: 6,
-    marginBottom: 10,
-  },
-  diffChip: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 6,
-    borderRadius: 9,
-    borderWidth: 1,
-  },
-  diffChipText: {
-    fontSize: 9.5,
-    fontWeight: "700",
-    letterSpacing: 0.2,
-  },
-  chipPressed: {
-    transform: [{ scale: 0.96 }],
-  },
-  catRow: {
-    gap: 7,
-    paddingRight: 14,
-    marginBottom: 14,
-  },
-  catChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  catChipText: {
-    fontSize: 10.5,
-    fontWeight: "600",
-  },
-
-  /* section head */
-  sectionHead: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "800",
-    letterSpacing: -0.3,
-    color: C.textPrimary,
-  },
-  sectionHintText: {
-    fontSize: 9.5,
-    color: C.textMuted,
-  },
-
-  /* challenge cards */
+  /* cards */
   cardList: {
-    gap: 8,
+    gap: 11,
   },
-  cardOuter: {
+  card: {
     position: "relative",
     flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-    borderRadius: 14,
+    gap: 12,
+    padding: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: C.border,
-    padding: 11,
     overflow: "hidden",
+    backgroundColor: "rgba(11,10,22,.92)",
   },
-  cardBg: {
+  cardSolved: {
+    borderColor: "rgba(34,197,94,.35)",
+  },
+  cardGlow: {
     position: "absolute",
     top: 0,
+    bottom: 0,
+    left: 0,
+    width: "34%",
+    opacity: 0.28,
+  },
+  cardSolvedRibbon: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderBottomLeftRadius: 12,
+    backgroundColor: "rgba(34,197,94,.9)",
+    zIndex: 5,
+  },
+  cardSolvedText: {
+    fontSize: 7.5,
+    fontWeight: "800",
+    letterSpacing: 1,
+    color: "#ffffff",
+  },
+  thumb: {
+    position: "relative",
+    width: 96,
+    height: 118,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    backgroundColor: "#04030a",
+  },
+  thumbHalo: {
+    position: "absolute",
+    top: -20,
+    right: -26,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    opacity: 0.55,
+  },
+  thumbIcon: {
+    position: "absolute",
+    top: 26,
     left: 0,
     right: 0,
-    bottom: 0,
-  },
-  cardRail: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: 3,
-  },
-  cardPressed: {
-    transform: [{ scale: 0.98 }],
-  },
-  catIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
     alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
+  },
+  thumbCat: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    right: 8,
+    fontSize: 7.2,
+    fontWeight: "700",
+    letterSpacing: 1,
+    color: C.textSecondary,
   },
   cardBody: {
     flex: 1,
     minWidth: 0,
-    gap: 5,
-  },
-  cardBodyDim: {
-    opacity: 0.55,
+    paddingRight: 40,
+    paddingTop: 2,
   },
   cardTop: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-  },
-  cardCat: {
-    fontSize: 7.5,
-    fontWeight: "700",
-    letterSpacing: 1,
-    textTransform: "uppercase",
-  },
-  solvedPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: "rgba(52,211,153,.12)",
-    borderWidth: 1,
-    borderColor: "rgba(52,211,153,.32)",
-  },
-  solvedText: {
-    fontSize: 7.5,
-    fontWeight: "700",
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-    color: C.green,
-  },
-  cardTitle: {
-    fontSize: 12.5,
-    fontWeight: "800",
-    letterSpacing: -0.2,
-    color: C.textPrimary,
-  },
-  cardMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
+    gap: 6,
+    marginBottom: 4,
   },
   diffPill: {
-    borderRadius: 6,
-    borderWidth: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
   },
-  diffText: {
-    fontSize: 7.5,
+  diffPillText: {
+    fontSize: 10,
     fontWeight: "700",
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
-  solvesRow: {
+  ptsPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    flexShrink: 1,
+    gap: 3,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: "rgba(251,191,36,.12)",
+    borderWidth: 1,
+    borderColor: "rgba(251,191,36,.3)",
   },
-  solvesText: {
-    fontSize: 9,
-    color: C.textMuted,
-    flexShrink: 1,
+  ptsPillText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: C.gold,
   },
-  cardRight: {
-    flexDirection: "column",
-    alignItems: "flex-end",
-    gap: 1,
+  bookmarkBtn: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: 30,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 9,
   },
-  cardPts: {
+  cardTitle: {
     fontSize: 15,
     fontWeight: "800",
-    letterSpacing: -0.4,
-    color: C.textPrimary,
+    letterSpacing: -0.3,
+    lineHeight: 19,
+    color: "#ffffff",
   },
-  cardPtsLabel: {
-    fontSize: 7.5,
-    fontWeight: "700",
-    letterSpacing: 1,
-    color: C.textMuted,
+  cardCategory: {
+    fontSize: 10.5,
+    color: C.textSecondary,
+    marginTop: 3,
+  },
+  cardTags: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+    marginTop: 8,
+  },
+  tag: {
+    borderRadius: 7,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  tagText: {
+    fontSize: 9,
+    fontWeight: "600",
+  },
+  cardStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 13,
+    marginTop: 10,
+  },
+  stat: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  statText: {
+    fontSize: 9.5,
+    color: C.textSecondary,
+  },
+  cardArrow: {
+    position: "absolute",
+    right: 12,
+    bottom: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,.9)",
   },
 
   /* skeleton */
   skCard: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-    padding: 11,
-    borderRadius: 14,
+    gap: 12,
+    padding: 12,
+    borderRadius: 16,
     backgroundColor: "rgba(18,16,31,.9)",
     borderWidth: 1,
     borderColor: C.border,
   },
-  skIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
-    backgroundColor: "rgba(255,255,255,.07)",
+  skThumb: {
+    width: 96,
+    height: 118,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,.06)",
   },
   skBody: {
     flex: 1,
-    gap: 6,
+    gap: 8,
+    paddingTop: 4,
   },
   skLineWide: {
-    height: 8,
-    width: "52%",
-    borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,.07)",
+    height: 11,
+    width: "58%",
+    borderRadius: 5,
+    backgroundColor: "rgba(255,255,255,.08)",
   },
   skLine: {
     height: 11,
     width: "88%",
     borderRadius: 5,
-    backgroundColor: "rgba(255,255,255,.09)",
-  },
-  skLineShort: {
-    height: 8,
-    width: "34%",
-    borderRadius: 4,
     backgroundColor: "rgba(255,255,255,.06)",
   },
+  skLineShort: {
+    height: 9,
+    width: "40%",
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,.05)",
+  },
   skPts: {
-    width: 30,
-    height: 22,
-    borderRadius: 7,
-    backgroundColor: "rgba(255,255,255,.07)",
+    width: 34,
+    height: 26,
+    borderRadius: 9,
+    backgroundColor: "rgba(255,255,255,.06)",
   },
 
   /* empty + footer */
   emptyWrap: {
     alignItems: "center",
-    paddingVertical: 42,
+    paddingVertical: 40,
     paddingHorizontal: 20,
-    gap: 8,
+    gap: 6,
   },
   emptyIc: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,.12)",
     borderWidth: 1,
-    marginBottom: 2,
+    borderColor: "rgba(139,92,246,.3)",
+    marginBottom: 4,
   },
   emptyTitle: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "800",
-    color: C.textPrimary,
+    color: C.textSecondary,
   },
   emptyText: {
-    fontSize: 10,
+    fontSize: 11,
     color: C.textMuted,
     textAlign: "center",
-    lineHeight: 14,
     maxWidth: 240,
   },
   footer: {
@@ -1055,6 +1871,190 @@ const styles = StyleSheet.create({
     color: C.textMuted,
   },
 
+  /* sheets */
+  sheetRoot: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  sheetScrim: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(4,3,9,.72)",
+  },
+  sheetPanel: {
+    position: "relative",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: "rgba(167,139,250,.25)",
+    backgroundColor: "#0d0b18",
+    maxHeight: "88%",
+    paddingBottom: 16,
+  },
+  sheetGrab: {
+    alignSelf: "center",
+    width: 38,
+    height: 4,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,.18)",
+    marginTop: 12,
+  },
+  sheetHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 10,
+  },
+  sheetHeadText: {
+    fontSize: 17,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+    color: C.textSecondary,
+  },
+  sheetClose: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,.05)",
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  sheetBody: {
+    paddingHorizontal: 18,
+    flexGrow: 0,
+  },
+  filterGroup: {
+    marginBottom: 22,
+  },
+  filterGroupHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10,
+  },
+  filterGroupTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    color: C.textMuted,
+  },
+  catGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  catGridOne: {
+    gap: 8,
+  },
+  catBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.borderStrong,
+    backgroundColor: "rgba(24,21,44,.7)",
+    flexBasis: "47%",
+    flexGrow: 1,
+  },
+  catBtnActive: {
+    backgroundColor: "rgba(139,92,246,.92)",
+    borderColor: "transparent",
+  },
+  catBtnText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.textSecondary,
+  },
+  catBtnActiveText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+  catCount: {
+    minWidth: 22,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    backgroundColor: "rgba(255,255,255,.06)",
+  },
+  catCountText: {
+    fontSize: 9.5,
+    fontWeight: "700",
+    color: C.textMuted,
+  },
+  diffRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  diffBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.borderStrong,
+    backgroundColor: "rgba(24,21,44,.7)",
+  },
+  diffBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.textSecondary,
+  },
+  sheetFoot: {
+    flexDirection: "row",
+    gap: 9,
+    paddingHorizontal: 18,
+    paddingTop: 4,
+  },
+  btnGhost: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 46,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,.05)",
+    borderWidth: 1,
+    borderColor: C.borderStrong,
+  },
+  btnGhostText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.textSecondary,
+  },
+  btnPrimary: {
+    flex: 1.4,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 46,
+    borderRadius: 13,
+    backgroundColor: "rgba(139,92,246,.92)",
+  },
+  btnPrimaryText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+
   /* auth gates */
   infoCard: {
     flexDirection: "row",
@@ -1073,7 +2073,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,.12)",
     borderWidth: 1,
+    borderColor: "rgba(139,92,246,.3)",
   },
   infoBody: {
     flex: 1,
