@@ -53,6 +53,6 @@ USER ctf
 
 ENV HOME=/home/ctf \
     SHELL=/bin/bash \
-    PS1='\u@ctf:\w\$ '
+    PS1='\u@challenge:\w\$ '
 
 CMD ["/bin/bash"]

@@ -72,6 +72,8 @@ const C = {
 const MAX_LINES = 600;
 const MAX_CHARS = 80;
 
+const PROMPT_LINE_RE = /^[\w.-]+@[\w.-]+:[\w~/.-]*\$\s*$/;
+
 type Toned = "out" | "err" | "dim" | "note" | "cyan" | "white" | "green" | "blank";
 
 type Line =
@@ -528,17 +530,27 @@ export default function TerminalScreen() {
   /* socket subscriptions for the active session */
   useEffect(() => {
     if (!isAuthenticated || !activeId) return;
+    let pendingTail = "";
     const offOutput = subscribeTerminalOutput((event) => {
       if (event.sessionId !== activeId) return;
       const clean = sanitizeOutput(event.data);
       if (!clean) return;
-      const chunks = clean.split("\n");
+      pendingTail += clean;
+      const chunks = pendingTail.split("\n");
+      pendingTail = chunks.pop() ?? "";
       setLines((prev) => {
         const next = [...prev];
         for (const chunk of chunks) {
           const line = chunk.trimEnd();
           if (!line) continue;
           if (lastCommandRef.current && line.trim() === lastCommandRef.current) continue;
+          if (PROMPT_LINE_RE.test(line)) continue;
+          if (lastCommandRef.current && lastCommandRef.current.length > 0) {
+            const maybeEcho = line.trim();
+            if (/^[\w.-]+@[\w.-]+:[\w~/.-]*\$\s+/i.test(maybeEcho) && maybeEcho.endsWith(lastCommandRef.current)) {
+              continue;
+            }
+          }
           next.push({ t: "text", tone: classifyLine(line), text: line });
         }
         while (next.length > MAX_LINES) next.shift();
@@ -546,6 +558,7 @@ export default function TerminalScreen() {
       });
     });
     const offExit = subscribeTerminalExit(() => {
+      pendingTail = "";
       setConnected(false);
       setExitNote("Session ended — container stopped.");
       disconnectTerminalSocket();
@@ -555,6 +568,7 @@ export default function TerminalScreen() {
       }, 900);
     });
     const offCrash = subscribeTerminalCrash((event) => {
+      pendingTail = "";
       setConnected(false);
       setCrashNote(event.reason);
       disconnectTerminalSocket();
@@ -562,6 +576,7 @@ export default function TerminalScreen() {
     });
     const offError = subscribeTerminalError((message) => setError(message));
     return () => {
+      pendingTail = "";
       offOutput();
       offExit();
       offCrash();
