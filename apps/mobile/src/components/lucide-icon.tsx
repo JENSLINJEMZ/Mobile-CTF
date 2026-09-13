@@ -54,6 +54,17 @@ const ICON_PATHS: Record<string, string> = {
     '<path d="M12 2s5 4.5 5 9a5 5 0 0 1-10 0c0-1.6.6-3 1.4-4.2C9.2 8.4 12 2 12 2z"/><path d="M12 22a6 6 0 0 0 6-6c0-1-.3-2-.8-2.9A6.5 6.5 0 0 1 12 22z" opacity=".7"/>',
   radar: '<circle cx="12" cy="12" r="8.5"/><path d="M4.2 12a7.8 7.8 0 0 1 13.4-5.5L12 12z"/>',
   notes: '<path d="M4 5.5h16M4 12h16M4 18.5h10"/>',
+  play: '<path d="M7 4.5 19 12 7 19.5z" fill="currentColor" stroke="none"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V5.5A2.5 2.5 0 0 0 13.5 3h-8A2.5 2.5 0 0 0 3 5.5v8A2.5 2.5 0 0 0 5.5 16H8"/>',
+  shift: '<path d="M12 4 4 12h4v8h8v-8h4z"/>',
+  backspace: '<path d="M21 5H9l-6 7 6 7h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"/><path d="m17 9-6 6M11 9l6 6"/>',
+  upload: '<path d="M12 15V4"/><path d="m8 8 4-4 4 4"/><path d="M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/>',
+  monitor: '<rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M8 20h8M12 16v4"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/>',
+  bulb: '<path d="M9.5 18h5"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.9V18h5v-2.2c0-.8.4-1.5 1-1.9A6 6 0 0 0 12 3Z"/>',
+  folder: '<path d="M3 7.5a2 2 0 0 1 2-2h3.5l2 2H19a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  server: '<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',
+  history: '<path d="M3.5 12a8.5 8.5 0 1 0 2.5-6.1L3.5 8.6"/><path d="M4 3.5v5h5"/><path d="M12 8v4l2.5 2"/>',
 };
 
 function parseNodes(source: string): SvgNode[] {
