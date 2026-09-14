@@ -33,5 +33,9 @@ COPY --from=build /repo/apps/api/package.json ./apps/api/package.json
 COPY --from=build /repo/apps/api/dist ./apps/api/dist
 COPY --from=build /repo/packages/database/package.json ./packages/database/package.json
 COPY --from=build /repo/packages/database/prisma ./packages/database/prisma
+# Seed sources + prisma client/src so `db:seed` can run as a one-shot service
+# against a remote database (e.g. the NAS deployment).
+COPY --from=build /repo/packages/database/src ./packages/database/src
+COPY --from=build /repo/packages/database/seed ./packages/database/seed
 EXPOSE 4000
 CMD ["node", "apps/api/dist/server.js"]
