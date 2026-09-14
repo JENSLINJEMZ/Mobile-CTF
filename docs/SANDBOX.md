@@ -59,7 +59,7 @@ Whatever a player types runs inside a container created with this `HostConfig`
 | `SecurityOpt`    | `["no-new-privileges"]`                   | blocks setuid escalation |
 | `NetworkMode`    | `"none"`                                  | no network, period |
 | `ReadonlyRootfs` | `true`                                    | image FS is read-only |
-| `Tmpfs`          | `/tmp` and `/home/ctf`, `rw,noexec,nosuid,nodev,size=8m` | writable scratch without exec |
+| `Tmpfs`          | `/tmp` `rw,noexec,nosuid,nodev,size=8m`; `/home/ctf` `rw,noexec,nosuid,nodev,size=8m,uid=10001,gid=10001` | writable scratch without exec; `ctf` user owns its home |
 | `User`           | `ctf:ctf` (uid 10001)                     | non-root in-container |
 | `Ulimits`        | `nofile` 64/64                            | fd ceiling |
 | `AutoRemove`     | `true`                                    | container cleaned when it stops |

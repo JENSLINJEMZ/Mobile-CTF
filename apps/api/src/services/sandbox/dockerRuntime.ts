@@ -149,7 +149,8 @@ export class DockerSandboxRuntime implements SandboxRuntime {
           Ulimits: [{ Name: "nofile", Soft: 64, Hard: 64 }],
           Tmpfs: {
             "/tmp": "rw,noexec,nosuid,nodev,size=8m",
-            "/home/ctf": "rw,noexec,nosuid,nodev,size=8m",
+            "/home/ctf":
+              "rw,noexec,nosuid,nodev,size=8m,uid=10001,gid=10001",
           },
         },
       });
