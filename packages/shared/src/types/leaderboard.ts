@@ -5,6 +5,7 @@ export interface LeaderboardEntryDto {
   userId: number;
   username: string;
   score: number;
+  solves: number;
 }
 
 export interface LeaderboardMeDto {

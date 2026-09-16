@@ -152,11 +152,21 @@ export async function getLeaderboard(
     });
   }
   const userIds = memberScores.map((e) => e.userId);
-  const users = await prisma.user.findMany({
-    where: { id: { in: userIds } },
-    select: { id: true, username: true },
-  });
+  const [users, solvesCounts] = await Promise.all([
+    prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, username: true },
+    }),
+    prisma.submission.groupBy({
+      by: ["userId"],
+      where: { userId: { in: userIds } },
+      _count: { userId: true },
+    }),
+  ]);
   const usernameById = new Map(users.map((u) => [u.id, u.username]));
+  const solvesCountById = new Map(
+    solvesCounts.map((s) => [s.userId, s._count.userId]),
+  );
 
   return {
     scope,
@@ -166,6 +176,7 @@ export async function getLeaderboard(
       userId: e.userId,
       username: usernameById.get(e.userId) ?? `player#${e.userId}`,
       score: e.score,
+      solves: solvesCountById.get(e.userId) ?? 0,
     })),
     me,
   };

@@ -74,6 +74,26 @@ const baseEventSchema = z.object({
   startsAt: z.string().datetime(),
   endsAt: z.string().datetime(),
   status: eventStatusSchema.default("SCHEDULED"),
+  speakers: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(100),
+        role: z.string().min(1).max(150),
+        avatarUrl: z.string().url().optional(),
+      }),
+    )
+    .max(20)
+    .optional(),
+  schedule: z
+    .array(
+      z.object({
+        time: z.string().min(1).max(20),
+        title: z.string().min(1).max(150),
+        host: z.string().min(1).max(100),
+      }),
+    )
+    .max(50)
+    .optional(),
 });
 
 function validateTimeWindow(

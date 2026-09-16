@@ -1,7 +1,10 @@
 # Multi-stage build for the @ctf/api workspace.
 # Build context = monorepo root.
 FROM node:22-bookworm-slim AS base
-RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get -o Acquire::AllowInsecureRepositories=true -o Acquire::AllowDowngradeToInsecureRepositories=true update && \
+    apt-get -o APT::Get::AllowUnauthenticated=true install -y --no-install-recommends debian-archive-keyring openssl ca-certificates && \
+    apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 WORKDIR /repo
 
 FROM base AS build

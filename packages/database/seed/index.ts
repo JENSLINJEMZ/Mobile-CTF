@@ -561,6 +561,16 @@ const EVENT_SEED = {
     "",
     "Some challenges unlock early, others appear as you earn score — keep solving!",
   ].join("\n"),
+  speakers: [
+    { name: "0xLumina", role: "Forensics Lead" },
+    { name: "kR4ken", role: "Red Team Ops" },
+  ],
+  schedule: [
+    { time: "10:00 AM", title: "Opening Briefing", host: "Team Cyferra" },
+    { time: "12:30 PM", title: "Live Challenge Kickoff", host: "0xLumina" },
+    { time: "04:00 PM", title: "Web Exploitation Workshop", host: "kR4ken" },
+    { time: "07:00 PM", title: "Closing Ceremony & Awards", host: "Community" },
+  ],
 };
 
 async function seedEvent(organizerId: number): Promise<number> {
@@ -575,6 +585,8 @@ async function seedEvent(organizerId: number): Promise<number> {
       status: "RUNNING",
       startsAt,
       endsAt,
+      speakers: EVENT_SEED.speakers,
+      schedule: EVENT_SEED.schedule,
       createdById: organizerId,
     },
     create: {
@@ -584,6 +596,8 @@ async function seedEvent(organizerId: number): Promise<number> {
       status: "RUNNING",
       startsAt,
       endsAt,
+      speakers: EVENT_SEED.speakers,
+      schedule: EVENT_SEED.schedule,
       createdById: organizerId,
     },
   });

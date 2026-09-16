@@ -1,76 +1,83 @@
-import type { AnnouncementDto, EventSummaryDto } from "@ctf/shared";
-import { Link, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import type { EventSummaryDto } from "@ctf/shared";
+import { LinearGradient } from "expo-linear-gradient";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
+  Text,
+  View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { EmptyState, ErrorState, LoadingState } from "@/components/state-views";
-import { ScreenShell } from "@/components/screen-shell";
-import { SegmentedControl } from "@/components/segmented-control";
-import { Surface } from "@/components/surface";
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { Radius, Spacing, TouchTarget } from "@/constants/theme";
-import { listAnnouncements } from "@/services/announcements";
-import { joinEvent, leaveEvent, listEvents } from "@/services/events";
-import { useAuthGate } from "@/hooks/use-auth-gate";
+import { AppHeader } from "@/components/app-header";
+import { EventCard } from "@/components/event-card";
+import { FeaturedCarousel } from "@/components/featured-carousel";
+import { LucideIcon } from "@/components/lucide-icon";
+import { ErrorState, LoadingState, EmptyState } from "@/components/state-views";
+import { C } from "@/constants/design";
+import { Spacing } from "@/constants/theme";
+import { useAuthStore } from "@/store/auth-store";
+import { useNotificationStore } from "@/store/notification-store";
+import { listEvents } from "@/services/events";
+import { getLeaderboard } from "@/services/leaderboard";
 import { useTheme } from "@/hooks/use-theme";
 
-function statusColor(status: EventSummaryDto["status"], theme: ReturnType<typeof useTheme>): string {
-  switch (status) {
-    case "DRAFT":
-      return theme.textSecondary;
-    case "SCHEDULED":
-      return theme.difficultyMedium;
-    case "RUNNING":
-      return theme.success;
-    case "ENDED":
-      return theme.danger;
+type EventTab = "upcoming" | "ongoing" | "past";
+
+const TABS: { key: EventTab; label: string }[] = [
+  { key: "upcoming", label: "Upcoming" },
+  { key: "ongoing", label: "Ongoing" },
+  { key: "past", label: "Past" },
+];
+
+function tabMatches(tab: EventTab, status: EventSummaryDto["status"]): boolean {
+  switch (tab) {
+    case "upcoming":
+      return status === "SCHEDULED" || status === "DRAFT";
+    case "ongoing":
+      return status === "RUNNING";
+    case "past":
+      return status === "ENDED";
   }
 }
 
-function remainingLabel(event: EventSummaryDto): string {
-  if (event.status === "SCHEDULED") {
-    const s = event.startsInSeconds ?? 0;
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    return `Starts in ${h > 0 ? `${h}h ` : ""}${m}m`;
-  }
-  if (event.status === "RUNNING") {
-    const end = new Date(event.endsAt).getTime();
-    const diff = Math.max(0, end - Date.now());
-    const h = Math.floor(diff / 3600000);
-    const m = Math.floor((diff % 3600000) / 60000);
-    return h > 0 ? `${h}h ${m}m left` : `${m}m left`;
-  }
-  if (event.status === "ENDED") return "Ended";
-  return "Draft";
-}
+const COMMUNITY = [
+  {
+    icon: "users" as const,
+    title: "Weekly CTF",
+    meta: "Every Sunday",
+    desc: "Short challenges. Big learning.",
+    count: "48 events",
+  },
+  {
+    icon: "cap" as const,
+    title: "Workshop Series",
+    meta: "Various Dates",
+    desc: "Hands-on sessions with experts.",
+    count: "12 events",
+  },
+];
 
 export default function EventsScreen() {
+  const insets = useSafeAreaInsets();
   const theme = useTheme();
-  const { isAuthenticated } = useAuthGate();
-  const [filter, setFilter] = useState<"UPCOMING" | "LIVE" | "FINISHED">("LIVE");
+  const router = useRouter();
+  const [tab, setTab] = useState<EventTab>("upcoming");
   const [events, setEvents] = useState<EventSummaryDto[] | null>(null);
-  const [announcements, setAnnouncements] = useState<AnnouncementDto[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [level, setLevel] = useState(1);
+  const authStatus = useAuthStore((s) => s.status);
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
 
   const load = useCallback(async () => {
     try {
       setError(null);
-      const [items, announcements] = await Promise.all([
-        listEvents(),
-        listAnnouncements().catch(() => []),
-      ]);
+      const items = await listEvents();
       setEvents(items);
-      setAnnouncements(announcements);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load events");
     }
@@ -82,25 +89,14 @@ export default function EventsScreen() {
     }, [load]),
   );
 
-  const onAction = useCallback(
-    async (event: EventSummaryDto) => {
-      if (busyId !== null) return;
-      setBusyId(event.id);
-      try {
-        if (event.joinedByMe) {
-          await leaveEvent(event.id);
-        } else {
-          await joinEvent(event.id);
-        }
-        void load();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Action failed");
-      } finally {
-        setBusyId(null);
-      }
-    },
-    [busyId, load],
-  );
+  useEffect(() => {
+    if (authStatus !== "authenticated") return;
+    getLeaderboard("global", 1)
+      .then((result) =>
+        setLevel(Math.max(1, Math.floor((result.me?.score ?? 0) / 250) + 1)),
+      )
+      .catch(() => undefined);
+  }, [authStatus]);
 
   const onPullRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -108,79 +104,54 @@ export default function EventsScreen() {
     setRefreshing(false);
   }, [load]);
 
-  const filteredEvents = (events ?? []).filter((e) => {
-    switch (filter) {
-      case "UPCOMING":
-        return e.status === "SCHEDULED" || e.status === "DRAFT";
-      case "LIVE":
-        return e.status === "RUNNING";
-      case "FINISHED":
-        return e.status === "ENDED";
-    }
-  });
+  const grouped = (events ?? []).reduce<Record<EventTab, EventSummaryDto[]>>(
+    (acc, event) => {
+      for (const t of TABS) {
+        if (tabMatches(t.key, event.status)) {
+          acc[t.key].push(event);
+          break;
+        }
+      }
+      return acc;
+    },
+    { upcoming: [], ongoing: [], past: [] },
+  );
+
+  const activeEvents = grouped[tab];
+  const featured = activeEvents.slice(0, 3);
+  const sectionTitle =
+    tab === "upcoming"
+      ? "Featured Events"
+      : tab === "ongoing"
+        ? "Happening Now"
+        : "Past Events";
 
   return (
-    <ScreenShell title="Events">
-      <SegmentedControl
-        accessibilityLabel="Filter events"
-        value={filter}
-        onChange={setFilter}
-        options={[
-          { label: "Upcoming", value: "UPCOMING" },
-          { label: "Live", value: "LIVE" },
-          { label: "Finished", value: "FINISHED" },
-        ]}
+    <View style={styles.root}>
+      <LinearGradient
+        colors={["#0a0913", "#07070f", "#06060d"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
       />
-
-      {announcements.length > 0 ? (
-        <FlatList
-          horizontal
-          data={announcements}
-          keyExtractor={(item) => String(item.id)}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{
-            gap: Spacing.two,
-            paddingBottom: Spacing.two,
-          }}
-          renderItem={({ item }) => (
-            <Surface
-              variant={item.pinned ? "selected" : "elevated"}
-              radius={Radius.md}
-              style={[
-                styles.announcement,
-                item.pinned && [
-                  styles.announcementPinned,
-                  { borderColor: theme.warning },
-                ],
-              ]}
-            >
-              <ThemedText type="smallBold" numberOfLines={1}>
-                {item.pinned ? "📌 " : ""}
-                {item.title}
-              </ThemedText>
-              <ThemedText
-                type="small"
-                themeColor="textSecondary"
-                numberOfLines={2}
-              >
-                {item.body}
-              </ThemedText>
-            </Surface>
-          )}
-        />
-      ) : null}
-
-      {error ? (
-        <ErrorState message={error} onRetry={() => void load()} />
-      ) : null}
+      <LinearGradient
+        colors={["rgba(109,40,217,.22)", "transparent"]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={styles.topGlow}
+      />
 
       {!events ? (
         <LoadingState />
+      ) : error && events.length === 0 ? (
+        <ErrorState message={error} onRetry={() => void load()} />
       ) : (
-        <FlatList
-          data={filteredEvents}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listContent}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingTop: insets.top + 8, paddingBottom: 40 + insets.bottom },
+          ]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -188,160 +159,425 @@ export default function EventsScreen() {
               tintColor={theme.accent}
             />
           }
-          renderItem={({ item }) => (
-            <Surface radius={Radius.lg} style={styles.card}>
-              <Link href={`/event/${item.id}`} asChild>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open event ${item.title}`}
-                  style={({ pressed }) => [
-                    styles.cardHeader,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <ThemedView style={styles.cardBody}>
-                    <ThemedView style={styles.titleRow}>
-                      <ThemedText type="smallBold" numberOfLines={1}>
-                        {item.title}
-                      </ThemedText>
-                      <ThemedView
-                        style={[
-                          styles.statusDot,
-                          { backgroundColor: statusColor(item.status, theme) },
-                        ]}
-                      />
-                    </ThemedView>
-                    <ThemedText
-                      type="small"
-                      style={{ color: statusColor(item.status, theme) }}
-                    >
-                      {remainingLabel(item)}
-                    </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {item.participantCount} participant
-                      {item.participantCount === 1 ? "" : "s"} ·{" "}
-                      {item.teamCount} team{item.teamCount === 1 ? "" : "s"}
-                    </ThemedText>
-                  </ThemedView>
-                </Pressable>
-              </Link>
+        >
+          {/* App header */}
+          <View style={styles.headerWrap}>
+            <AppHeader level={level} unreadCount={unreadCount} />
+          </View>
 
-              {isAuthenticated && item.status !== "ENDED" ? (
+          {/* Page head */}
+          <View style={styles.pageHead}>
+            <View style={styles.titleBlock}>
+              <LinearGradient
+                colors={["rgba(139,92,246,.22)", "rgba(20,16,34,.9)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.pageIcon}
+              >
+                <LucideIcon name="calendar" size={20} color="#c4b5fd" />
+              </LinearGradient>
+              <View>
+                <Text style={styles.pageTitle}>Events</Text>
+                <Text style={styles.pageSub}>
+                  Compete. Learn. Be part of the community.
+                </Text>
+              </View>
+            </View>
+            <View style={styles.scriptDeco}>
+              <Text style={styles.decoText}>
+                More{`\n`}Than{`\n`}Just CTF
+              </Text>
+            </View>
+          </View>
+
+          {/* Tab bar */}
+          <View style={styles.tabBar}>
+            {TABS.map((t) => {
+              const active = tab === t.key;
+              const count = grouped[t.key].length;
+              return (
                 <Pressable
-                  disabled={busyId !== null || item.status === "DRAFT"}
-                  onPress={() => void onAction(item)}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    item.joinedByMe ? `Leave event ${item.title}` : `Join event ${item.title}`
-                  }
-                  accessibilityState={{
-                    disabled: busyId !== null || item.status === "DRAFT",
-                  }}
-                  style={({ pressed }) => [
-                    styles.actionButton,
-                    {
-                      backgroundColor: item.joinedByMe
-                        ? theme.danger
-                        : item.status === "DRAFT"
-                          ? theme.backgroundSelected
-                          : theme.accent,
-                    },
-                    (busyId !== null || item.status === "DRAFT") &&
-                      styles.disabled,
-                    pressed && busyId === null && item.status !== "DRAFT" &&
-                      styles.pressed,
-                  ]}
+                  key={t.key}
+                  accessibilityRole="tab"
+                  accessibilityLabel={`${t.label} events, ${count}`}
+                  accessibilityState={{ selected: active }}
+                  onPress={() => setTab(t.key)}
+                  style={styles.tab}
                 >
-                  {busyId === item.id ? (
-                    <ActivityIndicator
-                      color={
-                        item.status === "DRAFT"
-                          ? theme.text
-                          : item.joinedByMe
-                            ? theme.onDanger
-                            : theme.onAccent
-                      }
-                      size="small"
+                  {active ? (
+                    <LinearGradient
+                      colors={["#8b5cf6", "#7c3aed"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.tabActiveBg}
                     />
-                  ) : (
-                    <ThemedText
-                      type="small"
-                      style={{
-                        color:
-                          item.status === "DRAFT"
-                            ? theme.text
-                            : item.joinedByMe
-                              ? theme.onDanger
-                              : theme.onAccent,
-                        fontWeight: "600",
-                      }}
+                  ) : null}
+                  <Text
+                    style={[styles.tabLabel, active && styles.tabLabelActive]}
+                  >
+                    {t.label}
+                  </Text>
+                  {count > 0 ? (
+                    <Text
+                      style={[
+                        styles.tabCount,
+                        active && styles.tabCountActive,
+                      ]}
                     >
-                      {item.joinedByMe
-                        ? "Leave"
-                        : item.status === "DRAFT"
-                          ? "Draft"
-                          : "Join"}
-                    </ThemedText>
-                  )}
+                      {count}
+                    </Text>
+                  ) : null}
                 </Pressable>
-              ) : null}
-            </Surface>
-          )}
-          ListEmptyComponent={
+              );
+            })}
+          </View>
+
+          {/* Featured carousel */}
+          {featured.length > 0 ? (
+            <FeaturedCarousel
+              events={featured}
+              onEventPress={(event) => router.push(`/event/${event.id}`)}
+            />
+          ) : null}
+
+          {/* Featured / list section */}
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>{sectionTitle}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="See all events"
+              onPress={() => setTab(tab)}
+              style={styles.linkBtn}
+            >
+              <Text style={styles.linkBtnText}>See All</Text>
+              <Text style={styles.linkBtnText}>→</Text>
+            </Pressable>
+          </View>
+
+          {activeEvents.length === 0 ? (
             <EmptyState message="No events right now. Check back soon!" />
-          }
-        />
+          ) : (
+            <View style={styles.eventList}>
+              {activeEvents.map((event, index) => (
+                <View key={event.id} style={styles.cardWrap}>
+                  <LinearGradient
+                    colors={[C.surface2, "rgba(11,10,22,.94)"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.cardBg}
+                  />
+                  <EventCard event={event} index={index} />
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Community events grid */}
+          <View style={[styles.sectionHead, styles.communityHead]}>
+            <Text style={styles.sectionTitle}>Community Events</Text>
+            <View style={styles.linkBtn}>
+              <Text style={styles.linkBtnText}>See All</Text>
+              <Text style={styles.linkBtnText}>→</Text>
+            </View>
+          </View>
+          <View style={styles.communityGrid}>
+            {COMMUNITY.map((c, index) => (
+              <CommunityCard key={c.title} item={c} index={index} />
+            ))}
+          </View>
+        </ScrollView>
       )}
-    </ScreenShell>
+    </View>
+  );
+}
+
+function CommunityCard({
+  item,
+  index,
+}: {
+  item: (typeof COMMUNITY)[number];
+  index: number;
+}) {
+  const theme = useTheme();
+  const accents = [C.purple, C.purpleLight];
+  const accent = accents[index % accents.length];
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Community event ${item.title}`}
+      style={({ pressed }) => [styles.communityCard, pressed && styles.pressed]}
+    >
+      <LinearGradient
+        colors={[C.surface2, "rgba(11,10,22,.94)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View
+        style={[
+          styles.commIcon,
+          { borderColor: theme.borderStrong },
+        ]}
+      >
+        <LucideIcon name={item.icon} size={18} color={accent} />
+      </View>
+      <View>
+        <Text style={styles.commTitle}>{item.title}</Text>
+        <View style={styles.commMeta}>
+          <LucideIcon name="calendar" size={11} color={C.purpleLight} />
+          <Text style={[styles.commMetaText, { color: theme.accent }]}>
+            {item.meta}
+          </Text>
+        </View>
+        <Text style={styles.commDesc}>{item.desc}</Text>
+      </View>
+      <View style={styles.commFoot}>
+        <Text style={styles.commCount}>{item.count}</Text>
+        <LucideIcon name="chevron" size={14} color={C.purpleLight} />
+      </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  announcement: {
-    width: 260,
-    borderRadius: 12,
-    padding: Spacing.three,
-    gap: Spacing.one,
+  root: {
+    flex: 1,
+    backgroundColor: C.bgPrimary,
   },
-  announcementPinned: {
-    borderWidth: 1,
+  topGlow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 200,
   },
   listContent: {
-    gap: Spacing.two,
-    paddingBottom: Spacing.four,
+    paddingHorizontal: 14,
+    paddingBottom: 40,
   },
-  card: {
-    borderRadius: 16,
-    padding: Spacing.three,
-    gap: Spacing.two,
+
+  /* page head */
+  headerWrap: {
+    marginTop: 4,
+    marginBottom: 14,
   },
-  cardHeader: {
+  pageHead: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: Spacing.three,
+    marginTop: 8,
+    marginBottom: 18,
   },
-  cardBody: {
-    flex: 1,
-    gap: Spacing.half,
-  },
-  titleRow: {
+  titleBlock: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.two,
+    alignItems: "flex-start",
+    gap: 11,
+    flexShrink: 1,
   },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  actionButton: {
-    borderRadius: 12,
+  pageIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: TouchTarget.Android,
-    paddingVertical: Spacing.two + Spacing.half,
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,.4)",
   },
-  disabled: {
-    opacity: 0.5,
+  pageTitle: {
+    fontSize: 34,
+    fontWeight: "900",
+    letterSpacing: -1.1,
+    lineHeight: 34,
+    marginBottom: 6,
+    color: C.textPrimary,
+  },
+  pageSub: {
+    fontSize: 13,
+    color: C.textSecondary,
+    lineHeight: 19,
+    maxWidth: 230,
+  },
+  scriptDeco: {
+    alignItems: "flex-end",
+    paddingTop: 6,
+    transform: [{ rotate: "-4deg" }],
+  },
+  decoText: {
+    fontSize: 16,
+    lineHeight: 17,
+    fontWeight: "600",
+    fontStyle: "italic",
+    textAlign: "right",
+    color: "rgba(196,181,253,.95)",
+    letterSpacing: 0.5,
+  },
+
+  /* tab bar */
+  tabBar: {
+    flexDirection: "row",
+    gap: 0,
+    padding: 5,
+    borderRadius: 14,
+    backgroundColor: "rgba(20,17,36,.85)",
+    borderWidth: 1,
+    borderColor: C.border,
+    marginBottom: 18,
+  },
+  tab: {
+    flex: 1,
+    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingVertical: 11,
+    borderRadius: 10,
+    minHeight: 42,
+    overflow: "hidden",
+  },
+  tabActiveBg: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 10,
+  },
+  tabLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: C.textSecondary,
+  },
+  tabLabelActive: {
+    color: "#fff",
+  },
+  tabCount: {
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    fontSize: 10,
+    fontWeight: "800",
+    lineHeight: 18,
+    textAlign: "center",
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,.14)",
+    color: C.textSecondary,
+  },
+  tabCountActive: {
+    backgroundColor: "rgba(255,255,255,.25)",
+    color: "#fff",
+  },
+
+  /* section head */
+  sectionHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: 2,
+    marginBottom: 12,
+  },
+  communityHead: {
+    marginTop: 6,
+  },
+  sectionTitle: {
+    fontSize: 19,
+    fontWeight: "800",
+    letterSpacing: -0.4,
+    color: C.textPrimary,
+  },
+  linkBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 4,
+  },
+  linkBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: C.purpleLight,
+  },
+
+  /* event list */
+  eventList: {
+    flexDirection: "column",
+    gap: 11,
+    marginBottom: 22,
+  },
+  cardWrap: {
+    position: "relative",
+    borderRadius: 15,
+    overflow: "hidden",
+  },
+  cardBg: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 15,
+  },
+
+  /* community grid */
+  communityGrid: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 10,
+  },
+  communityCard: {
+    flex: 1,
+    flexDirection: "column",
+    gap: 9,
+    padding: 13,
+    borderRadius: 15,
+    overflow: "hidden",
+  },
+  commIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,.14)",
+    borderWidth: 1,
+  },
+  commTitle: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    letterSpacing: -0.25,
+    lineHeight: 16,
+    color: "#fff",
+    marginBottom: 3,
+  },
+  commMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 3,
+  },
+  commMetaText: {
+    fontSize: 10.5,
+    fontWeight: "600",
+  },
+  commDesc: {
+    fontSize: 11,
+    lineHeight: 15,
+    color: C.textSecondary,
+  },
+  commFoot: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: "auto",
+    paddingTop: 4,
+  },
+  commCount: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: C.textMuted,
   },
   pressed: {
     opacity: 0.85,

@@ -42,6 +42,10 @@ const ICON_PATHS: Record<string, string> = {
   bell: '<path d="M18 8.5a6 6 0 0 0-12 0c0 6.5-2.5 8.5-2.5 8.5h17S18 15 18 8.5"/><path d="M13.8 20.5a2 2 0 0 1-3.6 0"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   check: '<path d="m5 12.5 4.5 4.5L19 7"/>',
+  crown:
+    '<path d="M3.5 17 6 8.5 10.5 12.5 12 5l1.5 7.5L18 8.5 20.5 17z"/><circle cx="5.5" cy="7" r="1.5"/><circle cx="12" cy="3.4" r="1.5"/><circle cx="18.5" cy="7" r="1.5"/><path d="M3.5 20h17"/>',
+  gift:
+    '<rect x="3.2" y="8" width="17.6" height="4" rx="1.2"/><path d="M5.2 12v8a1 1 0 0 0 1 1h11.6a1 1 0 0 0 1-1v-8"/><path d="M12 8v13"/><path d="M12 8a3 3 0 1 1 3-3c0 1.6-1.3 3-3 3z"/><path d="M12 8a3 3 0 1 0-3-3c0 1.6 1.3 3 3 3z"/>',
   wrench:
     '<path d="M14.7 6.3a4 4 0 0 1 5.3-5.3l-2.9 2.9 1.9 1.9 2.9-2.9a4 4 0 0 1-5.3 5.3l-6.4 6.4a2.1 2.1 0 1 1-3-3z" transform="translate(-1 2) scale(.85)"/><path d="M6.5 4.5 4 7l3.5 3.5L10 8z"/><path d="m9.5 10.5 8 8"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',

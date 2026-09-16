@@ -33,6 +33,18 @@ export interface EventChallengeDto {
   unlockRule: UnlockRuleDto | null;
 }
 
+export interface EventSpeaker {
+  name: string;
+  role: string;
+  avatarUrl?: string;
+}
+
+export interface EventScheduleItem {
+  time: string;
+  title: string;
+  host: string;
+}
+
 export interface EventSummaryDto {
   id: number;
   slug: string;
@@ -46,6 +58,8 @@ export interface EventSummaryDto {
   teamCount: number;
   joinedByMe: boolean;
   myTeamId: number | null;
+  speakers?: EventSpeaker[];
+  schedule?: EventScheduleItem[];
 }
 
 export interface EventListResponse {

@@ -2,6 +2,8 @@ import { ErrorCode, Difficulty } from "@ctf/shared";
 import type {
   EventChallengeDto,
   EventListResponse,
+  EventScheduleItem,
+  EventSpeaker,
   EventStatus,
   EventSummaryDto,
   UnlockLockedReason,
@@ -25,6 +27,8 @@ export interface EventRow {
   status: EventStatus;
   startsAt: Date;
   endsAt: Date;
+  speakers: unknown;
+  schedule: unknown;
   createdAt: Date;
   updatedAt: Date;
   createdById: number;
@@ -73,6 +77,36 @@ export async function getRegistrationState(
   return { joinedByMe: !!participant, myTeamId: participant?.teamId ?? null };
 }
 
+function parseSpeakers(raw: unknown): EventSpeaker[] | undefined {
+  if (!raw) return undefined;
+  try {
+    const arr = Array.isArray(raw) ? raw : JSON.parse(String(raw));
+    if (!Array.isArray(arr) || arr.length === 0) return undefined;
+    return arr.map((s: Record<string, unknown>) => ({
+      name: String(s.name ?? ""),
+      role: String(s.role ?? ""),
+      avatarUrl: s.avatarUrl ? String(s.avatarUrl) : undefined,
+    }));
+  } catch {
+    return undefined;
+  }
+}
+
+function parseSchedule(raw: unknown): EventScheduleItem[] | undefined {
+  if (!raw) return undefined;
+  try {
+    const arr = Array.isArray(raw) ? raw : JSON.parse(String(raw));
+    if (!Array.isArray(arr) || arr.length === 0) return undefined;
+    return arr.map((s: Record<string, unknown>) => ({
+      time: String(s.time ?? ""),
+      title: String(s.title ?? ""),
+      host: String(s.host ?? ""),
+    }));
+  } catch {
+    return undefined;
+  }
+}
+
 export function toSummaryDto(
   event: EventRow,
   now: Date,
@@ -80,6 +114,8 @@ export function toSummaryDto(
 ): EventSummaryDto {
   const participantCount = event._count?.participants ?? 0;
   const teamCount = event._count?.teams ?? 0;
+  const speakers = parseSpeakers(event.speakers);
+  const schedule = parseSchedule(event.schedule);
   return {
     id: event.id,
     slug: event.slug,
@@ -93,6 +129,8 @@ export function toSummaryDto(
     teamCount,
     joinedByMe: registration.joinedByMe,
     myTeamId: registration.myTeamId,
+    ...(speakers ? { speakers } : {}),
+    ...(schedule ? { schedule } : {}),
   };
 }
 

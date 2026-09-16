@@ -145,6 +145,8 @@ export interface AdminCreateEvent {
   startsAt: string;
   endsAt: string;
   status?: EventStatus;
+  speakers?: Array<{ name: string; role: string; avatarUrl?: string }>;
+  schedule?: Array<{ time: string; title: string; host: string }>;
 }
 
 export async function createEvent(
@@ -170,6 +172,8 @@ export async function createEvent(
       startsAt: new Date(input.startsAt),
       endsAt: new Date(input.endsAt),
       status: input.status ?? "SCHEDULED",
+      speakers: input.speakers ?? undefined,
+      schedule: input.schedule ?? undefined,
       createdById: organizerId,
     },
     include: { _count: { select: { participants: true, teams: true } } },
@@ -209,6 +213,8 @@ export async function updateEvent(
       startsAt: input.startsAt ? new Date(input.startsAt) : undefined,
       endsAt: input.endsAt ? new Date(input.endsAt) : undefined,
       status: input.status,
+      speakers: input.speakers ?? undefined,
+      schedule: input.schedule ?? undefined,
     },
     include: { _count: { select: { participants: true, teams: true } } },
   });
