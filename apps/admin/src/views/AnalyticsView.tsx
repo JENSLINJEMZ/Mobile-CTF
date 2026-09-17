@@ -8,11 +8,10 @@ import * as adminApi from "../adminApi";
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div
+      className="ctf-stat-tile"
       style={{
         flex: 1,
         padding: 12,
-        borderRadius: 10,
-        border: "1px solid #e2e8f0",
         display: "flex",
         flexDirection: "column",
         gap: 4,
@@ -21,7 +20,7 @@ function Stat({ label, value }: { label: string; value: number }) {
       <Text tone="secondary" size="xs">
         {label}
       </Text>
-      <div style={{ fontSize: 22, fontWeight: 700 }}>{value}</div>
+      <div className="ctf-stat-value">{value}</div>
     </div>
   );
 }
@@ -34,7 +33,7 @@ function MiniBar({ value, max }: { value: number; max: number }) {
         width: 10,
         height: 48,
         borderRadius: 4,
-        backgroundColor: "#e2e8f0",
+        backgroundColor: "var(--ui-surface-2, #e2e8f0)",
         display: "flex",
         alignItems: "flex-end",
         overflow: "hidden",
@@ -44,7 +43,7 @@ function MiniBar({ value, max }: { value: number; max: number }) {
         style={{
           width: "100%",
           height: `${pct}%`,
-          backgroundColor: "#2563eb",
+          backgroundColor: "var(--ui-accent, #2563eb)",
           borderRadius: 4,
         }}
       />
@@ -142,9 +141,8 @@ export function AnalyticsView({ session }: { session: Session }) {
           {overview.topChallenges.map((c) => (
             <div
               key={c.id}
+              className="ctf-row"
               style={{
-                display: "flex",
-                alignItems: "center",
                 justifyContent: "space-between",
                 gap: 12,
               }}
@@ -174,15 +172,20 @@ export function AnalyticsView({ session }: { session: Session }) {
           {overview.topSolvers.map((s, i) => (
             <div
               key={s.userId}
+              className="ctf-row"
               style={{
-                display: "flex",
-                alignItems: "center",
                 justifyContent: "space-between",
                 gap: 12,
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontWeight: 700, color: "#64748b", width: 20 }}>
+                <span
+                  style={{
+                    fontWeight: 700,
+                    color: "var(--ui-text-muted, #94a3b8)",
+                    width: 20,
+                  }}
+                >
                   {i + 1}
                 </span>
                 <span style={{ fontWeight: 600 }}>{s.username}</span>

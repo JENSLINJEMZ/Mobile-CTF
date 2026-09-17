@@ -35,6 +35,8 @@ Thumbs.db
 coverage/
 
 # Prisma
-packages/database/prisma/migrations/dev.dbartifacts/
+packages/database/prisma/migrations/dev.db
+artifacts/
+opencode
 opencode/
 postman/

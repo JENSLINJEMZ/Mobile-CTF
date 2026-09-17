@@ -8,7 +8,9 @@ import * as adminApi from "../adminApi";
 const inputStyle: React.CSSProperties = {
   padding: "8px 10px",
   borderRadius: 8,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--ui-border, #cbd5e1)",
+  backgroundColor: "var(--ui-surface-2, #ffffff)",
+  color: "var(--ui-text, #0f172a)",
   fontSize: 14,
   boxSizing: "border-box",
   width: "100%",
@@ -101,6 +103,7 @@ export function UsersView({ session }: { session: Session }) {
               if (e.key === "Enter") setBusy(true);
             }}
             placeholder="Search username or email"
+            className="ctf-input"
             style={{ ...inputStyle, flex: 1 }}
           />
           <Button
@@ -122,13 +125,10 @@ export function UsersView({ session }: { session: Session }) {
           {users.map((user) => (
             <div
               key={user.id}
+              className="ctf-row"
               style={{
-                display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: 10,
-                borderRadius: 10,
-                border: "1px solid #e2e8f0",
                 gap: 12,
               }}
             >
@@ -150,6 +150,7 @@ export function UsersView({ session }: { session: Session }) {
                   value={user.role}
                   onChange={(e) => void applyRole(user, e.target.value)}
                   disabled={busy}
+                  className="ctf-input"
                   style={{
                     ...inputStyle,
                     width: "auto",

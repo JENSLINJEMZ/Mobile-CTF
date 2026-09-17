@@ -8,7 +8,9 @@ import * as adminApi from "../adminApi";
 const inputStyle: React.CSSProperties = {
   padding: "8px 10px",
   borderRadius: 8,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--ui-border, #cbd5e1)",
+  backgroundColor: "var(--ui-surface-2, #ffffff)",
+  color: "var(--ui-text, #0f172a)",
   fontSize: 14,
   boxSizing: "border-box",
   width: "100%",
@@ -62,6 +64,7 @@ export function AuditLogView({ session }: { session: Session }) {
               if (e.key === "Enter") void load();
             }}
             placeholder="Filter by action (e.g. challenge.create)"
+            className="ctf-input"
             style={{ ...inputStyle, flex: 1 }}
           />
           <Button disabled={busy} onClick={() => void load()}>
@@ -88,14 +91,8 @@ export function AuditLogView({ session }: { session: Session }) {
           {items.map((entry) => (
             <div
               key={entry.id}
-              style={{
-                padding: 10,
-                borderRadius: 10,
-                border: "1px solid #e2e8f0",
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-              }}
+              className="ctf-row-col"
+              style={{ gap: 6 }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <Badge tone={actionTone(entry.action)}>{entry.action}</Badge>

@@ -64,16 +64,27 @@ export async function getAnalyticsOverview(): Promise<AnalyticsOverviewDto> {
     prisma.submission.count({ where: { isFirstBlood: true } }),
     prisma.$queryRaw<DayBucket[]>`
       SELECT
-        to_char(d."solvedAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
-        COUNT(*) AS "solves",
-        0::bigint AS "attempts",
-        COALESCE(SUM(d."pointsAwarded"), 0)::bigint AS "points"
+        COALESCE(s.date, a.date) AS date,
+        COALESCE(s."solves", 0)::bigint AS "solves",
+        COALESCE(a."attempts", 0)::bigint AS "attempts",
+        COALESCE(s."points", 0)::bigint AS "points"
       FROM (
-        SELECT id, "solvedAt", "pointsAwarded"
+        SELECT
+          to_char("solvedAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
+          COUNT(*) AS "solves",
+          COALESCE(SUM("pointsAwarded"), 0)::bigint AS "points"
         FROM "Submission"
         WHERE "solvedAt" >= (now() - interval '13 days')
-      ) d
-      GROUP BY 1
+        GROUP BY 1
+      ) s
+      FULL OUTER JOIN (
+        SELECT
+          to_char("createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
+          COUNT(*)::bigint AS "attempts"
+        FROM "SubmissionAttempt"
+        WHERE "createdAt" >= (now() - interval '13 days')
+        GROUP BY 1
+      ) a ON a.date = s.date
       ORDER BY 1 ASC
     `,
     prisma.$queryRaw<ChallengeBucket[]>`

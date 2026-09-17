@@ -57,6 +57,7 @@ import {
 } from "../services/events";
 import { listEvents } from "../services/eventQueries";
 import { getAnalyticsOverview } from "../services/analytics";
+import { getSystemStatus } from "../services/systemStatus";
 import { listAuditLog, recordAudit } from "../services/auditLog";
 import { listUsers, updateUser } from "../services/adminUsers";
 import { deleteAdminTeam, listAdminTeams } from "../services/adminTeams";
@@ -472,6 +473,17 @@ adminRouter.get(
   requirePermission("analytics.view"),
   asyncHandler(async (req, res) => {
     const data = await getAnalyticsOverview();
+    res.json({ success: true, data });
+  }),
+);
+
+// --- System status ---------------------------------------------------------
+
+adminRouter.get(
+  "/system/status",
+  requirePermission("analytics.view"),
+  asyncHandler(async (req, res) => {
+    const data = await getSystemStatus();
     res.json({ success: true, data });
   }),
 );

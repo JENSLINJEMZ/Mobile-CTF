@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import { colors, radius, spacing, typography } from "../tokens";
+import { spacing, typography } from "../tokens";
 
 type Variant = "primary" | "secondary" | "danger" | "ghost";
 type Size = "sm" | "md" | "lg";
@@ -17,23 +17,25 @@ export interface ButtonProps {
 
 const variantStyles: Record<Variant, CSSProperties> = {
   primary: {
-    backgroundColor: colors.primary,
-    color: colors.onPrimary,
-    border: `1px solid ${colors.primary}`,
+    backgroundColor: "var(--ui-accent, #2563eb)",
+    backgroundImage: "var(--ui-gradient-accent, none)",
+    color: "var(--ui-on-accent, #ffffff)",
+    border: "1px solid transparent",
+    boxShadow: "var(--ui-btn-glow, none)",
   },
   secondary: {
-    backgroundColor: colors.surface,
-    color: colors.text,
-    border: `1px solid ${colors.border}`,
+    backgroundColor: "var(--ui-surface-2, #ffffff)",
+    color: "var(--ui-text, #0f172a)",
+    border: "1px solid var(--ui-border, #e2e8f0)",
   },
   danger: {
-    backgroundColor: colors.danger,
-    color: colors.onPrimary,
-    border: `1px solid ${colors.danger}`,
+    backgroundColor: "var(--ui-danger, #dc2626)",
+    color: "var(--ui-on-danger, #ffffff)",
+    border: "1px solid transparent",
   },
   ghost: {
     backgroundColor: "transparent",
-    color: colors.primary,
+    color: "var(--ui-accent, #2563eb)",
     border: "1px solid transparent",
   },
 };
@@ -70,7 +72,7 @@ export function Button({
       style={{
         ...variantStyles[variant],
         ...sizeStyles[size],
-        borderRadius: radius.md,
+        borderRadius: "var(--ui-radius-sm, 12px)",
         fontWeight: typography.fontWeight.semibold,
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.5 : 1,

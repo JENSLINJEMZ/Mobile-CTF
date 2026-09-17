@@ -59,6 +59,55 @@ export interface UserAdminListResult {
   };
 }
 
+export type SystemServiceKey =
+  | "api"
+  | "database"
+  | "redis"
+  | "docker"
+  | "fileStorage"
+  | "sandbox"
+  | "proxy"
+  | "mail";
+
+export interface SystemStatusServiceDto {
+  key: SystemServiceKey;
+  ok: boolean;
+  detail?: string | null;
+}
+
+export interface SystemStatusResourcesDto {
+  cpuCount: number;
+  cpuModel: string;
+  load1: number;
+  load5: number;
+  load15: number;
+  memoryTotalBytes: number;
+  memoryUsedBytes: number;
+  processRssBytes: number;
+  uptimeSeconds: number;
+  version: string;
+}
+
+export interface StorageBucketDto {
+  name: string;
+  bytes: number;
+  color: string;
+}
+
+export interface SystemStorageDto {
+  path: string;
+  usedBytes: number;
+  totalBytes: number;
+  buckets: StorageBucketDto[];
+}
+
+export interface SystemStatusDto {
+  checkedAt: string;
+  services: SystemStatusServiceDto[];
+  resources: SystemStatusResourcesDto;
+  storage: SystemStorageDto;
+}
+
 export interface UserUpdatePayload {
   role?: Role;
   isActive?: boolean;

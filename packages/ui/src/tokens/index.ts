@@ -71,6 +71,31 @@ export const zIndex = {
   toast: 300,
 } as const;
 
+export const darkColors = {
+  bg: "#06090f",
+  surface: "#0d131f",
+  surface2: "#131b2c",
+  border: "rgba(124,138,165,0.18)",
+  borderStrong: "rgba(0,229,255,0.5)",
+  text: "#e6edf7",
+  textSecondary: "#c7d2e8",
+  textMuted: "#7c8aa5",
+  accent: "#00e5ff",
+  accent2: "#b14dff",
+  onAccent: "#041017",
+  success: "#22e6a0",
+  warning: "#ffb020",
+  danger: "#ff3b5c",
+} as const;
+
+export const hud = {
+  radius: { sm: 8, md: 12, lg: 16 },
+  fonts: {
+    sans: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    mono: 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
+  },
+} as const;
+
 export const tokens = {
   colors,
   spacing,
@@ -78,6 +103,8 @@ export const tokens = {
   radius,
   shadows,
   zIndex,
+  darkColors,
+  hud,
 } as const;
 
 export default tokens;

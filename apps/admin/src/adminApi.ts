@@ -11,6 +11,7 @@ import type {
   FileDto,
   FileListResult,
   PaginatedResult,
+  SystemStatusDto,
   TeamAdminDto,
   UserAdminDto,
   UnlockRuleDto,
@@ -394,6 +395,10 @@ export function getAnalyticsOverview(
     session,
     "/api/admin/analytics/overview",
   );
+}
+
+export function getSystemStatus(session: Session): Promise<SystemStatusDto> {
+  return request<SystemStatusDto>(session, "/api/admin/system/status");
 }
 
 export function listAuditLog(

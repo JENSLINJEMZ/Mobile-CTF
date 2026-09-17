@@ -13,7 +13,9 @@ import * as adminApi from "../adminApi";
 const inputStyle: React.CSSProperties = {
   padding: "8px 10px",
   borderRadius: 8,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--ui-border, #cbd5e1)",
+  backgroundColor: "var(--ui-surface-2, #ffffff)",
+  color: "var(--ui-text, #0f172a)",
   fontSize: 14,
   boxSizing: "border-box",
 };
@@ -126,6 +128,7 @@ function RuleEditor({ rule, candidates, onSave, busy }: RuleEditorProps) {
           setType(next);
           if (next === "ALWAYS") onSave(null);
         }}
+        className="ctf-input"
         style={inputStyle}
       >
         {(Object.keys(RULE_LABELS) as (keyof typeof RULE_LABELS)[]).map(
@@ -142,6 +145,7 @@ function RuleEditor({ rule, candidates, onSave, busy }: RuleEditorProps) {
           type="datetime-local"
           value={unlockAt}
           onChange={(e) => setUnlockAt(e.target.value)}
+          className="ctf-input"
           style={inputStyle}
         />
       ) : null}
@@ -182,6 +186,7 @@ function RuleEditor({ rule, candidates, onSave, busy }: RuleEditorProps) {
           value={minScore}
           onChange={(e) => setMinScore(e.target.value)}
           placeholder="Minimum score"
+          className="ctf-input"
           style={inputStyle}
         />
       ) : null}
@@ -411,6 +416,7 @@ export function EventsView({ session }: { session: Session }) {
                 onChange={(e) =>
                   setDraft((d) => ({ ...d, [f.key]: e.target.value }))
                 }
+                className="ctf-input"
                 style={inputStyle}
               />
             </label>
@@ -432,6 +438,7 @@ export function EventsView({ session }: { session: Session }) {
                   status: e.target.value as EventSummaryDto["status"],
                 }))
               }
+              className="ctf-input"
               style={inputStyle}
             >
               <option value="DRAFT">DRAFT</option>
@@ -456,6 +463,7 @@ export function EventsView({ session }: { session: Session }) {
                 setDraft((d) => ({ ...d, description: e.target.value }))
               }
               rows={4}
+              className="ctf-input"
               style={inputStyle}
             />
           </label>
@@ -484,7 +492,7 @@ export function EventsView({ session }: { session: Session }) {
           <Text tone="secondary">No events yet.</Text>
         ) : null}
         {events.map((event) => (
-          <div key={event.id} style={rowStyle}>
+          <div key={event.id} className="ctf-row" style={rowStyle}>
             <button
               onClick={() =>
                 void selectEvent(selectedId === event.id ? null : event.id)
@@ -535,6 +543,7 @@ export function EventsView({ session }: { session: Session }) {
                   e.target.value === "" ? "" : Number(e.target.value),
                 )
               }
+              className="ctf-input"
               style={{ ...inputStyle, flex: 1 }}
             >
               <option value="">Add a challenge…</option>
@@ -564,6 +573,7 @@ export function EventsView({ session }: { session: Session }) {
               return (
                 <div
                   key={ec.id}
+                  className="ctf-row"
                   style={{ ...rowStyle, alignItems: "flex-start" }}
                 >
                   <div
@@ -634,10 +644,7 @@ const rowStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 12,
-  padding: "10px 12px",
-  borderRadius: 10,
-  border: "1px solid #e2e8f0",
-  background: "#f8fafc",
+  background: "var(--ui-surface, #ffffff)",
 };
 
 const addRow: React.CSSProperties = {

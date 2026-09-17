@@ -1,31 +1,45 @@
-import { APP_NAME, APP_VERSION } from "@ctf/shared";
-import type { AuthResponse, UserDto } from "@ctf/shared";
-import type { AnalyticsOverviewDto, AuditLogDto } from "@ctf/shared";
-import { Badge, Button, Card, Text } from "@ctf/ui";
-import { useEffect, useState } from "react";
+import { APP_VERSION } from "@ctf/shared";
+import type { UserDto } from "@ctf/shared";
+import { useEffect, useRef, useState } from "react";
 
 import type { Session } from "./adminApi";
-import * as adminApi from "./adminApi";
+import { Icon } from "./icons";
 import { AnalyticsView } from "./views/AnalyticsView";
 import { AnnouncementsView } from "./views/AnnouncementsView";
 import { AuditLogView } from "./views/AuditLogView";
 import { ChallengesView } from "./views/ChallengesView";
+import { DashboardView } from "./views/DashboardView";
 import { EventsView } from "./views/EventsView";
 import { TeamsView } from "./views/TeamsView";
 import { UsersView } from "./views/UsersView";
 
-const NAV_ITEMS = [
+const NAV: Array<[string, string]> = [
+  ["Dashboard", "dashboard"],
+  ["Challenges", "flag"],
+  ["Events", "calendar"],
+  ["Users", "user"],
+  ["Teams", "users"],
+  ["Submissions", "inbox"],
+  ["Announcements", "mega"],
+  ["Analytics", "chart"],
+  ["Sandbox Manager", "box"],
+  ["Files & Resources", "folder"],
+  ["Badges & Rewards", "award"],
+  ["Payments", "card"],
+  ["Settings", "gear"],
+  ["Audit Log", "list"],
+];
+
+const WIRED = new Set([
   "Dashboard",
   "Challenges",
   "Events",
-  "Announcements",
   "Users",
   "Teams",
+  "Announcements",
   "Analytics",
   "Audit Log",
-] as const;
-
-type NavItem = (typeof NAV_ITEMS)[number];
+]);
 
 const SESSION_KEY = "ctf.adminSession.v1";
 
@@ -54,13 +68,21 @@ async function requestLogin(email: string, password: string): Promise<Session> {
   });
   const body = (await res.json().catch(() => null)) as {
     success: boolean;
-    data?: AuthResponse;
+    data?: { user: UserDto; tokens: { accessToken: string; refreshToken: string } };
     error?: { message: string };
   } | null;
   if (!res.ok || !body?.success || !body.data) {
     throw new Error(body?.error?.message ?? `Login failed (${res.status})`);
   }
-  return { user: body.data.user, ...body.data.tokens };
+  return {
+    user: {
+      id: body.data.user.id,
+      username: body.data.user.username,
+      email: body.data.user.email,
+      role: body.data.user.role,
+    },
+    ...body.data.tokens,
+  };
 }
 
 async function fetchSession(session: Session): Promise<UserDto> {
@@ -75,6 +97,34 @@ async function fetchSession(session: Session): Promise<UserDto> {
     throw new Error("Session expired");
   }
   return body.data;
+}
+
+function Brand() {
+  return (
+    <div className="brand">
+      <svg className="brand-mark" viewBox="0 0 48 48" fill="none">
+        <defs>
+          <linearGradient id="bm" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#22d3ee" />
+            <stop offset=".5" stopColor="#8b5cf6" />
+            <stop offset="1" stopColor="#ec4899" />
+          </linearGradient>
+        </defs>
+        <path
+          d="M5 40 L16 8 L24 26 L32 8 L43 40 L34 40 L28 24 L24 34 L20 24 L14 40 Z"
+          fill="url(#bm)"
+        />
+      </svg>
+      <div>
+        <div className="brand-name">Mobile CTF</div>
+        <div className="brand-sub">ADMIN CONSOLE</div>
+      </div>
+    </div>
+  );
+}
+
+function Arrow() {
+  return <Icon name="arrow" />;
 }
 
 function LoginView({ onLogin }: { onLogin: (s: Session) => void }) {
@@ -97,153 +147,76 @@ function LoginView({ onLogin }: { onLogin: (s: Session) => void }) {
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        minHeight: "100vh",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#0f172a",
-      }}
-    >
-      <Card
-        title={`${APP_NAME} Admin`}
-        style={{ width: 360 }}
-        bodyStyle={{ display: "flex", flexDirection: "column", gap: 12 }}
-      >
-        <Text tone="secondary" size="sm">
-          Admin console v{APP_VERSION}
-        </Text>
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-          style={inputStyle}
-        />
-        <input
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          type="password"
-          style={inputStyle}
-        />
-        {error ? (
-          <Text tone="danger" size="sm">
-            {error}
-          </Text>
-        ) : null}
-        <Button onClick={() => void submit()} disabled={busy}>
+    <div className="login-wrap">
+      <div className="login-card">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            paddingBottom: 2,
+          }}
+        >
+          <Brand />
+        </div>
+        <div>
+          <h2>Sign in</h2>
+          <div className="login-sub">Access the Mobile CTF administration console</div>
+        </div>
+        <label className="login-field">
+          <Icon name="user" />
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email"
+            autoComplete="username"
+          />
+        </label>
+        <label className="login-field">
+          <Icon name="gear" />
+          <input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            type="password"
+            autoComplete="current-password"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void submit();
+            }}
+          />
+        </label>
+        {error ? <div className="login-err">{error}</div> : null}
+        <button className="btn-primary login-btn" onClick={() => void submit()} disabled={busy}>
           {busy ? "Signing in…" : "Sign in"}
-        </Button>
-      </Card>
+        </button>
+      </div>
     </div>
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  padding: "10px 12px",
-  borderRadius: 8,
-  border: "1px solid #cbd5e1",
-  fontSize: 14,
-};
-
-function DashboardOverview({ session }: { session: Session }) {
-  const [overview, setOverview] = useState<AnalyticsOverviewDto | null>(null);
-  const [recent, setRecent] = useState<AuditLogDto[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    Promise.all([
-      adminApi.getAnalyticsOverview(session),
-      adminApi.listAuditLog(session, { limit: 8 }),
-    ])
-      .then(([o, a]) => {
-        setOverview(o);
-        setRecent(a.items);
-      })
-      .catch((err: unknown) =>
-        setError(err instanceof Error ? err.message : "Failed to load dashboard"),
-      );
-  }, [session]);
-
-  const stats: Array<[string, number]> = overview
-    ? [
-        ["Users", overview.totalUsers],
-        ["Challenges", overview.totalChallenges],
-        ["Solves", overview.totalSubmissions],
-        ["Points", overview.totalPointsAwarded],
-        ["Solves today", overview.solvesToday],
-      ]
-    : [];
-
+function Placeholder({ name }: { name: string }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {error ? <Text tone="danger">{error}</Text> : null}
-      <Card
-        title="Platform overview"
-        bodyStyle={{
-          display: "flex",
-          gap: 12,
-          flexWrap: "wrap",
+    <section className="card">
+      <div className="card-head">
+        <span className="card-title">{name}</span>
+        <span className="select">
+          Module
+          <Icon name="arrow" />
+        </span>
+      </div>
+      <div
+        style={{
+          padding: "4px 14px 18px",
+          fontSize: 12,
+          color: "#a49fc4",
+          lineHeight: 1.7,
         }}
       >
-        {stats.length === 0 ? (
-          <Text tone="secondary">Loading…</Text>
-        ) : (
-          stats.map(([label, value]) => (
-            <div
-              key={label}
-              style={{
-                flex: 1,
-                minWidth: 120,
-                padding: 12,
-                borderRadius: 10,
-                border: "1px solid #e2e8f0",
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-              }}
-            >
-              <Text tone="secondary" size="xs">
-                {label}
-              </Text>
-              <div style={{ fontSize: 22, fontWeight: 700 }}>{value}</div>
-            </div>
-          ))
-        )}
-      </Card>
-
-      <Card
-        title="Recent activity"
-        bodyStyle={{ display: "flex", flexDirection: "column", gap: 6 }}
-      >
-        {recent.length === 0 ? (
-          <Text tone="secondary">No recent admin activity.</Text>
-        ) : (
-          recent.map((entry) => (
-            <div
-              key={entry.id}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 12,
-                fontSize: 14,
-              }}
-            >
-              <span>
-                <Badge tone="neutral">{entry.action}</Badge>{" "}
-                <span style={{ fontWeight: 600 }}>{entry.entityType}</span>
-                {entry.entityId ? <span> #{entry.entityId}</span> : null}
-              </span>
-              <Text tone="secondary" size="xs">
-                {entry.actorUsername ?? `#${entry.actorId ?? "?"}`} ·{" "}
-                {new Date(entry.createdAt).toLocaleString()}
-              </Text>
-            </div>
-          ))
-        )}
-      </Card>
-    </div>
+        This module is not wired up in the current build of the admin console. Use the{" "}
+        <b style={{ color: "#cfcae8" }}>Dashboard</b> for an overview and the{" "}
+        <b style={{ color: "#cfcae8" }}>Audit Log</b> to trace administrative activity.
+      </div>
+    </section>
   );
 }
 
@@ -254,100 +227,225 @@ function Dashboard({
   session: Session;
   onLogout: () => void;
 }) {
-  const [activeView, setActiveView] = useState<NavItem>("Dashboard");
+  const [activeView, setActiveView] = useState<string>("Dashboard");
+  const [userOpen, setUserOpen] = useState(false);
+  const sideRef = useRef<HTMLElement>(null);
+  const timeRef = useRef<HTMLSpanElement>(null);
+  const dateRef = useRef<HTMLSpanElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const d = new Date();
+    if (dateRef.current) {
+      dateRef.current.textContent = d.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+    const t = setInterval(() => {
+      if (timeRef.current) {
+        timeRef.current.textContent = new Date().toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        });
+      }
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    const burger = document.getElementById("burger");
+    const check = () => {
+      const m = window.innerWidth <= 900;
+      if (burger) burger.style.display = m ? "grid" : "none";
+      if (!m) sideRef.current?.classList.remove("open");
+    };
+    burger?.addEventListener("click", () => sideRef.current?.classList.toggle("open"));
+    window.addEventListener("resize", check);
+    check();
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      burger?.removeEventListener("click", () => sideRef.current?.classList.toggle("open"));
+      window.removeEventListener("resize", check);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
+  const roleLabel = (session.user.role ?? "ADMIN")
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      <aside
-        style={{
-          width: 240,
-          backgroundColor: "#0f172a",
-          color: "#e2e8f0",
-          padding: 24,
-          flexShrink: 0,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <div>
-            <div style={{ color: "#ffffff", fontSize: 18, fontWeight: 700 }}>
-              {APP_NAME}
-            </div>
-            <Text tone="muted" size="sm">
-              Admin console v{APP_VERSION}
-            </Text>
-          </div>
-        </div>
-        <nav
-          style={{
-            marginTop: 24,
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-          }}
-        >
-          {NAV_ITEMS.map((item) => (
-            <a
-              key={item}
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveView(item);
+    <div className="shell">
+      <aside className="side" id="side" ref={sideRef}>
+        <Brand />
+        <div className="brand-tag">CONTROL · MANAGE · SECURE · INSPIRE</div>
+
+        <nav className="nav">
+          {NAV.map(([n, ic]) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => {
+                setActiveView(n);
+                sideRef.current?.classList.remove("open");
               }}
-              style={{
-                color: "#cbd5e1",
-                textDecoration: "none",
-                padding: "8px 12px",
-                borderRadius: 8,
-                cursor: "pointer",
-                fontWeight: activeView === item ? 700 : 400,
-                backgroundColor:
-                  activeView === item
-                    ? "rgba(37, 99, 235, 0.25)"
-                    : "transparent",
-              }}
+              className={`nav-item${activeView === n ? " active" : ""}`}
             >
-              {item}
-            </a>
+              <Icon name={ic} />
+              <span>{n}</span>
+            </button>
           ))}
         </nav>
-      </aside>
 
-      <main style={{ flex: 1, padding: 32 }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            marginBottom: 16,
-            gap: 12,
-          }}
-        >
-          <Text tone="secondary" size="sm">
-            {session.user.email} ({session.user.role})
-          </Text>
-          <Button onClick={onLogout}>Sign out</Button>
+        <div className="side-promo">
+          <svg className="hood" viewBox="0 0 64 64" fill="none">
+            <path
+              d="M32 4C20 4 12 14 12 28v12c0 10 8 20 20 20s20-10 20-20V28C52 14 44 4 32 4z"
+              fill="#000"
+            />
+            <path
+              d="M32 10c-9 0-15 8-15 18 0 4 2 7 5 8 2-6 5-9 10-9s8 3 10 9c3-1 5-4 5-8 0-10-6-18-15-18z"
+              fill="#1d1640"
+            />
+          </svg>
+          <h4>CTF Builders</h4>
+          <p>Build the next generation of security minds.</p>
+          <div className="quote">
+            “Same minds.
+            <br />
+            Different exploits.”
+          </div>
         </div>
 
-        {activeView === "Dashboard" ? (
-          <DashboardOverview session={session} />
-        ) : null}
-        {activeView === "Challenges" ? (
-          <ChallengesView session={session} />
-        ) : null}
-        {activeView === "Events" ? <EventsView session={session} /> : null}
-        {activeView === "Announcements" ? (
-          <AnnouncementsView session={session} />
-        ) : null}
-        {activeView === "Users" ? <UsersView session={session} /> : null}
-        {activeView === "Teams" ? <TeamsView session={session} /> : null}
-        {activeView === "Analytics" ? <AnalyticsView session={session} /> : null}
-        {activeView === "Audit Log" ? <AuditLogView session={session} /> : null}
-      </main>
+        <div className="side-foot">
+          <div>
+            <div className="v">v{APP_VERSION}</div>
+            <div className="n">Mobile CTF Admin</div>
+          </div>
+          <span className="pill-green">
+            <i className="dot"></i>API Online
+          </span>
+        </div>
+      </aside>
+
+      <div className="main">
+        <header className="topbar">
+          <button className="icon-btn" id="burger" style={{ display: "none" }} aria-label="Menu">
+            <Icon name="menu" />
+          </button>
+          <label className="search">
+            <Icon name="eye" style={{ width: 15, height: 15 }} />
+            <input
+              ref={searchRef}
+              placeholder="Search users, challenges, teams, submissions..."
+              aria-label="Search"
+            />
+            <span className="kbd">Ctrl K</span>
+          </label>
+          <div className="top-right">
+            <button className="icon-btn" aria-label="Theme">
+              <Icon name="sun" />
+            </button>
+            <button className="icon-btn" aria-label="Notifications">
+              <Icon name="bell" />
+              <span className="badge-count">6</span>
+            </button>
+            <div className="user-wrap">
+              <button
+                className="user"
+                onClick={() => setUserOpen((v) => !v)}
+                aria-label="Account"
+              >
+                <span className="avatar">
+                  <Icon name="user" />
+                </span>
+                <div>
+                  <div className="nm">{session.user.username ?? "admin"}</div>
+                  <div className="rl">{roleLabel}</div>
+                </div>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  style={{ width: 12, height: 12, color: "#6f6a90" }}
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+              {userOpen ? (
+                <>
+                  <div
+                    style={{
+                      position: "fixed",
+                      inset: 0,
+                      zIndex: 49,
+                    }}
+                    onClick={() => setUserOpen(false)}
+                  />
+                  <div className="user-menu">
+                    <button onClick={onLogout}>
+                      <Icon name="export" />
+                      Sign out
+                    </button>
+                  </div>
+                </>
+              ) : null}
+            </div>
+            <div className="clock">
+              <b>
+                <span ref={dateRef}></span>
+              </b>
+              <span ref={timeRef}>—</span>
+            </div>
+          </div>
+        </header>
+
+        <main className="content">
+          <div key={activeView} style={{ display: "contents" }}>
+            {activeView === "Dashboard" ? (
+              <DashboardView session={session} onNavigate={(v) => setActiveView(v)} />
+            ) : null}
+            {activeView === "Challenges" ? <ChallengesView session={session} /> : null}
+            {activeView === "Events" ? <EventsView session={session} /> : null}
+            {activeView === "Announcements" ? <AnnouncementsView session={session} /> : null}
+            {activeView === "Users" ? <UsersView session={session} /> : null}
+            {activeView === "Teams" ? <TeamsView session={session} /> : null}
+            {activeView === "Analytics" ? <AnalyticsView session={session} /> : null}
+            {activeView === "Audit Log" ? <AuditLogView session={session} /> : null}
+            {!WIRED.has(activeView) ? <Placeholder name={activeView} /> : null}
+          </div>
+
+          {activeView === "Dashboard" ? (
+            <footer className="foot">
+              <span className="q">“Hack. Learn. Compete. Repeat.”</span>
+              <span className="rt">
+                <svg viewBox="0 0 48 48" fill="none">
+                  <path
+                    d="M5 40 L16 8 L24 26 L32 8 L43 40 L34 40 L28 24 L24 34 L20 24 L14 40 Z"
+                    fill="url(#bm)"
+                  />
+                </svg>
+                Mobile CTF | Admin Console
+                <span style={{ color: "#6f6a90" }}>v{APP_VERSION}</span>
+              </span>
+            </footer>
+          ) : null}
+        </main>
+      </div>
     </div>
   );
 }
@@ -368,7 +466,9 @@ export function App() {
   useEffect(() => {
     if (!session) return;
     fetchSession(session)
-      .then((user) => setSession((prev) => (prev ? { ...prev, user } : prev)))
+      .then((user) =>
+        setSession((prev) => (prev ? { ...prev, user } : prev)),
+      )
       .catch(() => {
         persistSession(null);
         setSession(null);

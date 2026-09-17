@@ -12,7 +12,9 @@ import * as adminApi from "../adminApi";
 const inputStyle: React.CSSProperties = {
   padding: "8px 10px",
   borderRadius: 8,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--ui-border, #cbd5e1)",
+  backgroundColor: "var(--ui-surface-2, #ffffff)",
+  color: "var(--ui-text, #0f172a)",
   fontSize: 14,
   boxSizing: "border-box",
   width: "100%",
@@ -217,12 +219,14 @@ export function ChallengesView({ session }: { session: Session }) {
             value={draft.title}
             onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
             placeholder="Title"
+            className="ctf-input"
             style={inputStyle}
           />
           <input
             value={draft.slug}
             onChange={(e) => setDraft((d) => ({ ...d, slug: e.target.value }))}
             placeholder="Slug (url-slug)"
+            className="ctf-input"
             style={inputStyle}
           />
         </div>
@@ -233,6 +237,7 @@ export function ChallengesView({ session }: { session: Session }) {
           }
           rows={4}
           placeholder="Description (Markdown)"
+          className="ctf-input"
           style={inputStyle}
         />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -241,6 +246,7 @@ export function ChallengesView({ session }: { session: Session }) {
             onChange={(e) =>
               setDraft((d) => ({ ...d, categoryId: Number(e.target.value) }))
             }
+            className="ctf-input"
             style={inputStyle}
           >
             <option value={0} disabled>
@@ -262,6 +268,7 @@ export function ChallengesView({ session }: { session: Session }) {
                   Difficulty.EASY,
               }))
             }
+            className="ctf-input"
             style={inputStyle}
           >
             {DIFFICULTIES.map((d) => (
@@ -279,12 +286,14 @@ export function ChallengesView({ session }: { session: Session }) {
             }
             placeholder="Base points"
             type="number"
+            className="ctf-input"
             style={inputStyle}
           />
           <input
             value={draft.flag}
             onChange={(e) => setDraft((d) => ({ ...d, flag: e.target.value }))}
             placeholder={editingId === null ? "Flag (required)" : "Flag (leave blank to keep)"}
+            className="ctf-input"
             style={inputStyle}
           />
         </div>
@@ -327,12 +336,14 @@ export function ChallengesView({ session }: { session: Session }) {
           <input
             type="file"
             onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+            className="ctf-input"
             style={inputStyle}
           />
           <input
             value={attachmentTitle}
             onChange={(e) => setAttachmentTitle(e.target.value)}
             placeholder="Attachment title"
+            className="ctf-input"
             style={inputStyle}
           />
           <div style={{ display: "flex", gap: 8 }}>
@@ -357,8 +368,8 @@ export function ChallengesView({ session }: { session: Session }) {
           {versions.map((v) => (
             <div
               key={v.id}
+              className="ctf-row"
               style={{
-                display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
                 fontSize: 14,
@@ -384,18 +395,15 @@ export function ChallengesView({ session }: { session: Session }) {
           <Text tone="secondary">No challenges yet.</Text>
         ) : null}
         {challenges.map((item) => (
-          <div
-            key={item.id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: 10,
-              borderRadius: 10,
-              border: "1px solid #e2e8f0",
-              gap: 12,
-            }}
-          >
+<div
+              key={item.id}
+              className="ctf-row"
+              style={{
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontWeight: 600 }}>{item.title}</span>
               <Badge tone={difficultyTone(item.difficulty)}>

@@ -8,7 +8,9 @@ import * as adminApi from "../adminApi";
 const inputStyle: React.CSSProperties = {
   padding: "8px 10px",
   borderRadius: 8,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--ui-border, #cbd5e1)",
+  backgroundColor: "var(--ui-surface-2, #ffffff)",
+  color: "var(--ui-text, #0f172a)",
   fontSize: 14,
   boxSizing: "border-box",
   width: "100%",
@@ -124,6 +126,7 @@ export function AnnouncementsView({ session }: { session: Session }) {
           value={draft.title}
           onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
           placeholder="Title"
+          className="ctf-input"
           style={inputStyle}
         />
         <textarea
@@ -131,6 +134,7 @@ export function AnnouncementsView({ session }: { session: Session }) {
           onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
           rows={4}
           placeholder="Body (Markdown)"
+          className="ctf-input"
           style={inputStyle}
         />
         <label
@@ -168,14 +172,7 @@ export function AnnouncementsView({ session }: { session: Session }) {
           <Text tone="secondary">No announcements yet.</Text>
         ) : null}
         {announcements.map((item) => (
-          <div
-            key={item.id}
-            style={{
-              padding: 10,
-              borderRadius: 10,
-              border: "1px solid #e2e8f0",
-            }}
-          >
+          <div key={item.id} className="ctf-row-col">
             {editing === item.id ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <input
@@ -183,9 +180,10 @@ export function AnnouncementsView({ session }: { session: Session }) {
                   onChange={(e) =>
                     setEditDraft((d) => ({ ...d, title: e.target.value }))
                   }
-                  placeholder="Title"
-                  style={inputStyle}
-                />
+placeholder="Title"
+                    className="ctf-input"
+                    style={inputStyle}
+                  />
                 <textarea
                   value={editDraft.body}
                   onChange={(e) =>
@@ -193,6 +191,7 @@ export function AnnouncementsView({ session }: { session: Session }) {
                   }
                   rows={3}
                   placeholder="Body"
+                  className="ctf-input"
                   style={inputStyle}
                 />
                 <label

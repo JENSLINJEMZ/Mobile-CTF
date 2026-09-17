@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import { colors, typography } from "../tokens";
+import { typography } from "../tokens";
 
 type Tone = "default" | "secondary" | "muted" | "danger" | "success";
 
@@ -13,11 +13,11 @@ export interface TextProps {
 }
 
 const toneStyles: Record<Tone, CSSProperties> = {
-  default: { color: colors.text },
-  secondary: { color: colors.textSecondary },
-  muted: { color: colors.textMuted },
-  danger: { color: colors.danger },
-  success: { color: colors.success },
+  default: { color: "var(--ui-text, #0f172a)" },
+  secondary: { color: "var(--ui-text-secondary, #475569)" },
+  muted: { color: "var(--ui-text-muted, #94a3b8)" },
+  danger: { color: "var(--ui-danger, #dc2626)" },
+  success: { color: "var(--ui-success, #16a34a)" },
 };
 
 export function Text({
@@ -34,6 +34,7 @@ export function Text({
         fontSize: typography.fontSize[size],
         fontWeight: typography.fontWeight[weight],
         lineHeight: typography.lineHeight.md,
+        fontFamily: "var(--ui-font-sans, inherit)",
         margin: 0,
         ...style,
       }}

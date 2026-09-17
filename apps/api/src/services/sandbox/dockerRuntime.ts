@@ -1,5 +1,6 @@
 import Dockerode from "dockerode";
 import type { Container, DockerOptions } from "dockerode";
+import { readFileSync } from "node:fs";
 import type { Duplex } from "node:stream";
 
 import { env } from "../../config/env";
@@ -11,6 +12,27 @@ interface RunningInstance {
   containerId: string;
   stream: Duplex;
   exited: Promise<number | null>;
+}
+
+/** Parse `tcp://host[:port]` or bare `host[:port]` into dockerode options. */
+function tcpEndpoint(raw: string): { host: string; port: number } | null {
+  const value = raw.trim();
+  const m = /^tcp:\/\/([^:/]+)(?::(\d+))?$/i.exec(value) ??
+    (/^([^:/]+)(?::(\d+))?$/.exec(value) as RegExpExecArray | null);
+  const host = m?.[1] ?? "";
+  if (!m || !host) return null;
+  const port = m[2] ? Number(m[2]) : 2375;
+  return { host, port };
+}
+
+function tlsMaterial(): Pick<DockerOptions, "ca" | "cert" | "key"> {
+  const files = [
+    env.sandboxDockerTlsCa,
+    env.sandboxDockerTlsCert,
+    env.sandboxDockerTlsKey,
+  ] as const;
+  const [ca, cert, key] = files.map((p) => (p ? readFileSync(p) : undefined));
+  return { ca, cert, key };
 }
 
 function isConflict(err: unknown): boolean {
@@ -46,9 +68,10 @@ export class DockerSandboxRuntime implements SandboxRuntime {
     image?: string;
     concurrency?: number;
   }) {
-    const dockerOptions: DockerOptions = {
-      socketPath: options?.socketPath ?? env.sandboxSocketPath,
-    };
+    const dockerOptions: DockerOptions =
+      env.sandboxDockerHost && tcpEndpoint(env.sandboxDockerHost)
+        ? { ...tcpEndpoint(env.sandboxDockerHost)!, ...tlsMaterial() }
+        : { socketPath: options?.socketPath ?? env.sandboxSocketPath };
     this.docker = new Dockerode(dockerOptions);
     this.image = options?.image ?? env.sandboxImage;
     this.pool = new WorkerPool(

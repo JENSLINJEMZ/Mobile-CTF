@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import { colors, spacing, typography } from "../tokens";
+import { spacing, typography } from "../tokens";
 
 type Level = 1 | 2 | 3 | 4;
 
@@ -47,7 +47,8 @@ const levelMap: Record<
 export function Heading({ children, level = 1, style }: HeadingProps) {
   const { tag: Tag, style: levelStyle } = levelMap[level];
   const base: CSSProperties = {
-    color: colors.text,
+    color: "var(--ui-text, #0f172a)",
+    fontFamily: "var(--ui-font-sans, inherit)",
     marginTop: 0,
     marginBottom: spacing.md,
     lineHeight: typography.lineHeight.lg,

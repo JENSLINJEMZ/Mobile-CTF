@@ -1,22 +1,25 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import { colors, radius, shadows, spacing } from "../tokens";
+import { spacing } from "../tokens";
 
 export interface CardProps {
   children: ReactNode;
   title?: string;
   style?: CSSProperties;
   bodyStyle?: CSSProperties;
+  className?: string;
 }
 
-export function Card({ children, title, style, bodyStyle }: CardProps) {
+export function Card({ children, title, style, bodyStyle, className }: CardProps) {
   return (
     <section
+      className={className}
       style={{
-        backgroundColor: colors.surface,
-        borderRadius: radius.md,
-        border: `1px solid ${colors.border}`,
-        boxShadow: shadows.sm,
+        backgroundColor: "var(--ui-surface, #ffffff)",
+        backgroundImage: "var(--ui-gradient-surface, none)",
+        borderRadius: "var(--ui-radius-md, 12px)",
+        border: "1px solid var(--ui-border, #e2e8f0)",
+        boxShadow: "var(--ui-shadow, 0 1px 2px rgba(15, 23, 42, 0.06))",
         padding: spacing.lg,
         ...style,
       }}
@@ -28,7 +31,9 @@ export function Card({ children, title, style, bodyStyle }: CardProps) {
             marginBottom: spacing.md,
             fontSize: 16,
             fontWeight: 600,
-            color: colors.text,
+            color: "var(--ui-text, #0f172a)",
+            fontFamily: "var(--ui-font-sans, inherit)",
+            letterSpacing: "var(--ui-card-title-ls, 0)",
           }}
         >
           {title}

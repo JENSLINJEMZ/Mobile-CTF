@@ -8,7 +8,9 @@ import * as adminApi from "../adminApi";
 const inputStyle: React.CSSProperties = {
   padding: "8px 10px",
   borderRadius: 8,
-  border: "1px solid #cbd5e1",
+  border: "1px solid var(--ui-border, #cbd5e1)",
+  backgroundColor: "var(--ui-surface-2, #ffffff)",
+  color: "var(--ui-text, #0f172a)",
   fontSize: 14,
   boxSizing: "border-box",
   width: "100%",
@@ -64,6 +66,7 @@ export function TeamsView({ session }: { session: Session }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search team name or code"
+            className="ctf-input"
             style={{ ...inputStyle, flex: 1 }}
           />
           <Button disabled={busy} onClick={() => void load()}>
@@ -80,13 +83,10 @@ export function TeamsView({ session }: { session: Session }) {
           {teams.map((team) => (
             <div
               key={team.id}
+              className="ctf-row"
               style={{
-                display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: 10,
-                borderRadius: 10,
-                border: "1px solid #e2e8f0",
                 gap: 12,
               }}
             >
