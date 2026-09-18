@@ -45,6 +45,20 @@ export const createUserSchema = z.object({
   role: z.enum(["USER", "AUTHOR", "MODERATOR", "ADMIN", "SUPER_ADMIN"]).optional(),
 });
 
+export const updateAdminTeamSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(3, "Team name is too short")
+      .max(60, "Team name is too long"),
+    description: z.string().trim().max(400).optional(),
+  })
+  .partial()
+  .refine((v) => v.name !== undefined || v.description !== undefined, {
+    message: "Provide at least one of name or description",
+  });
+
 export const broadcastNotificationSchema = z.object({
   type: z.nativeEnum(NotificationType).default(NotificationType.SYSTEM),
   title: z.string().trim().min(1).max(200),
@@ -69,4 +83,19 @@ export const notificationListQuerySchema = z.object({
 export const createAttachmentSchema = z.object({
   fileId: z.coerce.number().int().positive(),
   title: z.string().trim().min(1).max(200),
+});
+
+export const adminSubmissionQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(PAGINATION.DEFAULT_PAGE),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(PAGINATION.MAX_LIMIT)
+    .default(PAGINATION.DEFAULT_LIMIT),
+  search: z.string().trim().min(1).max(120).optional(),
+  result: z.enum(["all", "correct", "incorrect"]).default("all"),
+  challengeId: z.coerce.number().int().positive().optional(),
+  userId: z.coerce.number().int().positive().optional(),
+  teamId: z.coerce.number().int().positive().optional(),
 });

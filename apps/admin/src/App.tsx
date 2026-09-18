@@ -11,6 +11,7 @@ import { ChallengesView } from "./views/ChallengesView";
 import { DashboardView } from "./views/DashboardView";
 import { EventsView } from "./views/EventsView";
 import { SandboxView } from "./views/sandbox/SandboxView";
+import { SubmissionsView } from "./views/SubmissionsView";
 import { TeamsView } from "./views/TeamsView";
 import { UsersView } from "./views/UsersView";
 
@@ -37,6 +38,7 @@ const WIRED = new Set([
   "Events",
   "Users",
   "Teams",
+  "Submissions",
   "Announcements",
   "Analytics",
   "Sandbox Manager",
@@ -426,7 +428,11 @@ function Dashboard({
                     ? " evt-shell"
                     : activeView === "Users"
                       ? " usr-shell"
-                      : ""
+: activeView === "Teams"
+                            ? " tm-shell"
+                            : activeView === "Submissions"
+                              ? " sub-shell"
+                              : ""
           }`}
         >
           <div key={activeView} style={{ display: "contents" }}>
@@ -443,6 +449,7 @@ function Dashboard({
               />
             ) : null}
             {activeView === "Teams" ? <TeamsView session={session} /> : null}
+            {activeView === "Submissions" ? <SubmissionsView session={session} /> : null}
             {activeView === "Analytics" ? <AnalyticsView session={session} /> : null}
             {activeView === "Sandbox Manager" ? <SandboxView session={session} /> : null}
             {activeView === "Audit Log" ? <AuditLogView session={session} /> : null}

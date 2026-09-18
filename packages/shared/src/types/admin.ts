@@ -113,6 +113,8 @@ export interface UserUpdatePayload {
   isActive?: boolean;
 }
 
+export type TeamAdminStatus = "active" | "inactive";
+
 export interface TeamAdminDto {
   id: number;
   name: string;
@@ -122,6 +124,10 @@ export interface TeamAdminDto {
   memberCount: number;
   leaderUsername: string | null;
   createdAt: string;
+  status: TeamAdminStatus;
+  points: number;
+  solves: number;
+  rank: number;
 }
 
 export interface TeamAdminListResult {
@@ -134,6 +140,133 @@ export interface TeamAdminListResult {
     hasNext: boolean;
     hasPrev: boolean;
   };
+}
+
+export interface TeamMemberAdminDto {
+  userId: number;
+  username: string;
+  role: "LEADER" | "MEMBER";
+  isActive: boolean;
+  joinedAt: string;
+  lastActiveAt: string | null;
+}
+
+export interface TeamActivityDto {
+  id: number;
+  type: "solve" | "join";
+  username: string;
+  challenge: string | null;
+  points: number;
+  at: string;
+}
+
+export interface TeamPerformancePointDto {
+  date: string;
+  points: number;
+  solves: number;
+}
+
+export interface TeamAdminDetailDto {
+  team: TeamAdminDto;
+  members: TeamMemberAdminDto[];
+  performance: TeamPerformancePointDto[];
+  activity: TeamActivityDto[];
+}
+
+export type SubmissionResultKey = "all" | "correct" | "incorrect";
+
+export interface SubmissionAdminRowDto {
+  id: number;
+  time: string;
+  userId: number;
+  username: string;
+  teamId: number | null;
+  teamName: string | null;
+  challengeId: number;
+  challenge: string;
+  flagHash: string;
+  correct: boolean;
+}
+
+export interface SubmissionAdminListResult {
+  items: SubmissionAdminRowDto[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
+export interface SubmissionKpiDto {
+  total: number;
+  correct: number;
+  incorrect: number;
+  uniqueUsers: number;
+  solveRatePct: number;
+  totalChangePct: number;
+  correctChangePct: number;
+  incorrectChangePct: number;
+  usersChangePct: number;
+}
+
+export interface SubmissionByDayPoint {
+  date: string;
+  total: number;
+  correct: number;
+  users: number;
+}
+
+export interface SubmissionTopUserDto {
+  userId: number;
+  username: string;
+  count: number;
+}
+
+export interface SubmissionTopTeamDto {
+  teamId: number;
+  name: string;
+  count: number;
+}
+
+export interface SubmissionTopChallengeDto {
+  challengeId: number;
+  title: string;
+  count: number;
+  pct: number;
+}
+
+export interface SubmissionRecentDto {
+  id: number;
+  userId: number;
+  username: string;
+  challengeId: number;
+  challenge: string;
+  time: string;
+}
+
+export interface SubmissionFilterOption {
+  id: number;
+  label: string;
+}
+
+export interface SubmissionFilterOptionsDto {
+  challenges: SubmissionFilterOption[];
+  users: SubmissionFilterOption[];
+  teams: SubmissionFilterOption[];
+}
+
+export interface SubmissionOverviewDto {
+  kpis: SubmissionKpiDto;
+  byDay: SubmissionByDayPoint[];
+  status: { total: number; correct: number; incorrect: number };
+  topTeams: SubmissionTopTeamDto[];
+  topUsers: SubmissionTopUserDto[];
+  topChallenges: SubmissionTopChallengeDto[];
+  recentCorrect: SubmissionRecentDto[];
+  filters: SubmissionFilterOptionsDto;
 }
 
 export interface AnalyticsDayPoint {

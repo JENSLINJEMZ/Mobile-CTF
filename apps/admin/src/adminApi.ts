@@ -12,7 +12,11 @@ import type {
   FileListResult,
   PaginatedResult,
   SandboxSnapshot,
+  SubmissionAdminListResult,
+  SubmissionOverviewDto,
+  SubmissionResultKey,
   SystemStatusDto,
+  TeamAdminDetailDto,
   TeamAdminDto,
   UserAdminDto,
   UnlockRuleDto,
@@ -443,12 +447,88 @@ export function listAdminTeams(
   );
 }
 
+export interface CreateAdminTeamInput {
+  name: string;
+  description?: string;
+}
+
+export function createAdminTeam(
+  session: Session,
+  input: CreateAdminTeamInput,
+): Promise<TeamAdminDto> {
+  return request<TeamAdminDto>(
+    session,
+    "/api/admin/teams",
+    json("POST", input),
+  );
+}
+
+export function updateAdminTeam(
+  session: Session,
+  id: number,
+  input: { name?: string; description?: string },
+): Promise<TeamAdminDto> {
+  return request<TeamAdminDto>(
+    session,
+    `/api/admin/teams/${id}`,
+    json("PATCH", input),
+  );
+}
+
+export function getAdminTeamDetail(
+  session: Session,
+  id: number,
+): Promise<TeamAdminDetailDto> {
+  return request<TeamAdminDetailDto>(
+    session,
+    `/api/admin/teams/${id}/detail`,
+  );
+}
+
 export function deleteAdminTeam(session: Session, id: number): Promise<void> {
   return request<{ deleted: boolean }>(
     session,
     `/api/admin/teams/${id}`,
     json("DELETE"),
   ).then(() => undefined);
+}
+
+// --- Submissions ----------------------------------------------------------
+
+export function getSubmissionOverview(
+  session: Session,
+): Promise<SubmissionOverviewDto> {
+  return request<SubmissionOverviewDto>(
+    session,
+    "/api/admin/submissions/overview",
+  );
+}
+
+export function listAdminSubmissions(
+  session: Session,
+  opts: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    result?: SubmissionResultKey;
+    challengeId?: number;
+    userId?: number;
+    teamId?: number;
+  } = {},
+): Promise<SubmissionAdminListResult> {
+  const q = new URLSearchParams();
+  if (opts.page != null) q.set("page", String(opts.page));
+  if (opts.limit != null) q.set("limit", String(opts.limit));
+  if (opts.search != null && opts.search.length > 0) q.set("search", opts.search);
+  if (opts.result != null && opts.result !== "all") q.set("result", opts.result);
+  if (opts.challengeId != null) q.set("challengeId", String(opts.challengeId));
+  if (opts.userId != null) q.set("userId", String(opts.userId));
+  if (opts.teamId != null) q.set("teamId", String(opts.teamId));
+  const qs = q.toString();
+  return request<SubmissionAdminListResult>(
+    session,
+    `/api/admin/submissions${qs.length > 0 ? `?${qs}` : ""}`,
+  );
 }
 
 // --- Analytics / audit log / notifications -------------------------------

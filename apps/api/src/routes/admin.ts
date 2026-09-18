@@ -12,12 +12,15 @@ import {
   adminListQuerySchema,
   auditLogQuerySchema,
   broadcastNotificationSchema,
+  createTeamSchema,
+  updateAdminTeamSchema,
   updateAnnouncementSchema,
   updateChallengeSchema,
   updateEventChallengeSchema,
   updateEventSchema,
   updateHintSchema,
   updateUserSchema,
+  adminSubmissionQuerySchema,
 } from "@ctf/shared";
 
 import { asyncHandler } from "../middleware/errors";
@@ -61,12 +64,22 @@ import { getAnalyticsOverview } from "../services/analytics";
 import { getSystemStatus } from "../services/systemStatus";
 import { listAuditLog, recordAudit } from "../services/auditLog";
 import { listUsers, createAdminUser, updateUser } from "../services/adminUsers";
-import { deleteAdminTeam, listAdminTeams } from "../services/adminTeams";
+import {
+  createAdminTeam,
+  deleteAdminTeam,
+  getAdminTeamDetail,
+  listAdminTeams,
+  updateAdminTeam,
+} from "../services/adminTeams";
 import {
   deleteFileAsset,
   listFiles,
   storeUpload,
 } from "../services/fileAssets";
+import {
+  getSubmissionOverview,
+  listAdminSubmissions,
+} from "../services/adminSubmissions";
 import { createBroadcastNotification } from "../services/notifications";
 import { getSandboxSnapshot, stopSandboxContainer } from "../services/sandboxAdmin";
 import { getSandboxRuntime } from "../services/terminalSessions";
@@ -471,6 +484,55 @@ adminRouter.get(
   }),
 );
 
+adminRouter.post(
+  "/teams",
+  requirePermission("teams.moderate"),
+  validateBody(createTeamSchema),
+  asyncHandler(async (req, res) => {
+    const actor = me(req);
+    const data = await createAdminTeam(actor, req.body);
+    await recordAudit({
+      actorId: actor.id,
+      actorUsername: actor.username,
+      action: "team.create",
+      entityType: "team",
+      entityId: String(data.id),
+      details: { name: data.name, slug: data.slug },
+      ipAddress: req.ip,
+    });
+    res.json({ success: true, data });
+  }),
+);
+
+adminRouter.get(
+  "/teams/:id(\\d+)/detail",
+  requirePermission("teams.moderate"),
+  asyncHandler(async (req, res) => {
+    const data = await getAdminTeamDetail(Number(req.params.id));
+    res.json({ success: true, data });
+  }),
+);
+
+adminRouter.patch(
+  "/teams/:id(\\d+)",
+  requirePermission("teams.moderate"),
+  validateBody(updateAdminTeamSchema),
+  asyncHandler(async (req, res) => {
+    const actor = me(req);
+    const data = await updateAdminTeam(Number(req.params.id), req.body);
+    await recordAudit({
+      actorId: actor.id,
+      actorUsername: actor.username,
+      action: "team.update",
+      entityType: "team",
+      entityId: String(data.id),
+      details: { changed: Object.keys(req.body) },
+      ipAddress: req.ip,
+    });
+    res.json({ success: true, data });
+  }),
+);
+
 adminRouter.delete(
   "/teams/:id(\\d+)",
   requirePermission("teams.moderate"),
@@ -486,6 +548,27 @@ adminRouter.delete(
       ipAddress: req.ip,
     });
     res.json({ success: true, data: { deleted: true } });
+  }),
+);
+
+// --- Submissions ----------------------------------------------------------
+
+adminRouter.get(
+  "/submissions/overview",
+  requirePermission("analytics.view"),
+  asyncHandler(async (_req, res) => {
+    const data = await getSubmissionOverview();
+    res.json({ success: true, data });
+  }),
+);
+
+adminRouter.get(
+  "/submissions",
+  requirePermission("analytics.view"),
+  asyncHandler(async (req, res) => {
+    const query = adminSubmissionQuerySchema.parse(req.query);
+    const data = await listAdminSubmissions(query);
+    res.json({ success: true, data });
   }),
 );
 
