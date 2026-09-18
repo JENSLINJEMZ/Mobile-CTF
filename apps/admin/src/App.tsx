@@ -422,7 +422,11 @@ function Dashboard({
               ? " sbox-shell"
               : activeView === "Challenges"
                 ? " chx-shell"
-                : ""
+: activeView === "Events"
+                    ? " evt-shell"
+                    : activeView === "Users"
+                      ? " usr-shell"
+                      : ""
           }`}
         >
           <div key={activeView} style={{ display: "contents" }}>
@@ -432,7 +436,12 @@ function Dashboard({
             {activeView === "Challenges" ? <ChallengesView session={session} /> : null}
             {activeView === "Events" ? <EventsView session={session} /> : null}
             {activeView === "Announcements" ? <AnnouncementsView session={session} /> : null}
-            {activeView === "Users" ? <UsersView session={session} /> : null}
+            {activeView === "Users" ? (
+              <UsersView
+                session={session}
+                onNavigate={(v) => setActiveView(v)}
+              />
+            ) : null}
             {activeView === "Teams" ? <TeamsView session={session} /> : null}
             {activeView === "Analytics" ? <AnalyticsView session={session} /> : null}
             {activeView === "Sandbox Manager" ? <SandboxView session={session} /> : null}

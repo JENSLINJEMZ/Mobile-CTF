@@ -2,657 +2,572 @@ import type {
   EventChallengeDto,
   EventSummaryDto,
   UnlockRuleDto,
-  UnlockRuleType,
 } from "@ctf/shared";
-import { Badge, Button, Card, Text } from "@ctf/ui";
+import { Text } from "@ctf/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { Session } from "../adminApi";
+import type {
+  EventLeaderboardRow,
+  Session,
+} from "../adminApi";
 import * as adminApi from "../adminApi";
+import { EventCard } from "./events/EventCard";
+import {
+  EventDetails,
+  type EventsSubTab,
+} from "./events/EventDetails";
+import { EventModal, type EventAdminPayload } from "./events/EventModal";
+import { EventKpis, type EventKpiValues } from "./events/EventKpis";
+import { matchesEvent, sortEvents, type SortKey } from "./events/sort";
+import { ChallengesTab, ParticipantsTab } from "./events/SubTabs";
+import { CARET, CHEV_R, QUILL, SEARCH, SLIDERS } from "./events/EventThumbs";
+import type { EventCardMeta } from "./events/format";
 
-const inputStyle: React.CSSProperties = {
-  padding: "8px 10px",
-  borderRadius: 8,
-  border: "1px solid var(--ui-border, #cbd5e1)",
-  backgroundColor: "var(--ui-surface-2, #ffffff)",
-  color: "var(--ui-text, #0f172a)",
-  fontSize: 14,
-  boxSizing: "border-box",
-};
+type TabKey = "all" | "RUNNING" | "SCHEDULED" | "ENDED" | "DRAFT";
 
-function field(
-  label: string,
-  key: string,
-  props?: React.InputHTMLAttributes<HTMLInputElement>,
-) {
-  return { label, key, props };
-}
-
-const EVENT_FIELDS = [
-  field("Title", "title", { placeholder: "CTF Summer Sprint" }),
-  field("Slug", "slug", { placeholder: "ctf-summer-sprint" }),
-  field("Starts at (local)", "startsAt", { type: "datetime-local" }),
-  field("Ends at (local)", "endsAt", { type: "datetime-local" }),
+const TABS: [TabKey, string][] = [
+  ["all", "All Events"],
+  ["RUNNING", "Running"],
+  ["SCHEDULED", "Scheduled"],
+  ["ENDED", "Completed"],
+  ["DRAFT", "Drafts"],
 ];
 
-function eventBadgeTone(
-  status: EventSummaryDto["status"],
-): "success" | "danger" | "neutral" | "info" {
-  switch (status) {
-    case "RUNNING":
-      return "success";
-    case "ENDED":
-      return "danger";
-    case "SCHEDULED":
-      return "info";
-    default:
-      return "neutral";
-  }
-}
-
-const RULE_LABELS: Record<string, string> = {
-  ALWAYS: "Always (no gate)",
-  TIME: "Unlock at time",
-  PREREQUISITE: "Requires challenge",
-  SCORE: "Requires score",
-};
-
-function toLocalInput(value?: string): string {
-  if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 16);
-}
-
-function fromLocalInput(value: string): string {
-  return new Date(value).toISOString();
-}
-
-interface RuleEditorProps {
-  rule: UnlockRuleDto | null;
-  candidates: EventChallengeDto[];
-  onSave: (rule: UnlockRuleDto | null) => void;
-  busy: boolean;
-}
-
-function RuleEditor({ rule, candidates, onSave, busy }: RuleEditorProps) {
-  const [type, setType] = useState<UnlockRuleType>(rule?.type ?? "ALWAYS");
-  const [unlockAt, setUnlockAt] = useState(
-    rule?.unlockAt ? toLocalInput(rule.unlockAt) : "",
-  );
-  const [requireChallengeIds, setRequireChallengeIds] = useState<number[]>(
-    rule?.requireChallengeIds ?? [],
-  );
-  const [minScore, setMinScore] = useState<string>(
-    rule?.minScore != null ? String(rule.minScore) : "",
-  );
-
-  const build = useCallback((): UnlockRuleDto | null => {
-    if (type === "ALWAYS") return null;
-    if (type === "TIME") {
-      if (!unlockAt) return null;
-      return { type, unlockAt: fromLocalInput(unlockAt) };
-    }
-    if (type === "PREREQUISITE") {
-      if (requireChallengeIds.length === 0) return null;
-      return { type, requireChallengeIds };
-    }
-    const score = Number(minScore);
-    if (!Number.isInteger(score) || score < 0) return null;
-    return { type, minScore: score };
-  }, [type, unlockAt, requireChallengeIds, minScore]);
-
-  const togglePrereq = useCallback((challengeId: number) => {
-    setRequireChallengeIds((prev) =>
-      prev.includes(challengeId)
-        ? prev.filter((id) => id !== challengeId)
-        : [...prev, challengeId],
-    );
-  }, []);
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-        width: "100%",
-      }}
-    >
-      <select
-        value={type}
-        onChange={(e) => {
-          const next = e.target.value as UnlockRuleType;
-          setType(next);
-          if (next === "ALWAYS") onSave(null);
-        }}
-        className="ctf-input"
-        style={inputStyle}
-      >
-        {(Object.keys(RULE_LABELS) as (keyof typeof RULE_LABELS)[]).map(
-          (key) => (
-            <option key={key} value={key}>
-              {RULE_LABELS[key]}
-            </option>
-          ),
-        )}
-      </select>
-
-      {type === "TIME" ? (
-        <input
-          type="datetime-local"
-          value={unlockAt}
-          onChange={(e) => setUnlockAt(e.target.value)}
-          className="ctf-input"
-          style={inputStyle}
-        />
-      ) : null}
-
-      {type === "PREREQUISITE" ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {candidates.map((c) => (
-            <label
-              key={c.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 14,
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={requireChallengeIds.includes(c.challengeId)}
-                onChange={() => togglePrereq(c.challengeId)}
-              />
-              {c.title}
-            </label>
-          ))}
-          {candidates.length === 0 ? (
-            <Text tone="secondary" size="xs">
-              No other challenges in this event yet.
-            </Text>
-          ) : null}
-        </div>
-      ) : null}
-
-      {type === "SCORE" ? (
-        <input
-          type="number"
-          min={0}
-          step={1}
-          value={minScore}
-          onChange={(e) => setMinScore(e.target.value)}
-          placeholder="Minimum score"
-          className="ctf-input"
-          style={inputStyle}
-        />
-      ) : null}
-
-      {type !== "ALWAYS" ? (
-        <Button
-          size="sm"
-          disabled={busy || !build()}
-          onClick={() => onSave(build())}
-        >
-          Save rule
-        </Button>
-      ) : null}
-    </div>
-  );
+function toMeta(e: EventSummaryDto): EventCardMeta {
+  return {
+    id: e.id,
+    slug: e.slug,
+    title: e.title,
+    description: e.description,
+    status: e.status,
+    startsAt: e.startsAt,
+    endsAt: e.endsAt,
+    participantCount: e.participantCount,
+    teamCount: e.teamCount,
+    challengeCount: e.challengeCount ?? 0,
+    createdAt: e.createdAt,
+    updatedAt: e.updatedAt,
+  };
 }
 
 export function EventsView({ session }: { session: Session }) {
-  const [events, setEvents] = useState<EventSummaryDto[]>([]);
-  const [allChallenges, setAllChallenges] = useState<
-    { id: number; title: string }[]
-  >([]);
+  const [events, setEvents] = useState<EventCardMeta[]>([]);
+  const [challengeRows, setChallengeRows] = useState<Record<number, EventChallengeDto[]>>({});
+  const [leaderboard, setLeaderboard] = useState<Record<number, EventLeaderboardRow[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [allChallenges, setAllChallenges] = useState<{ id: number; title: string }[]>([]);
 
+  const [tab, setTab] = useState<TabKey>("all");
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortKey>("newest");
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [eventChallenges, setEventChallenges] = useState<EventChallengeDto[]>(
-    [],
-  );
-  const [addChallengeId, setAddChallengeId] = useState<number | "">("");
-  const [editingRowId, setEditingRowId] = useState<number | null>(null);
+  const [subTab, setSubTab] = useState<EventsSubTab>("overview");
 
-  const [draft, setDraft] = useState<{
-    title: string;
-    slug: string;
-    description: string;
-    startsAt: string;
-    endsAt: string;
-    status: EventSummaryDto["status"];
-  }>({
-    title: "",
-    slug: "",
-    description: "",
-    startsAt: "",
-    endsAt: "",
-    status: "SCHEDULED",
-  });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Omit<EventAdminPayload, "id"> | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
 
-  const loadEvents = useCallback(async () => {
+  const load = useCallback(async () => {
     setError(null);
     try {
-      setEvents(await adminApi.listAdminEvents(session));
+      const items = await adminApi.listAdminEvents(session);
+      const challenges = await adminApi.listAllChallenges(session);
+      setEvents(items.map(toMeta));
+      setAllChallenges(challenges.map((c) => ({ id: c.id, title: c.title })));
+      const first = items[0];
+      if (first) {
+        setSelectedId((prev) =>
+          prev != null && items.some((e) => e.id === prev) ? prev : first.id,
+        );
+      } else {
+        setSelectedId(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load events");
     }
   }, [session]);
 
-  const loadChallenges = useCallback(async () => {
-    try {
-      const items = await adminApi.listAllChallenges(session);
-      setAllChallenges(items.map((c) => ({ id: c.id, title: c.title })));
-    } catch {
-      setAllChallenges([]);
-    }
-  }, [session]);
-
   useEffect(() => {
-    void loadEvents();
-    void loadChallenges();
-  }, [loadEvents, loadChallenges]);
+    void load();
+  }, [load]);
 
-  const selectEvent = useCallback(
-    async (id: number | null) => {
-      setSelectedId(id);
-      setEditingRowId(null);
-      if (id == null) {
-        setEventChallenges([]);
-        return;
-      }
+  const loadChallenges = useCallback(
+    async (eventId: number) => {
       try {
-        setEventChallenges(
-          await adminApi.listAdminEventChallenges(session, id),
-        );
+        const rows = await adminApi.listAdminEventChallenges(session, eventId);
+        setChallengeRows((prev) => ({ ...prev, [eventId]: rows }));
       } catch {
-        setEventChallenges([]);
+        setChallengeRows((prev) => ({ ...prev, [eventId]: [] }));
       }
     },
     [session],
   );
+
+  const loadLeaderboard = useCallback(
+    async (eventId: number) => {
+      try {
+        const data = await adminApi.listEventLeaderboard(session, eventId, "participants", 100);
+        setLeaderboard((prev) => ({ ...prev, [eventId]: data.entries }));
+      } catch {
+        setLeaderboard((prev) => ({ ...prev, [eventId]: [] }));
+      }
+    },
+    [session],
+  );
+
+  useEffect(() => {
+    if (selectedId != null) {
+      void loadChallenges(selectedId);
+      void loadLeaderboard(selectedId);
+    }
+  }, [selectedId, loadChallenges, loadLeaderboard]);
+
+  const filtered = useMemo(() => {
+    let rows = events.filter(
+      (e) =>
+        matchesEvent(e, query) &&
+        (tab === "all" || e.status === tab),
+    );
+    rows = sortEvents(rows, sort);
+    return rows;
+  }, [events, query, tab, sort]);
+
+  const kpis = useMemo<EventKpiValues>(() => {
+    const counts = { total: events.length, running: 0, scheduled: 0, completed: 0, drafts: 0 };
+    let participants = 0;
+    let challenges = 0;
+    for (const e of events) {
+      if (e.status === "RUNNING") counts.running++;
+      else if (e.status === "SCHEDULED") counts.scheduled++;
+      else if (e.status === "ENDED") counts.completed++;
+      else counts.drafts++;
+      participants += e.participantCount;
+      challenges += e.challengeCount;
+    }
+    return { ...counts, participants, challenges };
+  }, [events]);
 
   const selected = events.find((e) => e.id === selectedId) ?? null;
 
-  const onCreate = useCallback(async () => {
-    if (busy || !draft.title || !draft.slug || !draft.startsAt || !draft.endsAt)
-      return;
-    setBusy(true);
-    setError(null);
-    try {
-      await adminApi.createEvent(session, {
-        ...draft,
-        startsAt: fromLocalInput(draft.startsAt),
-        endsAt: fromLocalInput(draft.endsAt),
-      });
-      setDraft({
-        title: "",
-        slug: "",
-        description: "",
-        startsAt: "",
-        endsAt: "",
-        status: "SCHEDULED",
-      });
-      await loadEvents();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create event");
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, draft, session, loadEvents]);
+  const openCreate = useCallback(() => {
+    setEditing(null);
+    setEditingId(null);
+    setModalError(null);
+    setModalOpen(true);
+  }, []);
 
-  const onAddChallenge = useCallback(async () => {
-    if (busy || selectedId == null || addChallengeId === "") return;
-    setBusy(true);
-    setError(null);
-    try {
-      const added = await adminApi.addEventChallenge(session, selectedId, {
-        challengeId: addChallengeId as number,
-        sortOrder: eventChallenges.length,
-      });
-      setEventChallenges((prev) => [...prev, added]);
-      setAddChallengeId("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add challenge");
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, selectedId, addChallengeId, eventChallenges.length, session]);
+  const openEdit = useCallback((e: EventCardMeta | EventSummaryDto) => {
+    setEditing({
+      title: e.title,
+      slug: e.slug,
+      description: e.description,
+      status: e.status,
+      startsAt: e.startsAt,
+      endsAt: e.endsAt,
+    });
+    setEditingId(e.id);
+    setModalError(null);
+    setModalOpen(true);
+  }, []);
 
-  const onSaveRule = useCallback(
-    async (ec: EventChallengeDto, rule: UnlockRuleDto | null) => {
-      setBusy(true);
-      setError(null);
+  const refreshSelected = useCallback(async () => {
+    if (selectedId == null) return;
+    try {
+      const items = await adminApi.listAdminEvents(session);
+      const updated = items.map(toMeta);
+      setEvents(updated);
+      if (selectedId != null) void loadChallenges(selectedId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to refresh");
+    }
+  }, [session, selectedId, loadChallenges]);
+
+  const save = useCallback(
+    async (p: EventAdminPayload) => {
+      setSaving(true);
+      setModalError(null);
       try {
-        const updated = await adminApi.updateEventChallenge(session, ec.id, {
-          unlock: rule,
-        });
-        setEventChallenges((prev) =>
-          prev.map((c) => (c.id === ec.id ? updated : c)),
-        );
-        setEditingRowId(null);
+        if (editingId != null) {
+          await adminApi.updateEvent(session, editingId, p);
+        } else {
+          await adminApi.createEvent(session, p);
+        }
+        setModalOpen(false);
+        setEditing(null);
+        setEditingId(null);
+        await load();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to save rule");
+        setModalError(err instanceof Error ? err.message : "Save failed");
       } finally {
-        setBusy(false);
+        setSaving(false);
       }
     },
-    [session],
+    [session, editingId, load],
   );
 
-  const onRemoveChallenge = useCallback(
-    async (ec: EventChallengeDto) => {
-      if (busy) return;
-      setBusy(true);
-      setError(null);
-      try {
-        await adminApi.removeEventChallenge(session, ec.id);
-        setEventChallenges((prev) => prev.filter((c) => c.id !== ec.id));
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to remove challenge",
-        );
-      } finally {
-        setBusy(false);
-      }
-    },
-    [busy, session],
-  );
-
-  const onDeleteEvent = useCallback(
+  const onDelete = useCallback(
     async (id: number) => {
-      if (busy) return;
+      if (
+        !globalThis.confirm(
+          "Delete this event? This cannot be undone.",
+        )
+      )
+        return;
       setBusy(true);
       setError(null);
       try {
         await adminApi.deleteEvent(session, id);
         if (selectedId === id) {
           setSelectedId(null);
-          setEventChallenges([]);
+          setSubTab("overview");
         }
-        await loadEvents();
+        await load();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to delete event");
+        setError(err instanceof Error ? err.message : "Delete failed");
       } finally {
         setBusy(false);
       }
     },
-    [busy, session, selectedId, loadEvents],
+    [session, selectedId, load],
   );
 
-  const addableChallenges = useMemo(() => {
-    const inEvent = new Set(eventChallenges.map((c) => c.challengeId));
-    return allChallenges.filter((c) => !inEvent.has(c.id));
-  }, [allChallenges, eventChallenges]);
+  const onDuplicate = useCallback(
+    async (e: EventCardMeta) => {
+      setBusy(true);
+      setError(null);
+      try {
+        await adminApi.createEvent(session, {
+          title: `${e.title} (copy)`,
+          slug: `${e.slug}-copy`,
+          description: e.description,
+          status: "DRAFT",
+          startsAt: e.startsAt,
+          endsAt: e.endsAt,
+        });
+        await load();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Duplicate failed");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [session, load],
+  );
+
+  const onAddChallenge = useCallback(
+    async (eventId: number, challengeId: number) => {
+      setBusy(true);
+      setError(null);
+      try {
+        const rows = challengeRows[eventId] ?? [];
+        await adminApi.addEventChallenge(session, eventId, {
+          challengeId,
+          sortOrder: rows.length,
+        });
+        await loadChallenges(eventId);
+        await refreshSelected();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to add challenge");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [session, challengeRows, loadChallenges, refreshSelected],
+  );
+
+  const onUpdateChallenge = useCallback(
+    async (ec: EventChallengeDto, rule: UnlockRuleDto | null) => {
+      setBusy(true);
+      setError(null);
+      try {
+        await adminApi.updateEventChallenge(session, ec.id, { unlock: rule });
+        if (selectedId != null) await loadChallenges(selectedId);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to save rule");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [session, selectedId, loadChallenges],
+  );
+
+  const onRemoveChallenge = useCallback(
+    async (ec: EventChallengeDto) => {
+      setBusy(true);
+      setError(null);
+      try {
+        await adminApi.removeEventChallenge(session, ec.id);
+        if (selectedId != null) {
+          await loadChallenges(selectedId);
+          await refreshSelected();
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to remove challenge");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [session, selectedId, loadChallenges, refreshSelected],
+  );
+
+  const subExtra = useMemo(() => {
+    if (selected == null) return null;
+    const rows = challengeRows[selected.id] ?? [];
+    const inEvent = new Set(rows.map((r) => r.challengeId));
+    const addable = allChallenges.filter((c) => !inEvent.has(c.id));
+    if (subTab === "challenges") {
+      return (
+        <ChallengesTab
+          eventId={selected.id}
+          challenges={rows}
+          addable={addable}
+          busy={busy}
+          onAdd={onAddChallenge}
+          onUpdate={onUpdateChallenge}
+          onRemove={onRemoveChallenge}
+        />
+      );
+    }
+    if (subTab === "participants") {
+      return (
+        <ParticipantsTab
+          entries={leaderboard[selected.id] ?? []}
+          loading={busy}
+          onRefresh={() => void loadLeaderboard(selected.id)}
+        />
+      );
+    }
+    if (subTab === "settings") {
+      return (
+        <div className="evt-subtab">
+          <p className="evt-settings-note">
+            Edit this event&apos;s details. This opens the same editor used to
+            create events.
+          </p>
+          <button className="evt-edit-btn" onClick={() => openEdit(selected)}>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d={QUILL} />
+            </svg>
+            Edit Event
+          </button>
+        </div>
+      );
+    }
+    return null;
+  }, [
+    selected,
+    subTab,
+    challengeRows,
+    allChallenges,
+    busy,
+    onAddChallenge,
+    onUpdateChallenge,
+    onRemoveChallenge,
+    leaderboard,
+    loadLeaderboard,
+    openEdit,
+  ]);
+
+  const quickAction = useCallback(
+    (action: string) => {
+      switch (action) {
+        case "challenges":
+          setSubTab("challenges");
+          break;
+        case "participants":
+          setSubTab("participants");
+          break;
+        case "leaderboard":
+          setSubTab("participants");
+          break;
+        case "edit":
+          if (selected) openEdit(selected);
+          break;
+        case "duplicate":
+          if (selected) void onDuplicate(selected);
+          break;
+        case "delete":
+          if (selected) void onDelete(selected.id);
+          break;
+        default:
+          break;
+      }
+    },
+    [selected, openEdit, onDuplicate, onDelete],
+  );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {error ? <Text tone="danger">{error}</Text> : null}
-
-      <Card
-        title="Create event"
-        bodyStyle={{ display: "flex", flexDirection: "column", gap: 12 }}
-      >
-        <div style={gridTwo}>
-          {EVENT_FIELDS.map((f) => (
-            <label
-              key={f.key}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-                fontSize: 13,
-              }}
-            >
-              {f.label}
-              <input
-                {...f.props}
-                value={String(draft[f.key as keyof typeof draft])}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, [f.key]: e.target.value }))
-                }
-                className="ctf-input"
-                style={inputStyle}
-              />
-            </label>
-          ))}
-          <label
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 4,
-              fontSize: 13,
-            }}
-          >
-            Status
-            <select
-              value={draft.status}
-              onChange={(e) =>
-                setDraft((d) => ({
-                  ...d,
-                  status: e.target.value as EventSummaryDto["status"],
-                }))
-              }
-              className="ctf-input"
-              style={inputStyle}
-            >
-              <option value="DRAFT">DRAFT</option>
-              <option value="SCHEDULED">SCHEDULED</option>
-              <option value="RUNNING">RUNNING</option>
-              <option value="ENDED">ENDED</option>
-            </select>
-          </label>
-          <label
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 4,
-              fontSize: 13,
-              gridColumn: "1 / -1",
-            }}
-          >
-            Description (Markdown)
-            <textarea
-              value={draft.description}
-              onChange={(e) =>
-                setDraft((d) => ({ ...d, description: e.target.value }))
-              }
-              rows={4}
-              className="ctf-input"
-              style={inputStyle}
-            />
-          </label>
-        </div>
+    <div className="evt">
+      {/* ---------- page head ---------- */}
+      <div className="page-head">
         <div>
-          <Button
-            disabled={
-              busy ||
-              !draft.title ||
-              !draft.slug ||
-              !draft.startsAt ||
-              !draft.endsAt
-            }
-            onClick={() => void onCreate()}
-          >
-            Create event
-          </Button>
+          <div className="breadcrumbs">
+            <span>Dashboard</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d={CHEV_R} />
+            </svg>
+            <span className="active">Events</span>
+          </div>
+          <h1 className="page-title">Events</h1>
+          <p className="page-sub">
+            Create, schedule and manage CTF events. Control challenges,
+            timelines and participant experience.
+          </p>
         </div>
-      </Card>
+        <div className="page-actions">
+          <p className="page-quote">
+            “Events create moments.
+            <br />
+            Moments create hackers.”
+          </p>
+          <button className="btn btn-primary" onClick={openCreate}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Create Event
+          </button>
+        </div>
+      </div>
 
-      <Card
-        title="Events"
-        bodyStyle={{ display: "flex", flexDirection: "column", gap: 10 }}
-      >
-        {events.length === 0 ? (
-          <Text tone="secondary">No events yet.</Text>
-        ) : null}
-        {events.map((event) => (
-          <div key={event.id} className="ctf-row" style={rowStyle}>
-            <button
-              onClick={() =>
-                void selectEvent(selectedId === event.id ? null : event.id)
-              }
-              style={{
-                border: "none",
-                background: "none",
-                cursor: "pointer",
-                textAlign: "left",
-                flex: 1,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: 0,
-              }}
-            >
-              <span style={{ fontWeight: 600 }}>{event.title}</span>
-              <Badge tone={eventBadgeTone(event.status)}>{event.status}</Badge>
-            </button>
-            <Text tone="secondary" size="xs">
-              {event.participantCount} players · {event.teamCount} teams
-            </Text>
-            <Button
-              size="sm"
-              variant="danger"
-              onClick={() => void onDeleteEvent(event.id)}
-            >
-              Delete
-            </Button>
-          </div>
-        ))}
-      </Card>
+      {error ? <div className="sbx-error">{error}</div> : null}
 
-      {selected ? (
-        <Card
-          title={`Manage: ${selected.title}`}
-          bodyStyle={{ display: "flex", flexDirection: "column", gap: 12 }}
-        >
-          <Text tone="secondary" size="sm">
-            {selected.description.split("\n").slice(0, 3).join(" ")}
-          </Text>
+      <div className="evt-grid-layout">
+        {/* ---------- left column ---------- */}
+        <div className="left-col" id="evtList">
+          <EventKpis v={kpis} events={events} />
 
-          <div style={addRow}>
-            <select
-              value={addChallengeId}
-              onChange={(e) =>
-                setAddChallengeId(
-                  e.target.value === "" ? "" : Number(e.target.value),
-                )
-              }
-              className="ctf-input"
-              style={{ ...inputStyle, flex: 1 }}
-            >
-              <option value="">Add a challenge…</option>
-              {addableChallenges.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title}
-                </option>
-              ))}
-            </select>
-            <Button
-              size="sm"
-              disabled={busy || addChallengeId === ""}
-              onClick={() => void onAddChallenge()}
-            >
-              Add
-            </Button>
-          </div>
-
-          {eventChallenges.length === 0 ? (
-            <Text tone="secondary" size="sm">
-              No challenges in this event yet. Add one above, then configure its
-              unlock rule.
-            </Text>
-          ) : (
-            eventChallenges.map((ec) => {
-              const busyRow = editingRowId === ec.id;
-              return (
-                <div
-                  key={ec.id}
-                  className="ctf-row"
-                  style={{ ...rowStyle, alignItems: "flex-start" }}
+          {/* tabs + filter */}
+          <div className="tabs-row">
+            <div className="tabs">
+              {TABS.map(([key, label]) => (
+                <button
+                  key={key}
+                  className={`tab${tab === key ? " is-active" : ""}`}
+                  onClick={() => setTab(key)}
                 >
-                  <div
-                    style={{
-                      flex: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 6,
-                    }}
-                  >
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 10 }}
-                    >
-                      <span style={{ fontWeight: 600 }}>{ec.title}</span>
-                      <Badge tone="neutral">{ec.basePoints} pts</Badge>
-                      <Badge tone={ec.locked ? "neutral" : "success"}>
-                        {ec.locked ? "Locked" : "Open"}
-                      </Badge>
-                    </div>
-                    <Text tone="secondary" size="xs">
-                      {ec.unlockRule
-                        ? `Rule: ${RULE_LABELS[ec.unlockRule.type] ?? ec.unlockRule.type}`
-                        : "Rule: always open"}
-                    </Text>
-                    {busyRow ? (
-                      <RuleEditor
-                        rule={ec.unlockRule}
-                        candidates={eventChallenges.filter(
-                          (c) => c.challengeId !== ec.challengeId,
-                        )}
-                        busy={busy}
-                        onSave={(rule) => void onSaveRule(ec, rule)}
-                      />
-                    ) : null}
-                  </div>
-                  <div style={rowActions}>
-                    <Button
-                      size="sm"
-                      onClick={() => setEditingRowId(busyRow ? null : ec.id)}
-                    >
-                      {busyRow ? "Close" : "Edit rule"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      onClick={() => void onRemoveChallenge(ec)}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-              );
-            })
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="tabs-actions">
+              <label className="filter-search-sm">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d={SEARCH} />
+                </svg>
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search events..."
+                />
+              </label>
+              <label className="filter-select evt-sort-select">
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as SortKey)}
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="participants">Most Participants</option>
+                  <option value="challenges">Most Challenges</option>
+                </select>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d={CARET} />
+                </svg>
+              </label>
+              <button className="filter-btn" onClick={() => setQuery("")}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d={SLIDERS} />
+                </svg>
+                Reset
+              </button>
+            </div>
+          </div>
+
+          {/* event list */}
+          <div className="event-list">
+            {filtered.length === 0 ? (
+              <div className="evt-empty">
+                {events.length === 0
+                  ? "No events yet. Create your first event to get started."
+                  : "No events match the current filter."}
+              </div>
+            ) : (
+              filtered.map((e) => (
+                <EventCard
+                  key={e.id}
+                  event={e}
+                  selected={e.id === selectedId}
+                  onSelect={(id) => {
+                    setSelectedId(id);
+                    setSubTab("overview");
+                  }}
+                />
+              ))
+            )}
+          </div>
+
+          {/* footer */}
+          <div className="footer">
+            <span>“Capture Knowledge. Release Potential.”</span>
+            <div className="footer-brand">
+              <svg className="fm-logo" viewBox="0 0 40 28" fill="none">
+                <defs>
+                  <linearGradient id="evt-foot-grad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#c4b5fd" />
+                    <stop offset="55%" stopColor="#8b5cf6" />
+                    <stop offset="100%" stopColor="#6d28d9" />
+                  </linearGradient>
+                </defs>
+                <path d="M2 26 L12 2 L20 13.5 L28 2 L38 26 L29 26 L24.5 15.5 L20 22 L15.5 15.5 L11 26 Z" fill="url(#evt-foot-grad)" />
+              </svg>
+              <b>Mobile CTF</b>
+              <span className="sep"></span>
+              <span>Admin Console</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ---------- right column ---------- */}
+        <div className="right-col">
+          {selected ? (
+            <EventDetails
+              event={selected}
+              challenges={challengeRows[selected.id] ?? []}
+              subTab={subTab}
+              onSubTab={setSubTab}
+              onEdit={() => openEdit(selected)}
+              onQuickAction={quickAction}
+              extra={subExtra}
+            />
+          ) : (
+            <div className="panel evt-empty-panel">
+              <Text tone="secondary" size="sm">
+                Select an event to manage its challenges, participants and
+                settings.
+              </Text>
+            </div>
           )}
-        </Card>
-      ) : null}
+        </div>
+      </div>
+
+      <EventModal
+        open={modalOpen}
+        editing={editing}
+        busy={saving}
+        error={modalError}
+        onClose={() => setModalOpen(false)}
+        onSave={(p) => void save(p)}
+      />
     </div>
   );
 }
-
-const gridTwo: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: 12,
-};
-
-const rowStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 12,
-  background: "var(--ui-surface, #ffffff)",
-};
-
-const addRow: React.CSSProperties = {
-  display: "flex",
-  gap: 8,
-};
-
-const rowActions: React.CSSProperties = {
-  display: "flex",
-  gap: 8,
-};

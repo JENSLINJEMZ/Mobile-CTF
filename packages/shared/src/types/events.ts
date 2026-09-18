@@ -58,6 +58,9 @@ export interface EventSummaryDto {
   teamCount: number;
   joinedByMe: boolean;
   myTeamId: number | null;
+  challengeCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
   speakers?: EventSpeaker[];
   schedule?: EventScheduleItem[];
 }

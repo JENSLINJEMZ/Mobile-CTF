@@ -8,6 +8,7 @@ import {
   createEventChallengeSchema,
   createEventSchema,
   createHintSchema,
+  createUserSchema,
   adminListQuerySchema,
   auditLogQuerySchema,
   broadcastNotificationSchema,
@@ -59,7 +60,7 @@ import { listEvents } from "../services/eventQueries";
 import { getAnalyticsOverview } from "../services/analytics";
 import { getSystemStatus } from "../services/systemStatus";
 import { listAuditLog, recordAudit } from "../services/auditLog";
-import { listUsers, updateUser } from "../services/adminUsers";
+import { listUsers, createAdminUser, updateUser } from "../services/adminUsers";
 import { deleteAdminTeam, listAdminTeams } from "../services/adminTeams";
 import {
   deleteFileAsset,
@@ -412,6 +413,26 @@ adminRouter.get(
   asyncHandler(async (req, res) => {
     const { page, limit, search } = adminListQuerySchema.parse(req.query);
     const data = await listUsers({ page, limit, search });
+    res.json({ success: true, data });
+  }),
+);
+
+adminRouter.post(
+  "/users",
+  requirePermission("users.manage"),
+  validateBody(createUserSchema),
+  asyncHandler(async (req, res) => {
+    const actor = me(req);
+    const data = await createAdminUser(actor, req.body);
+    await recordAudit({
+      actorId: actor.id,
+      actorUsername: actor.username,
+      action: "user.create",
+      entityType: "user",
+      entityId: String(data.id),
+      details: { username: data.username, role: data.role },
+      ipAddress: req.ip,
+    });
     res.json({ success: true, data });
   }),
 );

@@ -4,6 +4,7 @@ import { prisma } from "@ctf/database";
 import type { Prisma } from "@prisma/client";
 
 import { ApiError } from "../middleware/errors";
+import { hashPassword } from "../utils/password";
 import { getUserTotalScore, rebuildGlobalScore } from "./leaderboard";
 
 interface DbUserRow {
@@ -93,6 +94,71 @@ export async function listUsers(input: {
 export interface UpdateUserInput {
   role?: Role;
   isActive?: boolean;
+}
+
+export interface CreateUserInput {
+  email: string;
+  username: string;
+  password: string;
+  role?: Role;
+}
+
+export async function createAdminUser(
+  actor: { id: number; role: Role },
+  input: CreateUserInput,
+): Promise<UserAdminDto> {
+  const granted = getRoleValue(input.role ?? Role.USER);
+  const actorRank = roleRank(getRoleValue(actor.role));
+  if (roleRank(granted) >= actorRank) {
+    throw new ApiError(
+      403,
+      "FORBIDDEN",
+      "You cannot grant a role equal to or above your own",
+    );
+  }
+  if (granted === "SUPER_ADMIN") {
+    throw new ApiError(403, "FORBIDDEN", "SUPER_ADMIN must be granted manually");
+  }
+
+  const email = input.email.toLowerCase();
+  const existing = await prisma.user.findFirst({
+    where: { OR: [{ email }, { username: input.username }] },
+    select: { email: true },
+  });
+  if (existing) {
+    throw new ApiError(
+      409,
+      "CONFLICT",
+      existing.email === email
+        ? "Email is already registered"
+        : "Username is already taken",
+    );
+  }
+
+  const passwordHash = await hashPassword(input.password);
+  const user = await prisma.user.create({
+    data: {
+      email,
+      username: input.username,
+      passwordHash,
+      role: granted,
+    },
+    select: {
+      id: true,
+      email: true,
+      username: true,
+      role: true,
+      isActive: true,
+      lastLoginAt: true,
+      createdAt: true,
+      _count: { select: { submissions: true } },
+    },
+  });
+
+  return toAdminDto(
+    { ...user, role: toSharedRole(user.role) },
+    0,
+  );
 }
 
 function getRoleValue(role: string): Role {

@@ -32,7 +32,11 @@ export interface EventRow {
   createdAt: Date;
   updatedAt: Date;
   createdById: number;
-  _count?: { participants: number; teams: number };
+  _count?: {
+    participants: number;
+    teams: number;
+    eventChallenges?: number;
+  };
 }
 
 export function eventLeaderboardKey(eventId: number): string {
@@ -127,6 +131,9 @@ export function toSummaryDto(
     startsInSeconds: startsInSeconds(event, now),
     participantCount,
     teamCount,
+    challengeCount: event._count?.eventChallenges ?? 0,
+    createdAt: event.createdAt.toISOString(),
+    updatedAt: event.updatedAt.toISOString(),
     joinedByMe: registration.joinedByMe,
     myTeamId: registration.myTeamId,
     ...(speakers ? { speakers } : {}),
@@ -141,7 +148,9 @@ async function loadEventRows(
     where,
     orderBy: { startsAt: "desc" },
     include: {
-      _count: { select: { participants: true, teams: true } },
+      _count: {
+        select: { participants: true, teams: true, eventChallenges: true },
+      },
     },
   });
   return rows as unknown as EventRow[];

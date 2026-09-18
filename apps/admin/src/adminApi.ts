@@ -161,6 +161,27 @@ export function removeEventChallenge(
   ).then(() => undefined);
 }
 
+export interface EventLeaderboardRow {
+  rank: number;
+  id: number;
+  name: string;
+  score: number;
+}
+
+export function listEventLeaderboard(
+  session: Session,
+  eventId: number,
+  scope: "participants" | "teams" = "participants",
+  limit = 100,
+): Promise<{ entries: EventLeaderboardRow[] }> {
+  return request<{
+    entries: EventLeaderboardRow[];
+  }>(
+    session,
+    `/api/events/${eventId}/leaderboard?scope=${scope}&limit=${limit}`,
+  );
+}
+
 // --- Challenges / Announcements ------------------------------------------
 
 export function listAllChallenges(
@@ -348,6 +369,14 @@ export function deleteAttachment(
 
 // --- Users ----------------------------------------------------------------
 
+function listQuery(opts: { page?: number; limit?: number; search?: string }): string {
+  const q = new URLSearchParams();
+  if (opts.page != null) q.set("page", String(opts.page));
+  if (opts.limit != null) q.set("limit", String(opts.limit));
+  if (opts.search != null && opts.search.length > 0) q.set("search", opts.search);
+  return q.toString();
+}
+
 export interface AdminListResult<T> {
   items: T[];
   meta: {
@@ -362,12 +391,31 @@ export interface AdminListResult<T> {
 
 export function listAdminUsers(
   session: Session,
-  search = "",
+  opts: { page?: number; limit?: number; search?: string } = {},
 ): Promise<AdminListResult<UserAdminDto>> {
-  const query = search
-    ? `/api/admin/users?limit=100&search=${encodeURIComponent(search)}`
-    : "/api/admin/users?limit=100";
-  return request<AdminListResult<UserAdminDto>>(session, query);
+  const q = listQuery(opts);
+  return request<AdminListResult<UserAdminDto>>(
+    session,
+    `/api/admin/users${q.length > 0 ? `?${q}` : ""}`,
+  );
+}
+
+export interface CreateAdminUserInput {
+  email: string;
+  username: string;
+  password: string;
+  role?: string;
+}
+
+export function createAdminUser(
+  session: Session,
+  input: CreateAdminUserInput,
+): Promise<UserAdminDto> {
+  return request<UserAdminDto>(
+    session,
+    "/api/admin/users",
+    json("POST", input),
+  );
 }
 
 export function updateUser(
@@ -386,12 +434,13 @@ export function updateUser(
 
 export function listAdminTeams(
   session: Session,
-  search = "",
+  opts: { page?: number; limit?: number; search?: string } = {},
 ): Promise<AdminListResult<TeamAdminDto>> {
-  const query = search
-    ? `/api/admin/teams?limit=100&search=${encodeURIComponent(search)}`
-    : "/api/admin/teams?limit=100";
-  return request<AdminListResult<TeamAdminDto>>(session, query);
+  const q = listQuery(opts);
+  return request<AdminListResult<TeamAdminDto>>(
+    session,
+    `/api/admin/teams${q.length > 0 ? `?${q}` : ""}`,
+  );
 }
 
 export function deleteAdminTeam(session: Session, id: number): Promise<void> {

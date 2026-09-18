@@ -26,7 +26,7 @@ export function TeamsView({ session }: { session: Session }) {
     async (query = search) => {
       setError(null);
       try {
-        setTeams((await adminApi.listAdminTeams(session, query)).items);
+        setTeams((await adminApi.listAdminTeams(session, { search: query })).items);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load teams");
       }

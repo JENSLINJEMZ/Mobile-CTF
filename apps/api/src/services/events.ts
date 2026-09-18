@@ -29,7 +29,9 @@ export async function joinEvent(
 ): Promise<EventSummaryDto> {
   const event = await prisma.event.findUnique({
     where: { id: eventId },
-    include: { _count: { select: { participants: true, teams: true } } },
+    include: {
+      _count: { select: { participants: true, teams: true, eventChallenges: true } },
+    },
   });
   if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, "Event not found");
 
@@ -82,7 +84,9 @@ export async function joinEvent(
 
   const updated = await prisma.event.findUnique({
     where: { id: eventId },
-    include: { _count: { select: { participants: true, teams: true } } },
+    include: {
+      _count: { select: { participants: true, teams: true, eventChallenges: true } },
+    },
   });
   const summary = toSummaryDto(updated as unknown as EventRow, new Date(), {
     joinedByMe: true,
@@ -99,7 +103,9 @@ export async function leaveEvent(
 ): Promise<EventSummaryDto> {
   const event = await prisma.event.findUnique({
     where: { id: eventId },
-    include: { _count: { select: { participants: true, teams: true } } },
+    include: {
+      _count: { select: { participants: true, teams: true, eventChallenges: true } },
+    },
   });
   if (!event) throw new ApiError(404, ErrorCode.NOT_FOUND, "Event not found");
 
@@ -130,7 +136,9 @@ export async function leaveEvent(
 
   const updated = await prisma.event.findUnique({
     where: { id: eventId },
-    include: { _count: { select: { participants: true, teams: true } } },
+    include: {
+      _count: { select: { participants: true, teams: true, eventChallenges: true } },
+    },
   });
   return toSummaryDto(updated as unknown as EventRow, new Date(), {
     joinedByMe: false,
@@ -176,7 +184,9 @@ export async function createEvent(
       schedule: input.schedule ?? undefined,
       createdById: organizerId,
     },
-    include: { _count: { select: { participants: true, teams: true } } },
+    include: {
+      _count: { select: { participants: true, teams: true, eventChallenges: true } },
+    },
   });
   await recordAudit({
     actorId: organizerId,
@@ -216,7 +226,9 @@ export async function updateEvent(
       speakers: input.speakers ?? undefined,
       schedule: input.schedule ?? undefined,
     },
-    include: { _count: { select: { participants: true, teams: true } } },
+    include: {
+      _count: { select: { participants: true, teams: true, eventChallenges: true } },
+    },
   });
   const dto = toSummaryDto(event as unknown as EventRow, new Date(), {
     joinedByMe: false,

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { AUDIT, NOTIFICATION, PAGINATION } from "../constants";
 import { NotificationType } from "../types/enums";
+import { emailSchema, passwordSchema, usernameSchema } from "./auth";
 
 export const adminListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(PAGINATION.DEFAULT_PAGE),
@@ -36,6 +37,13 @@ export const updateUserSchema = z
   .refine((v) => v.role !== undefined || v.isActive !== undefined, {
     message: "Provide at least one of role or isActive",
   });
+
+export const createUserSchema = z.object({
+  email: emailSchema,
+  username: usernameSchema,
+  password: passwordSchema,
+  role: z.enum(["USER", "AUTHOR", "MODERATOR", "ADMIN", "SUPER_ADMIN"]).optional(),
+});
 
 export const broadcastNotificationSchema = z.object({
   type: z.nativeEnum(NotificationType).default(NotificationType.SYSTEM),
