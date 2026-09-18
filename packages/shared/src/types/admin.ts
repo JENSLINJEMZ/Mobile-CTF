@@ -236,3 +236,111 @@ export interface NotificationsResponse {
     hasPrev: boolean;
   };
 }
+
+// --- Sandbox manager ------------------------------------------------------
+
+export interface SandboxHostDto {
+  name: string;
+  os: string;
+  arch: string;
+  product: string;
+  cores: number;
+  memTotalBytes: number;
+  dockerRootDir: string;
+  dockerApiVersion: string;
+}
+
+export type SandboxContainerStatus =
+  | "running"
+  | "paused"
+  | "stopped"
+  | "created";
+
+export interface SandboxContainerUserDto {
+  id: number;
+  username: string;
+}
+
+export interface SandboxContainerDto {
+  id: string;
+  sessionId: string | null;
+  name: string;
+  image: string;
+  status: SandboxContainerStatus;
+  state: string;
+  user: SandboxContainerUserDto | null;
+  cpu: number;
+  ramMb: number;
+  cpuPct: number | null;
+  memBytes: number | null;
+  memPct: number | null;
+  uptimeSeconds: number | null;
+  createdAt: string | null;
+  expiresAt: string | null;
+  networkMode: string;
+  ipAddress: string | null;
+  rxBytes: number;
+  txBytes: number;
+  exportPort: string | null;
+}
+
+export interface SandboxKpisDto {
+  running: number;
+  stopped: number;
+  paused: number;
+  total: number;
+  activeUsers: number;
+  storageUsedBytes: number;
+  storageTotalBytes: number;
+  avgSessionMinutes: number;
+}
+
+export interface SandboxResourcesDto {
+  cpu: { load: number; cores: number; pct: number };
+  memory: { used: number; total: number; pct: number };
+  storage: { used: number; total: number; pct: number };
+  network: { rxBytes: number; txBytes: number };
+}
+
+export interface SandboxTrendPoint {
+  date: string;
+  running: number;
+  stopped: number;
+  total: number;
+}
+
+export interface SandboxCategoryPoint {
+  name: string;
+  value: number;
+  color: string;
+}
+
+export interface SandboxActivityDto {
+  id: string;
+  time: number;
+  text: string;
+  color: string;
+  icon: string;
+}
+
+export interface SandboxLimitsDto {
+  image: string;
+  maxCpuPerEnv: number;
+  maxRamPerEnvMb: number;
+  maxConcurrent: number;
+  pidsLimit: number;
+  sessionTimeoutSeconds: number;
+}
+
+export interface SandboxSnapshot {
+  at: string;
+  daemonUp: boolean;
+  host: SandboxHostDto | null;
+  kpis: SandboxKpisDto;
+  containers: SandboxContainerDto[];
+  resources: SandboxResourcesDto;
+  trends: SandboxTrendPoint[];
+  categories: SandboxCategoryPoint[];
+  activity: SandboxActivityDto[];
+  limits: SandboxLimitsDto;
+}

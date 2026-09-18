@@ -11,6 +11,7 @@ import type {
   FileDto,
   FileListResult,
   PaginatedResult,
+  SandboxSnapshot,
   SystemStatusDto,
   TeamAdminDto,
   UserAdminDto,
@@ -279,6 +280,21 @@ export function listChallengeVersions(
   ).then((r) => r ?? []);
 }
 
+export function getChallengeDetail(
+  session: Session,
+  id: number,
+): Promise<ChallengeDetailDto> {
+  return request<ChallengeDetailDto>(session, `/api/challenges/${id}`);
+}
+
+export function deleteChallenge(session: Session, id: number): Promise<void> {
+  return request<{ deleted: boolean }>(
+    session,
+    `/api/admin/challenges/${id}`,
+    json("DELETE"),
+  ).then(() => undefined);
+}
+
 // --- Files & attachments --------------------------------------------------
 
 export function uploadFile(
@@ -423,4 +439,21 @@ export function broadcastNotification(
     "/api/admin/notifications/broadcast",
     json("POST", payload),
   );
+}
+
+// --- Sandbox manager ------------------------------------------------------
+
+export function getSandboxOverview(session: Session): Promise<SandboxSnapshot> {
+  return request<SandboxSnapshot>(session, "/api/admin/sandbox/overview");
+}
+
+export function stopSandboxContainer(
+  session: Session,
+  containerId: string,
+): Promise<void> {
+  return request<{ stopped: boolean }>(
+    session,
+    `/api/admin/sandbox/containers/${containerId}/stop`,
+    json("POST"),
+  ).then(() => undefined);
 }

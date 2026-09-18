@@ -86,7 +86,11 @@ async function apiRequest<T>(
 ): Promise<T> {
   const { method = "GET", body, auth = false } = options;
 
-  const headers: Record<string, string> = { Accept: "application/json" };
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache",
+  };
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";
   }

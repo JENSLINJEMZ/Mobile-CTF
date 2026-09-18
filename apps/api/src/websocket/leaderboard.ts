@@ -4,6 +4,7 @@ import { Server as SocketIOServer, type Server } from "socket.io";
 import { setLeaderboardSolvedHandler } from "../services/leaderboardEvents";
 import { logger } from "../utils/logger";
 import { authByHandshake } from "./auth";
+import { attachSandboxAdminNamespace } from "./sandboxAdmin";
 import { attachTerminalNamespace } from "./terminal";
 
 const ROOM = "leaderboard";
@@ -34,6 +35,7 @@ export function attachSocket(
   });
 
   attachTerminalNamespace(socket);
+  attachSandboxAdminNamespace(socket);
 
   return socket;
 }

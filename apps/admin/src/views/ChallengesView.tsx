@@ -1,86 +1,103 @@
 import type {
+  AuditLogDto,
   ChallengeSummaryDto,
-  ChallengeVersionDto,
+  Difficulty,
 } from "@ctf/shared";
-import { Difficulty } from "@ctf/shared";
-import { Badge, Button, Card, Text } from "@ctf/ui";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { Session } from "../adminApi";
 import * as adminApi from "../adminApi";
+import {
+  ChallengeModal,
+  type ChallengeAdminPayload,
+  type EditingChallenge,
+} from "./challenges/ChallengeModal";
+import { CategoriesPanel } from "./challenges/CategoriesPanel";
+import { ChallengesGrid } from "./challenges/ChallengesGrid";
+import { ChallengesTable } from "./challenges/ChallengesTable";
+import {
+  DIFF_LABEL,
+  exportChallengesCsv,
+  matchesQuery,
+} from "./challenges/format";
+import { KpiCards } from "./challenges/KpiCards";
+import { QuickActions } from "./challenges/QuickActions";
+import { RecentActivity } from "./challenges/RecentActivity";
 
-const inputStyle: React.CSSProperties = {
-  padding: "8px 10px",
-  borderRadius: 8,
-  border: "1px solid var(--ui-border, #cbd5e1)",
-  backgroundColor: "var(--ui-surface-2, #ffffff)",
-  color: "var(--ui-text, #0f172a)",
-  fontSize: 14,
-  boxSizing: "border-box",
-  width: "100%",
-};
+type ViewMode = "list" | "grid";
+type SortKey = "newest" | "oldest" | "solves" | "points";
+type StatusKey = "all" | "published" | "draft";
 
-const emptyDraft = {
-  title: "",
-  slug: "",
-  description: "",
-  categoryId: 0,
-  difficulty: Difficulty.EASY,
-  basePoints: "100",
-  flag: "",
-  published: true,
-};
+interface Filters {
+  cat: string;
+  diff: string;
+  status: StatusKey;
+  sort: SortKey;
+}
 
-const DIFFICULTIES: Difficulty[] = [
-  Difficulty.EASY,
-  Difficulty.MEDIUM,
-  Difficulty.HARD,
-  Difficulty.EXPERT,
-];
+const PER_PAGE = 10;
 
-function difficultyTone(
-  d: Difficulty,
-): "success" | "warning" | "danger" | "neutral" | "info" {
-  switch (d) {
-    case "EASY":
-      return "success";
-    case "MEDIUM":
-      return "info";
-    case "HARD":
-      return "warning";
-    case "EXPERT":
-      return "danger";
+function sortRows(rows: ChallengeSummaryDto[], sort: SortKey) {
+  const copy = [...rows];
+  switch (sort) {
+    case "newest":
+      copy.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      break;
+    case "oldest":
+      copy.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+      break;
+    case "solves":
+      copy.sort((a, b) => b.solvedCount - a.solvedCount);
+      break;
+    case "points":
+      copy.sort((a, b) => b.basePoints - a.basePoints);
+      break;
     default:
-      return "neutral";
+      break;
   }
+  return copy;
 }
 
 export function ChallengesView({ session }: { session: Session }) {
   const [challenges, setChallenges] = useState<ChallengeSummaryDto[]>([]);
-  const [categories, setCategories] = useState<ChallengeSummaryDto["category"][]>(
-    [],
-  );
+  const [categories, setCategories] = useState<
+    ChallengeSummaryDto["category"][]
+  >([]);
+  const [activity, setActivity] = useState<AuditLogDto[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busySet, setBusySet] = useState<Set<number>>(new Set());
 
-  const [draft, setDraft] = useState(emptyDraft);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [versions, setVersions] = useState<ChallengeVersionDto[] | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [attachmentTitle, setAttachmentTitle] = useState("");
+  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<Filters>({
+    cat: "all",
+    diff: "all",
+    status: "all",
+    sort: "newest",
+  });
+  const [page, setPage] = useState(1);
+  const [view, setView] = useState<ViewMode>("list");
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<EditingChallenge | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [list, cats] = await Promise.all([
+      const [list, cats, log] = await Promise.all([
         adminApi.listAdminChallenges(session),
         adminApi.listCategories(session),
+        adminApi.listAuditLog(session, { limit: 100 }),
       ]);
       setChallenges(list.items);
       setCategories(cats);
-      if (cats.length > 0) {
-        setDraft((d) => (d.categoryId === 0 ? { ...d, categoryId: cats[0]!.id } : d));
-      }
+      setActivity(
+        log.items.filter(
+          (a) =>
+            a.entityType === "challenge" || a.action.startsWith("challenge."),
+        ),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load challenges");
     }
@@ -90,343 +107,461 @@ export function ChallengesView({ session }: { session: Session }) {
     void load();
   }, [load]);
 
-  const startCreate = useCallback(() => {
-    setEditingId(null);
-    setVersions(null);
-    setSelectedFile(null);
-    setAttachmentTitle("");
-    setDraft({
-      ...emptyDraft,
-      categoryId: categories[0]?.id ?? 0,
+  const markBusy = useCallback((id: number, on: boolean) => {
+    setBusySet((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
     });
-  }, [categories]);
+  }, []);
 
-  const startEdit = useCallback(
-    (item: ChallengeSummaryDto) => {
-      setEditingId(item.id);
-      setVersions(null);
-      setSelectedFile(null);
-      setAttachmentTitle("");
-      setDraft({
-        title: item.title,
-        slug: item.slug,
-        description: "",
-        categoryId: item.category.id,
-        difficulty: item.difficulty,
-        basePoints: String(item.basePoints),
-        flag: "",
-        published: item.published,
-      });
-      void adminApi
-        .listChallengeVersions(session, item.id)
-        .then(setVersions)
-        .catch(() => undefined);
+  const filtered = useMemo(() => {
+    let rows = challenges.filter(
+      (c) =>
+        matchesQuery(c, query) &&
+        (filters.cat === "all" || c.category.slug === filters.cat) &&
+        (filters.diff === "all" || c.difficulty === filters.diff) &&
+        (filters.status === "all" ||
+          (filters.status === "published" ? c.published : !c.published)),
+    );
+    rows = sortRows(rows, filters.sort);
+    return rows;
+  }, [challenges, query, filters]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const safePage = Math.min(page, pageCount);
+  const pageRows = useMemo(
+    () => filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE),
+    [filtered, safePage],
+  );
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
+
+  const kpis = useMemo(
+    () => ({
+      total: challenges.length,
+      published: challenges.filter((c) => c.published).length,
+      drafts: challenges.filter((c) => !c.published).length,
+      categories: categories.length,
+      solves: challenges.reduce((acc, c) => acc + c.solvedCount, 0),
+      points: challenges.reduce((acc, c) => acc + c.basePoints, 0),
+    }),
+    [challenges, categories],
+  );
+
+  const openCreate = useCallback(() => {
+    setEditing(null);
+    setModalError(null);
+    setModalOpen(true);
+  }, []);
+
+  const openEdit = useCallback(
+    async (c: ChallengeSummaryDto) => {
+      setModalError(null);
+      try {
+        const detail = await adminApi.getChallengeDetail(session, c.id);
+        setEditing({ ...c, description: detail.description });
+        setModalOpen(true);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load challenge");
+      }
     },
     [session],
   );
 
-  const onSave = useCallback(async () => {
-    if (busy || !draft.title.trim() || !draft.slug.trim()) return;
-    setBusy(true);
-    setError(null);
-    const payload = {
-      title: draft.title.trim(),
-      slug: draft.slug.trim(),
-      description: draft.description.trim(),
-      categoryId: draft.categoryId,
-      difficulty: draft.difficulty,
-      basePoints: Number(draft.basePoints) || 0,
-      published: draft.published,
-      ...(draft.flag.trim() ? { flag: draft.flag.trim() } : {}),
-    };
-    try {
-      if (editingId === null) {
-        await adminApi.createChallenge(session, payload);
-      } else {
-        await adminApi.updateChallenge(session, editingId, payload);
+  const closeModal = useCallback(() => {
+    if (saving) return;
+    setModalOpen(false);
+    setEditing(null);
+    setModalError(null);
+  }, [saving]);
+
+  const save = useCallback(
+    async (p: ChallengeAdminPayload) => {
+      setSaving(true);
+      setModalError(null);
+      try {
+        if (editing) {
+          await adminApi.updateChallenge(session, editing.id, p);
+        } else {
+          await adminApi.createChallenge(session, p);
+        }
+        setModalOpen(false);
+        setEditing(null);
+        await load();
+      } catch (err) {
+        setModalError(err instanceof Error ? err.message : "Save failed");
+      } finally {
+        setSaving(false);
       }
-      setDraft(emptyDraft);
-      setEditingId(null);
-      setVersions(null);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save challenge");
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, draft, editingId, session, load]);
+    },
+    [session, editing, load],
+  );
 
   const togglePublish = useCallback(
-    async (item: ChallengeSummaryDto) => {
-      if (busy) return;
-      setBusy(true);
+    async (c: ChallengeSummaryDto) => {
+      if (busySet.has(c.id)) return;
+      markBusy(c.id, true);
       setError(null);
       try {
-        await adminApi.updateChallenge(session, item.id, {
-          title: item.title,
-          slug: item.slug,
-          description: "",
-          categoryId: item.category.id,
-          difficulty: item.difficulty,
-          basePoints: item.basePoints,
-          published: !item.published,
+        const detail = await adminApi.getChallengeDetail(session, c.id);
+        await adminApi.updateChallenge(session, c.id, {
+          title: c.title,
+          slug: c.slug,
+          description: detail.description,
+          categoryId: c.category.id,
+          difficulty: c.difficulty,
+          basePoints: c.basePoints,
+          published: !c.published,
         });
         await load();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to toggle publish");
       } finally {
-        setBusy(false);
+        markBusy(c.id, false);
       }
     },
-    [busy, session, load],
+    [session, load, busySet, markBusy],
   );
 
-  const onUpload = useCallback(
-    async (challengeId: number) => {
-      if (!selectedFile) return;
-      setBusy(true);
+  const duplicate = useCallback(
+    async (c: ChallengeSummaryDto) => {
+      if (busySet.has(c.id)) return;
+      markBusy(c.id, true);
       setError(null);
       try {
-        const file = await adminApi.uploadFile(session, selectedFile);
-        await adminApi.createAttachment(session, challengeId, {
-          fileId: file.id,
-          title: attachmentTitle.trim() || selectedFile.name,
+        const detail = await adminApi.getChallengeDetail(session, c.id);
+        await adminApi.createChallenge(session, {
+          title: `${c.title} (copy)`,
+          slug: `${c.slug}-copy`,
+          description: detail.description,
+          categoryId: c.category.id,
+          difficulty: c.difficulty,
+          basePoints: c.basePoints,
+          published: false,
         });
-        setSelectedFile(null);
-        setAttachmentTitle("");
         await load();
-        const v = await adminApi.listChallengeVersions(session, challengeId);
-        setVersions(v);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Upload failed");
+        setError(err instanceof Error ? err.message : "Duplicate failed");
       } finally {
-        setBusy(false);
+        markBusy(c.id, false);
       }
     },
-    [busy, selectedFile, attachmentTitle, session, load],
+    [session, load, busySet, markBusy],
+  );
+
+  const remove = useCallback(
+    async (c: ChallengeSummaryDto) => {
+      if (busySet.has(c.id)) return;
+      if (
+        !globalThis.confirm(
+          `Delete challenge "${c.title}"? This cannot be undone.`,
+        )
+      )
+        return;
+      markBusy(c.id, true);
+      setError(null);
+      try {
+        await adminApi.deleteChallenge(session, c.id);
+        await load();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Delete failed");
+      } finally {
+        markBusy(c.id, false);
+      }
+    },
+    [session, load, busySet, markBusy],
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {error ? <Text tone="danger">{error}</Text> : null}
-
-      <Card
-        title={editingId === null ? "New challenge" : `Edit challenge #${editingId}`}
-        bodyStyle={{ display: "flex", flexDirection: "column", gap: 12 }}
-      >
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <input
-            value={draft.title}
-            onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-            placeholder="Title"
-            className="ctf-input"
-            style={inputStyle}
-          />
-          <input
-            value={draft.slug}
-            onChange={(e) => setDraft((d) => ({ ...d, slug: e.target.value }))}
-            placeholder="Slug (url-slug)"
-            className="ctf-input"
-            style={inputStyle}
-          />
-        </div>
-        <textarea
-          value={draft.description}
-          onChange={(e) =>
-            setDraft((d) => ({ ...d, description: e.target.value }))
-          }
-          rows={4}
-          placeholder="Description (Markdown)"
-          className="ctf-input"
-          style={inputStyle}
-        />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <select
-            value={draft.categoryId}
-            onChange={(e) =>
-              setDraft((d) => ({ ...d, categoryId: Number(e.target.value) }))
-            }
-            className="ctf-input"
-            style={inputStyle}
-          >
-            <option value={0} disabled>
-              Select category
-            </option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={draft.difficulty}
-            onChange={(e) =>
-              setDraft((d) => ({
-                ...d,
-                difficulty:
-                  DIFFICULTIES.find((x) => x === e.target.value) ??
-                  Difficulty.EASY,
-              }))
-            }
-            className="ctf-input"
-            style={inputStyle}
-          >
-            {DIFFICULTIES.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <input
-            value={draft.basePoints}
-            onChange={(e) =>
-              setDraft((d) => ({ ...d, basePoints: e.target.value }))
-            }
-            placeholder="Base points"
-            type="number"
-            className="ctf-input"
-            style={inputStyle}
-          />
-          <input
-            value={draft.flag}
-            onChange={(e) => setDraft((d) => ({ ...d, flag: e.target.value }))}
-            placeholder={editingId === null ? "Flag (required)" : "Flag (leave blank to keep)"}
-            className="ctf-input"
-            style={inputStyle}
-          />
-        </div>
-        <label
-          style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}
-        >
-          <input
-            type="checkbox"
-            checked={draft.published}
-            onChange={(e) =>
-              setDraft((d) => ({ ...d, published: e.target.checked }))
-            }
-          />
-          Published (visible to players)
-        </label>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Button
-            disabled={
-              busy ||
-              !draft.title.trim() ||
-              !draft.slug.trim() ||
-              !draft.description.trim() ||
-              draft.categoryId === 0
-            }
-            onClick={() => void onSave()}
-          >
-            {editingId === null ? "Create" : "Save"}
-          </Button>
-          <Button variant="secondary" onClick={startCreate}>
-            Reset
-          </Button>
-        </div>
-      </Card>
-
-      {editingId !== null ? (
-        <Card
-          title="Attachment"
-          bodyStyle={{ display: "flex", flexDirection: "column", gap: 12 }}
-        >
-          <input
-            type="file"
-            onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
-            className="ctf-input"
-            style={inputStyle}
-          />
-          <input
-            value={attachmentTitle}
-            onChange={(e) => setAttachmentTitle(e.target.value)}
-            placeholder="Attachment title"
-            className="ctf-input"
-            style={inputStyle}
-          />
-          <div style={{ display: "flex", gap: 8 }}>
-            <Button
-              disabled={busy || !selectedFile}
-              onClick={() => void onUpload(editingId)}
-            >
-              Upload &amp; attach
-            </Button>
+    <div className="chx">
+      {/* ---------- page head ---------- */}
+      <div className="page-head">
+        <div>
+          <div className="breadcrumbs">
+            <span>Dashboard</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m9 6 6 6-6 6" />
+            </svg>
+            <span className="active">Challenges</span>
           </div>
-        </Card>
-      ) : null}
+          <h1 className="page-title">Challenges</h1>
+          <p className="page-sub">
+            Create, manage and organize challenges for events. Build unique experiences
+            for players.
+          </p>
+        </div>
+        <div className="page-actions">
+          <p className="page-quote">“Good challenges create better hackers.”</p>
+          <button className="btn btn-primary" onClick={openCreate}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Create Challenge
+          </button>
+        </div>
+      </div>
 
-      {versions ? (
-        <Card
-          title="Version history"
-          bodyStyle={{ display: "flex", flexDirection: "column", gap: 8 }}
-        >
-          {versions.length === 0 ? (
-            <Text tone="secondary">No prior versions.</Text>
-          ) : null}
-          {versions.map((v) => (
-            <div
-              key={v.id}
-              className="ctf-row"
-              style={{
-                justifyContent: "space-between",
-                alignItems: "center",
-                fontSize: 14,
+      {error ? <div className="sbx-error">{error}</div> : null}
+
+      <div className="chx-grid-layout">
+        {/* ---------- left column ---------- */}
+        <div className="left-col">
+          <KpiCards v={kpis} challenges={challenges} categories={categories} />
+
+          {/* filter bar */}
+          <div className="filter-bar chx-filter-bar">
+            <label className="filter-search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20.5 20.5-3.6-3.6" />
+              </svg>
+              <input
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search challenges, categories or tags…"
+              />
+            </label>
+
+            <label className="filter-select chx-filter-select">
+              <select
+                value={filters.cat}
+                onChange={(e) => {
+                  setFilters((f) => ({ ...f, cat: e.target.value }));
+                  setPage(1);
+                }}
+              >
+                <option value="all">All Categories</option>
+                {[...categories]
+                  .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                  .map((c) => (
+                    <option key={c.id} value={c.slug}>
+                      {c.name}
+                    </option>
+                  ))}
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </label>
+
+            <label className="filter-select chx-filter-select">
+              <select
+                value={filters.diff}
+                onChange={(e) => {
+                  setFilters((f) => ({ ...f, diff: e.target.value }));
+                  setPage(1);
+                }}
+              >
+                <option value="all">All Difficulties</option>
+                {(Object.keys(DIFF_LABEL) as Difficulty[]).map((d) => (
+                  <option key={d} value={d}>
+                    {DIFF_LABEL[d]}
+                  </option>
+                ))}
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </label>
+
+            <label className="filter-select chx-filter-select">
+              <select
+                value={filters.status}
+                onChange={(e) => {
+                  setFilters((f) => ({
+                    ...f,
+                    status: e.target.value as StatusKey,
+                  }));
+                  setPage(1);
+                }}
+              >
+                <option value="all">All Status</option>
+                <option value="published">Published</option>
+                <option value="draft">Draft</option>
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </label>
+
+            <label className="filter-select chx-filter-select">
+              <select
+                value={filters.sort}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    sort: e.target.value as SortKey,
+                  }))
+                }
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="solves">Most Solved</option>
+                <option value="points">Highest Points</option>
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </label>
+
+            <button
+              className="filter-btn"
+              onClick={() => {
+                setQuery("");
+                setFilters({ cat: "all", diff: "all", status: "all", sort: "newest" });
+                setPage(1);
               }}
             >
-              <span>
-                <Badge tone="info">v{v.version}</Badge>{" "}
-                <span style={{ fontWeight: 600 }}>{v.title}</span>
-              </span>
-              <Text tone="secondary" size="xs">
-                {new Date(v.createdAt).toLocaleString()} · {v.authorUsername}
-              </Text>
-            </div>
-          ))}
-        </Card>
-      ) : null}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 5h18M6 12h12M10 19h4" />
+              </svg>
+              Clear
+            </button>
 
-      <Card
-        title="Challenges"
-        bodyStyle={{ display: "flex", flexDirection: "column", gap: 8 }}
-      >
-        {challenges.length === 0 ? (
-          <Text tone="secondary">No challenges yet.</Text>
-        ) : null}
-        {challenges.map((item) => (
-<div
-              key={item.id}
-              className="ctf-row"
-              style={{
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-              }}
-            >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontWeight: 600 }}>{item.title}</span>
-              <Badge tone={difficultyTone(item.difficulty)}>
-                {item.difficulty}
-              </Badge>
-              <Badge tone={item.published ? "success" : "neutral"}>
-                {item.published ? "published" : "draft"}
-              </Badge>
-              <Text tone="secondary" size="xs">
-                {item.solvedCount} solves · {item.basePoints} pts
-              </Text>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <Button size="sm" variant="secondary" onClick={() => startEdit(item)}>
-                Edit
-              </Button>
-              <Button size="sm" onClick={() => void togglePublish(item)}>
-                {item.published ? "Unpublish" : "Publish"}
-              </Button>
+            <div className="view-toggle">
+              <button
+                className={view === "list" ? "is-active" : ""}
+                aria-label="List view"
+                title="List view"
+                onClick={() => setView("list")}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <button
+                className={view === "grid" ? "is-active" : ""}
+                aria-label="Grid view"
+                title="Grid view"
+                onClick={() => setView("grid")}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7" rx="1.8" />
+                  <rect x="14" y="3" width="7" height="7" rx="1.8" />
+                  <rect x="3" y="14" width="7" height="7" rx="1.8" />
+                  <rect x="14" y="14" width="7" height="7" rx="1.8" />
+                </svg>
+              </button>
             </div>
           </div>
-        ))}
-      </Card>
+
+          <div className="export-row">
+            <button
+              className="btn-export"
+              onClick={() => exportChallengesCsv(filtered)}
+              disabled={filtered.length === 0}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3.5v11" />
+                <path d="m7 10 5 5 5-5" />
+                <path d="M5 19.5h14" />
+              </svg>
+              Export ({filtered.length})
+            </button>
+          </div>
+
+          {view === "list" ? (
+            <ChallengesTable
+              rows={pageRows}
+              start={(safePage - 1) * PER_PAGE}
+              onEdit={(c) => void openEdit(c)}
+              onDuplicate={(c) => void duplicate(c)}
+              onDelete={(c) => void remove(c)}
+              onToggle={(c) => void togglePublish(c)}
+              busy={busySet}
+            />
+          ) : (
+            <ChallengesGrid
+              rows={pageRows}
+              onEdit={(c) => void openEdit(c)}
+              onToggle={(c) => void togglePublish(c)}
+            />
+          )}
+
+          {/* pagination */}
+          <div className="pagination">
+            <div className="page-info">
+              Showing{" "}
+              <b>
+                {filtered.length === 0 ? 0 : (safePage - 1) * PER_PAGE + 1}
+              </b>{" "}
+              to <b>{Math.min(safePage * PER_PAGE, filtered.length)}</b> of{" "}
+              <b>{filtered.length}</b> challenges
+            </div>
+            <div className="page-controls">
+              <button
+                className="page-btn"
+                aria-label="Previous"
+                disabled={safePage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
+              </button>
+              {Array.from({ length: pageCount }, (_, i) => i + 1)
+                .filter((p) => p <= 7 || Math.abs(p - safePage) <= 1)
+                .map((p) => (
+                  <button
+                    key={p}
+                    className={`page-btn${p === safePage ? " is-active" : ""}`}
+                    onClick={() => setPage(p)}
+                  >
+                    {p}
+                  </button>
+                ))}
+              <button
+                className="page-btn"
+                aria-label="Next"
+                disabled={safePage >= pageCount}
+                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m9 6 6 6-6 6" />
+                </svg>
+              </button>
+            </div>
+            <div className="per-page">
+              {PER_PAGE} per page
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* ---------- right column ---------- */}
+        <div className="right-col">
+          <QuickActions onNew={openCreate} onTemplate={openCreate} />
+          <CategoriesPanel
+            categories={categories}
+            challenges={challenges}
+            activeSlug={filters.cat === "all" ? null : filters.cat}
+            onPick={(slug) => {
+              setFilters((f) => ({ ...f, cat: slug ?? "all" }));
+              setPage(1);
+            }}
+          />
+          <RecentActivity items={activity} />
+        </div>
+      </div>
+
+      <ChallengeModal
+        open={modalOpen}
+        editing={editing}
+        categories={categories}
+        busy={saving}
+        error={modalError}
+        onClose={closeModal}
+        onSave={(p) => void save(p)}
+      />
     </div>
   );
 }

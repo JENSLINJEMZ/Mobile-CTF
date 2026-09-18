@@ -35,6 +35,16 @@ function tlsMaterial(): Pick<DockerOptions, "ca" | "cert" | "key"> {
   return { ca, cert, key };
 }
 
+/** Build a dockerode client for the configured sandbox daemon (local socket
+ * or TLS-protected remote endpoint). */
+export function createDockerClient(): Dockerode {
+  const dockerOptions: DockerOptions =
+    env.sandboxDockerHost && tcpEndpoint(env.sandboxDockerHost)
+      ? { ...tcpEndpoint(env.sandboxDockerHost)!, ...tlsMaterial() }
+      : { socketPath: env.sandboxSocketPath };
+  return new Dockerode(dockerOptions);
+}
+
 function isConflict(err: unknown): boolean {
   if (typeof err !== "object" || err === null) return false;
   return (err as { statusCode?: number }).statusCode === 409;
@@ -68,11 +78,7 @@ export class DockerSandboxRuntime implements SandboxRuntime {
     image?: string;
     concurrency?: number;
   }) {
-    const dockerOptions: DockerOptions =
-      env.sandboxDockerHost && tcpEndpoint(env.sandboxDockerHost)
-        ? { ...tcpEndpoint(env.sandboxDockerHost)!, ...tlsMaterial() }
-        : { socketPath: options?.socketPath ?? env.sandboxSocketPath };
-    this.docker = new Dockerode(dockerOptions);
+    this.docker = createDockerClient();
     this.image = options?.image ?? env.sandboxImage;
     this.pool = new WorkerPool(
       options?.concurrency ?? env.sandboxCreateConcurrency,

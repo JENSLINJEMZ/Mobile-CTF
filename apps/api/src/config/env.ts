@@ -67,6 +67,11 @@ export const env = {
   sandboxMemoryMb: Number(process.env.SANDBOX_MEMORY_MB ?? 64),
   sandboxCpus: Number(process.env.SANDBOX_CPUS ?? 0.5),
   sandboxPidsLimit: Number(process.env.SANDBOX_PIDS_LIMIT ?? 64),
+  sandboxNasSshHost: process.env.SANDBOX_NAS_SSH_HOST ?? "192.168.50.2",
+  sandboxNasSshUser: process.env.SANDBOX_NAS_SSH_USER ?? "root",
+  sandboxNasSshPort: Number(process.env.SANDBOX_NAS_SSH_PORT ?? 22),
+  sandboxNasSshIdentity:
+    process.env.SANDBOX_NAS_SSH_IDENTITY ?? `${process.env.HOME ?? "/home/jemzi"}/.ssh/id_rsa`,
   terminalTtlSeconds: Number(
     process.env.TERMINAL_TTL_SECONDS ?? TERMINAL.DEFAULT_TTL_SECONDS,
   ),

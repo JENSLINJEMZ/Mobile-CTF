@@ -10,6 +10,7 @@ import { AuditLogView } from "./views/AuditLogView";
 import { ChallengesView } from "./views/ChallengesView";
 import { DashboardView } from "./views/DashboardView";
 import { EventsView } from "./views/EventsView";
+import { SandboxView } from "./views/sandbox/SandboxView";
 import { TeamsView } from "./views/TeamsView";
 import { UsersView } from "./views/UsersView";
 
@@ -38,6 +39,7 @@ const WIRED = new Set([
   "Teams",
   "Announcements",
   "Analytics",
+  "Sandbox Manager",
   "Audit Log",
 ]);
 
@@ -414,7 +416,15 @@ function Dashboard({
           </div>
         </header>
 
-        <main className="content">
+        <main
+          className={`content${
+            activeView === "Sandbox Manager"
+              ? " sbox-shell"
+              : activeView === "Challenges"
+                ? " chx-shell"
+                : ""
+          }`}
+        >
           <div key={activeView} style={{ display: "contents" }}>
             {activeView === "Dashboard" ? (
               <DashboardView session={session} onNavigate={(v) => setActiveView(v)} />
@@ -425,6 +435,7 @@ function Dashboard({
             {activeView === "Users" ? <UsersView session={session} /> : null}
             {activeView === "Teams" ? <TeamsView session={session} /> : null}
             {activeView === "Analytics" ? <AnalyticsView session={session} /> : null}
+            {activeView === "Sandbox Manager" ? <SandboxView session={session} /> : null}
             {activeView === "Audit Log" ? <AuditLogView session={session} /> : null}
             {!WIRED.has(activeView) ? <Placeholder name={activeView} /> : null}
           </div>

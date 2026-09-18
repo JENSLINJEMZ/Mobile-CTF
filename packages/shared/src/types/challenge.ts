@@ -27,6 +27,8 @@ export interface ChallengeSummaryDto {
   tags: ChallengeTagDto[];
   locked?: boolean;
   lockedReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface HintDto {

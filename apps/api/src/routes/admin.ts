@@ -67,6 +67,8 @@ import {
   storeUpload,
 } from "../services/fileAssets";
 import { createBroadcastNotification } from "../services/notifications";
+import { getSandboxSnapshot, stopSandboxContainer } from "../services/sandboxAdmin";
+import { getSandboxRuntime } from "../services/terminalSessions";
 
 function me(req: { user?: AuthUser }): AuthUser {
   if (!req.user) {
@@ -485,6 +487,26 @@ adminRouter.get(
   asyncHandler(async (req, res) => {
     const data = await getSystemStatus();
     res.json({ success: true, data });
+  }),
+);
+
+// --- Sandbox --------------------------------------------------------------
+
+adminRouter.get(
+  "/sandbox/overview",
+  requirePermission("analytics.view"),
+  asyncHandler(async (_req, res) => {
+    const data = await getSandboxSnapshot();
+    res.json({ success: true, data });
+  }),
+);
+
+adminRouter.post(
+  "/sandbox/containers/:containerId/stop",
+  requirePermission("analytics.view"),
+  asyncHandler(async (req, res) => {
+    await stopSandboxContainer(req.params.containerId!, getSandboxRuntime());
+    res.json({ success: true, data: { stopped: true } });
   }),
 );
 

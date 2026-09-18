@@ -198,6 +198,8 @@ export async function listChallenges(
         tags: c.tags.map((t) => toTagDto(t.tag)),
         locked: gate?.locked ?? false,
         lockedReason: gate?.reason ?? null,
+        createdAt: c.createdAt.toISOString(),
+        updatedAt: c.updatedAt.toISOString(),
       };
     }),
     meta: {
