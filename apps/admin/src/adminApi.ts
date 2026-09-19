@@ -1,5 +1,7 @@
 import type {
+  AnnouncementAdminListResult,
   AnnouncementDto,
+  AnnouncementOverviewDto,
   AnalyticsOverviewDto,
   AuditLogListResult,
   ChallengeDetailDto,
@@ -248,6 +250,42 @@ export function deleteAnnouncement(
     `/api/admin/announcements/${id}`,
     json("DELETE"),
   ).then(() => undefined);
+}
+
+export interface AnnouncementAdminQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  pinned?: boolean;
+  recent?: boolean;
+  sort?: "newest" | "oldest";
+}
+
+export function listAdminAnnouncements(
+  session: Session,
+  opts: AnnouncementAdminQuery = {},
+): Promise<AnnouncementAdminListResult> {
+  const q = new URLSearchParams();
+  if (opts.page != null) q.set("page", String(opts.page));
+  if (opts.limit != null) q.set("limit", String(opts.limit));
+  if (opts.search != null && opts.search.length > 0) q.set("search", opts.search);
+  if (opts.pinned != null) q.set("pinned", String(opts.pinned));
+  if (opts.recent != null) q.set("recent", String(opts.recent));
+  if (opts.sort != null) q.set("sort", opts.sort);
+  const qs = q.toString();
+  return request<AnnouncementAdminListResult>(
+    session,
+    `/api/admin/announcements${qs.length > 0 ? `?${qs}` : ""}`,
+  );
+}
+
+export function getAnnouncementOverview(
+  session: Session,
+): Promise<AnnouncementOverviewDto> {
+  return request<AnnouncementOverviewDto>(
+    session,
+    "/api/admin/announcements/overview",
+  );
 }
 
 // --- Challenges (admin, incl. drafts) ------------------------------------

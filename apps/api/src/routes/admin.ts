@@ -21,6 +21,7 @@ import {
   updateHintSchema,
   updateUserSchema,
   adminSubmissionQuerySchema,
+  adminAnnouncementQuerySchema,
 } from "@ctf/shared";
 
 import { asyncHandler } from "../middleware/errors";
@@ -39,6 +40,10 @@ import {
   deleteAnnouncement,
   updateAnnouncement,
 } from "../services/announcements";
+import {
+  getAnnouncementOverview,
+  listAdminAnnouncements,
+} from "../services/adminAnnouncements";
 import {
   createAttachment,
   createChallenge,
@@ -383,6 +388,25 @@ adminRouter.delete(
 );
 
 // --- Announcements --------------------------------------------------------
+
+adminRouter.get(
+  "/announcements/overview",
+  requirePermission("announcements.manage"),
+  asyncHandler(async (_req, res) => {
+    const data = await getAnnouncementOverview();
+    res.json({ success: true, data });
+  }),
+);
+
+adminRouter.get(
+  "/announcements",
+  requirePermission("announcements.manage"),
+  asyncHandler(async (req, res) => {
+    const query = adminAnnouncementQuerySchema.parse(req.query);
+    const data = await listAdminAnnouncements(query);
+    res.json({ success: true, data });
+  }),
+);
 
 adminRouter.post(
   "/announcements",

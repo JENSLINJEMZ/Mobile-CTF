@@ -228,7 +228,6 @@ export function DashboardView({
 
   useEffect(() => {
     let on = true;
-    let timer: number | undefined;
     const poll = () => {
       const t0 = performance.now();
       adminApi
@@ -246,10 +245,10 @@ export function DashboardView({
         });
     };
     poll();
-    timer = window.setInterval(poll, 30000);
+    const timer = window.setInterval(poll, 30000);
     return () => {
       on = false;
-      if (timer !== undefined) window.clearInterval(timer);
+      window.clearInterval(timer);
     };
   }, [session]);
 

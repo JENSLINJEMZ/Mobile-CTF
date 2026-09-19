@@ -429,10 +429,14 @@ function Dashboard({
                     : activeView === "Users"
                       ? " usr-shell"
 : activeView === "Teams"
-                            ? " tm-shell"
-                            : activeView === "Submissions"
-                              ? " sub-shell"
-                              : ""
+                      ? " tm-shell"
+                      : activeView === "Submissions"
+                        ? " sub-shell"
+                        : activeView === "Announcements"
+                          ? " an-shell"
+                          : activeView === "Analytics"
+                            ? " aly-shell"
+                            : ""
           }`}
         >
           <div key={activeView} style={{ display: "contents" }}>
@@ -450,7 +454,12 @@ function Dashboard({
             ) : null}
             {activeView === "Teams" ? <TeamsView session={session} /> : null}
             {activeView === "Submissions" ? <SubmissionsView session={session} /> : null}
-            {activeView === "Analytics" ? <AnalyticsView session={session} /> : null}
+            {activeView === "Analytics" ? (
+              <AnalyticsView
+                session={session}
+                onNavigate={(v) => setActiveView(v)}
+              />
+            ) : null}
             {activeView === "Sandbox Manager" ? <SandboxView session={session} /> : null}
             {activeView === "Audit Log" ? <AuditLogView session={session} /> : null}
             {!WIRED.has(activeView) ? <Placeholder name={activeView} /> : null}

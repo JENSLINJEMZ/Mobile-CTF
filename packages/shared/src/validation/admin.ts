@@ -99,3 +99,23 @@ export const adminSubmissionQuerySchema = z.object({
   userId: z.coerce.number().int().positive().optional(),
   teamId: z.coerce.number().int().positive().optional(),
 });
+
+export const adminAnnouncementQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(PAGINATION.DEFAULT_PAGE),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(PAGINATION.MAX_LIMIT)
+    .default(PAGINATION.DEFAULT_LIMIT),
+  search: z.string().trim().min(1).max(120).optional(),
+  pinned: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === "true")),
+  recent: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === "true")),
+  sort: z.enum(["newest", "oldest"]).default("newest"),
+});

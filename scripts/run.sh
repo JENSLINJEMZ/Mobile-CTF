@@ -5,7 +5,7 @@
 #   ./scripts/run.sh                    start everything (default)
 #   ./scripts/run.sh stop               stop api / metro / admin (docker stays up)
 #   ./scripts/run.sh status             show what is running
-#   ./scripts/run.sh logs <service>     tail a service log (api|metro|admin|infra)
+#   ./scripts/run.sh logs <service>     tail a service log (api|metro|admin)
 #
 # Options (start):
 #   --admin            also start the admin dashboard (vite, port 5173)
@@ -19,10 +19,16 @@
 #   --down             (stop) also stop the postgres/redis containers
 #   -h|--help          this help
 #
-# Dev runs the API on the host (tsx watch). The compose `api` service exists
-# for prod-style deployment only and is intentionally never started here.
-# The terminal sandbox is an ephemeral container (ctf-sandbox:latest) spawned
-# by the API through the host docker daemon.
+# Services (all host processes, logs live in .run/):
+#   api    tsx watch on :4000   (@ctf/api)
+#   metro  Expo dev server :8081 (apps/mobile)
+#   admin  Vite dashboard :5173 (@ctf/admin, requires --admin)
+#
+# Infra runs as docker compose containers: postgres (:5432) and redis (:6379).
+# The compose `api` service exists for prod-style deployment only and is
+# intentionally never started here. The terminal sandbox is an ephemeral
+# container (ctf-sandbox:latest) spawned by the API through the host docker
+# daemon — build it with infrastructure/sandbox/Dockerfile.
 
 set -euo pipefail
 
@@ -173,7 +179,6 @@ wait_for() {
   return 1
 }
 
-wait_port() { wait_for "$1 (:${2})" "$3" port_open "$2"; }
 wait_http() { wait_for "HTTP $1" "$2" bash -c "command -v curl >/dev/null 2>&1 && curl -fsS '$3' >/dev/null"; }
 
 # ---- steps ------------------------------------------------------------------
@@ -249,9 +254,9 @@ step_services() {
     warn "Metro already listening on :$WEB_PORT — skipping"
   else
     if [ "$RESET_CACHE" = 1 ]; then
-      start_process metro apps/mobile bash -c 'exec npx expo start --port 8081 --clear'
+      start_process metro apps/mobile bash -c 'exec npx expo start --port 8081 --host lan --clear'
     else
-      start_process metro apps/mobile bash -c 'exec npx expo start --port 8081'
+      start_process metro apps/mobile bash -c 'exec npx expo start --port 8081 --host lan'
     fi
   fi
 
@@ -259,7 +264,9 @@ step_services() {
     if port_open "$ADMIN_PORT"; then
       warn "admin already listening on :$ADMIN_PORT — skipping"
     else
-      start_process admin . bash -c 'exec npm run dev --workspace=@ctf/admin'
+      # --host binds vite to 0.0.0.0 so the dashboard is reachable from any
+      # device on the network, not just this machine.
+      start_process admin . bash -c 'exec npm run dev --workspace=@ctf/admin -- --host'
     fi
   fi
 }
@@ -307,9 +314,9 @@ cmd_start() {
 
 cmd_stop() {
   say "stopping managed services"
-  stop_process api   "tsx watch src/server.ts"
-  stop_process metro "expo start --port 8081"
-  stop_process admin "apps/admin.*vite"
+  stop_process api   "node_modules/.bin/tsx watch src/server.ts"
+  stop_process metro "node_modules/.bin/expo start"
+  stop_process admin "node_modules/.bin/vite"
   if [ "$DOWN" = 1 ]; then
     say "stopping docker containers"
     docker stop ctf-postgres ctf-redis >/dev/null 2>&1 || true
@@ -347,7 +354,7 @@ cmd_status() {
 cmd_logs() {
   local name="${1:-}"
   case "$name" in
-    api|metro|admin) wait_port "log file" "$name" 5 test -f "$RUNDIR/$name.log" || true;
+    api|metro|admin) wait_for "log $name" 5 bash -c "test -f '$RUNDIR/$name.log'" || true;
                      tail -n 200 -f "$RUNDIR/$name.log" ;;
     "") die "usage: ./scripts/run.sh logs <api|metro|admin>" ;;
     *) warn "unknown service '$name' (api|metro|admin)" ;;

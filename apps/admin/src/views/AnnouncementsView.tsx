@@ -1,268 +1,326 @@
-import type { AnnouncementDto } from "@ctf/shared";
-import { Badge, Button, Card, Text } from "@ctf/ui";
-import { useCallback, useEffect, useState } from "react";
+import type {
+  AnnouncementAdminListResult,
+  AnnouncementAdminRowDto,
+  AnnouncementOverviewDto,
+} from "@ctf/shared";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Session } from "../adminApi";
 import * as adminApi from "../adminApi";
+import { AnnouncementForm, type AnnouncementDraft } from "./announcements/AnnouncementForm";
+import { AnnouncementKpis } from "./announcements/AnnouncementKpis";
+import { AnnouncementRail } from "./announcements/AnnouncementRail";
+import { AnnouncementTable } from "./announcements/AnnouncementTable";
+import { CARET, PLUS, SEARCH, SLIDERS, SVG, CHECK } from "./teams/TeamIcons";
 
-const inputStyle: React.CSSProperties = {
-  padding: "8px 10px",
-  borderRadius: 8,
-  border: "1px solid var(--ui-border, #cbd5e1)",
-  backgroundColor: "var(--ui-surface-2, #ffffff)",
-  color: "var(--ui-text, #0f172a)",
-  fontSize: 14,
-  boxSizing: "border-box",
-  width: "100%",
-};
+const PAGE_SIZE = 10;
+const EMPTY_DRAFT: AnnouncementDraft = { title: "", body: "", pinned: false };
+
+type TabKey = "all" | "pinned" | "recent";
 
 export function AnnouncementsView({ session }: { session: Session }) {
-  const [announcements, setAnnouncements] = useState<AnnouncementDto[]>([]);
+  const [overview, setOverview] = useState<AnnouncementOverviewDto | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
-  const [draft, setDraft] = useState({ title: "", body: "", pinned: false });
-  const [editing, setEditing] = useState<number | null>(null);
-  const [editDraft, setEditDraft] = useState({
-    title: "",
-    body: "",
-    pinned: false,
+  const [result, setResult] = useState<AnnouncementAdminListResult>({
+    items: [],
+    meta: { page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1, hasNext: false, hasPrev: false },
   });
+  const [rowsLoading, setRowsLoading] = useState(false);
+  const [page, setPage] = useState(1);
 
-  const load = useCallback(async () => {
+  const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<TabKey>("all");
+  const [sort, setSort] = useState<"newest" | "oldest">("newest");
+
+  const [draft, setDraft] = useState<AnnouncementDraft>(EMPTY_DRAFT);
+  const [editing, setEditing] = useState<AnnouncementAdminRowDto | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [focusKey, setFocusKey] = useState(0);
+
+  const [toast, setToast] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  const notify = useCallback((msg: string) => {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 2600);
+  }, []);
+
+  const loadOverview = useCallback(async () => {
+    setLoading(true);
     setError(null);
     try {
-      setAnnouncements(await adminApi.listAnnouncements(session));
+      setOverview(await adminApi.getAnnouncementOverview(session));
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load announcements",
-      );
+      setError(err instanceof Error ? err.message : "Failed to load announcements");
+    } finally {
+      setLoading(false);
     }
   }, [session]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void loadOverview();
+  }, [loadOverview]);
 
-  const onCreate = useCallback(async () => {
+  useEffect(() => {
+    setPage(1);
+  }, [query, tab, sort]);
+
+  const loadRows = useCallback(async () => {
+    setRowsLoading(true);
+    try {
+      const res = await adminApi.listAdminAnnouncements(session, {
+        page,
+        limit: PAGE_SIZE,
+        search: query.trim().length > 0 ? query.trim() : undefined,
+        pinned: tab === "pinned" ? true : undefined,
+        recent: tab === "recent" ? true : undefined,
+        sort,
+      });
+      setResult(res);
+      setPage(res.meta.page);
+    } catch {
+      setResult({
+        items: [],
+        meta: { page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1, hasNext: false, hasPrev: false },
+      });
+    } finally {
+      setRowsLoading(false);
+    }
+  }, [session, page, query, tab, sort]);
+
+  useEffect(() => {
+    void loadRows();
+  }, [loadRows]);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([loadOverview(), loadRows()]);
+  }, [loadOverview, loadRows]);
+
+  const focusForm = useCallback(() => {
+    setFocusKey((k) => k + 1);
+    window.requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, []);
+
+  const handleNew = useCallback(() => {
+    setEditing(null);
+    setDraft({ ...EMPTY_DRAFT });
+    setError(null);
+    focusForm();
+  }, [focusForm]);
+
+  const handleEdit = useCallback(
+    (row: AnnouncementAdminRowDto) => {
+      setEditing(row);
+      setDraft({ title: row.title, body: row.body, pinned: row.pinned });
+      setError(null);
+      focusForm();
+    },
+    [focusForm],
+  );
+
+  const handleCopy = useCallback(
+    async (row: AnnouncementAdminRowDto) => {
+      const text = `${row.title}\n\n${row.body}`;
+      try {
+        await navigator.clipboard.writeText(text);
+        notify(`Copied announcement #${row.id} to clipboard.`);
+      } catch {
+        notify("Could not copy to clipboard.");
+      }
+    },
+    [notify],
+  );
+
+  const handleDelete = useCallback(
+    async (row: AnnouncementAdminRowDto) => {
+      if (!window.confirm(`Delete announcement "${row.title}"? This cannot be undone.`)) return;
+      setBusy(true);
+      setError(null);
+      try {
+        await adminApi.deleteAnnouncement(session, row.id);
+        if (editing?.id === row.id) {
+          setEditing(null);
+          setDraft({ ...EMPTY_DRAFT });
+        }
+        await refreshAll();
+        notify(`Announcement #${row.id} deleted.`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to delete announcement");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [session, editing, refreshAll, notify],
+  );
+
+  const handleSubmit = useCallback(async () => {
     if (busy || !draft.title.trim() || !draft.body.trim()) return;
     setBusy(true);
     setError(null);
     try {
-      await adminApi.createAnnouncement(session, {
+      const payload: adminApi.AnnouncementPayload = {
         title: draft.title.trim(),
         body: draft.body.trim(),
         pinned: draft.pinned,
-      });
-      setDraft({ title: "", body: "", pinned: false });
-      await load();
+      };
+      if (editing) {
+        await adminApi.updateAnnouncement(session, editing.id, payload);
+        notify(`Announcement #${editing.id} updated.`);
+      } else {
+        await adminApi.createAnnouncement(session, payload);
+        notify("Announcement published.");
+      }
+      setEditing(null);
+      setDraft({ ...EMPTY_DRAFT });
+      await refreshAll();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to create announcement",
-      );
+      setError(err instanceof Error ? err.message : "Failed to publish announcement");
     } finally {
       setBusy(false);
     }
-  }, [busy, draft, session, load]);
+  }, [busy, draft, editing, session, refreshAll, notify]);
 
-  const startEdit = useCallback((item: AnnouncementDto) => {
-    setEditing(item.id);
-    setEditDraft({ title: item.title, body: item.body, pinned: item.pinned });
+  const handleReset = useCallback(() => {
+    setEditing(null);
+    setDraft({ ...EMPTY_DRAFT });
+    setError(null);
+    setFocusKey((k) => k + 1);
   }, []);
 
-  const onSaveEdit = useCallback(
-    async (id: number) => {
-      if (busy || !editDraft.title.trim() || !editDraft.body.trim()) return;
-      setBusy(true);
-      setError(null);
-      try {
-        await adminApi.updateAnnouncement(session, id, {
-          title: editDraft.title.trim(),
-          body: editDraft.body.trim(),
-          pinned: editDraft.pinned,
-        });
-        setEditing(null);
-        await load();
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to update announcement",
-        );
-      } finally {
-        setBusy(false);
-      }
-    },
-    [busy, editDraft, session, load],
-  );
-
-  const onDelete = useCallback(
-    async (id: number) => {
-      if (busy) return;
-      setBusy(true);
-      setError(null);
-      try {
-        await adminApi.deleteAnnouncement(session, id);
-        if (editing === id) setEditing(null);
-        await load();
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to delete announcement",
-        );
-      } finally {
-        setBusy(false);
-      }
-    },
-    [busy, editing, session, load],
-  );
+  const tabs: { key: TabKey; label: string }[] = [
+    { key: "all", label: "All Announcements" },
+    { key: "pinned", label: "Pinned" },
+    { key: "recent", label: "Recent" },
+  ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {error ? <Text tone="danger">{error}</Text> : null}
-
-      <Card
-        title="New announcement"
-        bodyStyle={{ display: "flex", flexDirection: "column", gap: 12 }}
-      >
-        <input
-          value={draft.title}
-          onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-          placeholder="Title"
-          className="ctf-input"
-          style={inputStyle}
-        />
-        <textarea
-          value={draft.body}
-          onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
-          rows={4}
-          placeholder="Body (Markdown)"
-          className="ctf-input"
-          style={inputStyle}
-        />
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontSize: 14,
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={draft.pinned}
-            onChange={(e) =>
-              setDraft((d) => ({ ...d, pinned: e.target.checked }))
-            }
-          />
-          Pinned (shown first on the mobile Events tab)
-        </label>
+    <div className="an">
+      <div className="page-head">
         <div>
-          <Button
-            disabled={busy || !draft.title.trim() || !draft.body.trim()}
-            onClick={() => void onCreate()}
-          >
-            Create
-          </Button>
-        </div>
-      </Card>
-
-      <Card
-        title="Announcements"
-        bodyStyle={{ display: "flex", flexDirection: "column", gap: 10 }}
-      >
-        {announcements.length === 0 ? (
-          <Text tone="secondary">No announcements yet.</Text>
-        ) : null}
-        {announcements.map((item) => (
-          <div key={item.id} className="ctf-row-col">
-            {editing === item.id ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <input
-                  value={editDraft.title}
-                  onChange={(e) =>
-                    setEditDraft((d) => ({ ...d, title: e.target.value }))
-                  }
-placeholder="Title"
-                    className="ctf-input"
-                    style={inputStyle}
-                  />
-                <textarea
-                  value={editDraft.body}
-                  onChange={(e) =>
-                    setEditDraft((d) => ({ ...d, body: e.target.value }))
-                  }
-                  rows={3}
-                  placeholder="Body"
-                  className="ctf-input"
-                  style={inputStyle}
-                />
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    fontSize: 14,
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={editDraft.pinned}
-                    onChange={(e) =>
-                      setEditDraft((d) => ({ ...d, pinned: e.target.checked }))
-                    }
-                  />
-                  Pinned
-                </label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <Button
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => void onSaveEdit(item.id)}
-                  >
-                    Save
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setEditing(null)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontWeight: 600 }}>{item.title}</span>
-                  {item.pinned ? <Badge tone="info">pinned</Badge> : null}
-                  <Text tone="secondary" size="xs">
-                    {new Date(item.createdAt).toLocaleString()}
-                  </Text>
-                </div>
-                <Text tone="secondary" size="sm">
-                  {item.body.length > 160
-                    ? `${item.body.slice(0, 160)}…`
-                    : item.body}
-                </Text>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => startEdit(item)}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    onClick={() => void onDelete(item.id)}
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </div>
-            )}
+          <div className="breadcrumbs">
+            <span>Dashboard</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m9 6 6 6-6 6" />
+            </svg>
+            <span className="active">Announcements</span>
           </div>
-        ))}
-      </Card>
+          <h1 className="page-title">Announcements</h1>
+          <p className="page-sub">
+            Keep your community informed. Share updates, rules, maintenance notices, and more.
+          </p>
+        </div>
+        <div className="page-actions">
+          <p className="an-page-quote">"Information today.<br />Innovators tomorrow."</p>
+          <button className="btn btn-primary" type="button" onClick={handleNew}>
+            <SVG d={PLUS} size={13} />
+            New Announcement
+          </button>
+        </div>
+      </div>
+
+      {error ? <div className="an-banner">Failed to load announcements: {error}</div> : null}
+
+      {loading && !overview ? (
+        <div className="an-loading">Loading announcements…</div>
+      ) : overview ? (
+        <div className="an-grid" ref={formRef}>
+          <div className="left-col">
+            <AnnouncementKpis kpis={overview.kpis} />
+
+            <div className="tabs-row">
+              <div className="tabs">
+                {tabs.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    className={`tab${tab === t.key ? " is-active" : ""}`}
+                    onClick={() => setTab(t.key)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <span className="an-clip-count">
+                {result.meta.total.toLocaleString("en-US")} announcement
+                {result.meta.total === 1 ? "" : "s"}
+              </span>
+            </div>
+
+            <div className="filter-bar">
+              <label className="filter-search">
+                <SVG d={SEARCH} size={14} />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search announcements..."
+                />
+              </label>
+              <label className="filter-select">
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as "newest" | "oldest")}
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                </select>
+                <SVG d={CARET} size={11} />
+              </label>
+              <button className="filter-btn" type="button" onClick={() => notify("Filters applied.")}>
+                <SVG d={SLIDERS} size={13} />
+                Filter
+              </button>
+            </div>
+
+            <AnnouncementTable
+              items={result.items}
+              meta={result.meta}
+              page={page}
+              pageSize={PAGE_SIZE}
+              loading={rowsLoading}
+              onPage={setPage}
+              onEdit={handleEdit}
+              onCopy={(row) => void handleCopy(row)}
+              onDelete={(row) => void handleDelete(row)}
+            />
+
+            <div className="an-footer">
+              <span>"Communicate clearly. Compete fairly. Grow together."</span>
+              <div className="an-footer-brand">
+                <b>Mobile CTF</b>
+                <span className="sep" />
+                <span>Admin Console</span>
+                <span className="sep" />
+                <span>v2.1.0</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="right-col">
+            <AnnouncementForm
+              editing={editing}
+              value={draft}
+              busy={busy}
+              focusKey={focusKey}
+              onChange={setDraft}
+              onSubmit={() => void handleSubmit()}
+              onCancel={handleReset}
+              onReset={handleNew}
+            />
+            <AnnouncementRail overview={overview} />
+          </div>
+        </div>
+      ) : null}
+
+      {toast ? (
+        <div className="sub-toast">
+          <SVG d={CHECK} size={14} />
+          {toast}
+        </div>
+      ) : null}
     </div>
   );
 }

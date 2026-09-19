@@ -269,6 +269,54 @@ export interface SubmissionOverviewDto {
   filters: SubmissionFilterOptionsDto;
 }
 
+export interface AnnouncementAdminRowDto {
+  id: number;
+  pinned: boolean;
+  title: string;
+  body: string;
+  excerpt: string;
+  authorId: number;
+  authorUsername: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AnnouncementAdminListResult {
+  items: AnnouncementAdminRowDto[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
+export interface AnnouncementKpiDto {
+  total: number;
+  pinned: number;
+  last7: number;
+  authors: number;
+  totalChangePct: number;
+  pinnedChangePct: number;
+  last7ChangePct: number;
+  authorsChangePct: number;
+}
+
+export interface AnnouncementRecentDto {
+  id: number;
+  title: string;
+  pinned: boolean;
+  username: string;
+  createdAt: string;
+}
+
+export interface AnnouncementOverviewDto {
+  kpis: AnnouncementKpiDto;
+  recent: AnnouncementRecentDto[];
+}
+
 export interface AnalyticsDayPoint {
   date: string;
   solves: number;
@@ -294,6 +342,112 @@ export interface AnalyticsSolverRow {
   points: number;
 }
 
+export interface AnalyticsKpiPoint {
+  value: number;
+  changePct: number;
+  sparkline: number[];
+}
+
+export interface AnalyticsKpis {
+  totalUsers: AnalyticsKpiPoint;
+  activeUsers: AnalyticsKpiPoint;
+  totalSubmissions: AnalyticsKpiPoint;
+  correctSubmissions: AnalyticsKpiPoint;
+  pointsAwarded: AnalyticsKpiPoint;
+  challenges: AnalyticsKpiPoint;
+}
+
+export interface AnalyticsUserGrowthPoint {
+  date: string;
+  total: number;
+  newUsers: number;
+}
+
+export interface AnalyticsHourlyPoint {
+  hour: string;
+  count: number;
+}
+
+export interface AnalyticsCategoryPoint {
+  name: string;
+  count: number;
+  pct: number;
+  color: string;
+}
+
+export interface AnalyticsDifficultyItem {
+  count: number;
+  solves: number;
+  pct: number;
+}
+
+export interface AnalyticsRolePoint {
+  role: string;
+  label: string;
+  count: number;
+  pct: number;
+  color: string;
+}
+
+export interface AnalyticsDifficultyStats {
+  easy: AnalyticsDifficultyItem;
+  medium: AnalyticsDifficultyItem;
+  hard: AnalyticsDifficultyItem;
+  expert: AnalyticsDifficultyItem;
+}
+
+export interface AnalyticsHeatmapCell {
+  day: number;
+  hour: number;
+  level: number;
+  count: number;
+}
+
+export interface AnalyticsTopUserRow {
+  rank: number;
+  userId: number;
+  username: string;
+  teamName: string | null;
+  points: number;
+  solves: number;
+}
+
+export interface AnalyticsTopTeamRow {
+  rank: number;
+  teamId: number;
+  name: string;
+  members: number;
+  points: number;
+}
+
+export interface AnalyticsEventPerfRow {
+  id: number;
+  name: string;
+  start: string;
+  end: string;
+  participants: number;
+  solves: number;
+}
+
+export interface AnalyticsRecentActivityRow {
+  id: string;
+  text: string;
+  time: string;
+  pts: string;
+  icon: string;
+  color: string;
+}
+
+export interface AnalyticsPlatformHealth {
+  services: Array<{ key: string; name: string; ok: boolean; val: string }>;
+  summary: {
+    uptime: string;
+    avgResponse: string;
+    ramUsage: string;
+    activeSandboxes: number;
+  };
+}
+
 export interface AnalyticsOverviewDto {
   totalUsers: number;
   activeUsers: number;
@@ -308,6 +462,18 @@ export interface AnalyticsOverviewDto {
   submissionsByDay: AnalyticsDayPoint[];
   topChallenges: AnalyticsChallengeRow[];
   topSolvers: AnalyticsSolverRow[];
+  kpis?: AnalyticsKpis;
+  userGrowth?: AnalyticsUserGrowthPoint[];
+  hourlyActivity?: AnalyticsHourlyPoint[];
+  categoryDistribution?: AnalyticsCategoryPoint[];
+  difficultyDistribution?: AnalyticsDifficultyStats;
+  userRoleDistribution?: AnalyticsRolePoint[];
+  heatmap?: AnalyticsHeatmapCell[];
+  topUsersTable?: AnalyticsTopUserRow[];
+  topTeamsTable?: AnalyticsTopTeamRow[];
+  eventPerformance?: AnalyticsEventPerfRow[];
+  recentActivity?: AnalyticsRecentActivityRow[];
+  platformHealth?: AnalyticsPlatformHealth;
 }
 
 export interface FileDto {

@@ -1,3 +1,5 @@
+import Constants from "expo-constants";
+
 import { API_PREFIX } from "@ctf/shared";
 
 import {
@@ -6,8 +8,30 @@ import {
   storeTokens,
 } from "./token-storage";
 
-export const API_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
+const LOOPBACK =
+  /^(https?:\/\/)(localhost|127\.0\.0\.1|0\.0\.0\.0)([:/]|$)/i;
+
+/**
+ * Resolve where the API lives. Preference order:
+ *  1. An explicit EXPO_PUBLIC_API_URL that is not localhost (a real deployed
+ *     endpoint configured on purpose).
+ *  2. The host that served the JS bundle (Constants.expoConfig.hostUri), so a
+ *     phone on any network talks to the API on the same machine that Metro is
+ *     running from (Metro and the API share the host; API port is 4000).
+ *  3. EXPO_PUBLIC_API_URL verbatim (dev default: http://localhost:4000).
+ */
+function resolveApiUrl(): string {
+  const explicit = process.env.EXPO_PUBLIC_API_URL;
+  if (explicit && !LOOPBACK.test(explicit)) return explicit;
+
+  const host = Constants.expoConfig?.hostUri?.split(":")[0];
+  if (host && !LOOPBACK.test(`http://${host}`)) {
+    return `http://${host}:4000`;
+  }
+  return explicit ?? "http://localhost:4000";
+}
+
+export const API_URL = resolveApiUrl();
 
 /**
  * Whether the backend is actually reachable right now. The app's online-ness
