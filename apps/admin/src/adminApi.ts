@@ -13,7 +13,10 @@ import type {
   FileDto,
   FileListResult,
   PaginatedResult,
+  PlatformSettingsDto,
+  PlatformSettingsUpdatePayload,
   SandboxSnapshot,
+  SettingsOverviewDto,
   SubmissionAdminListResult,
   SubmissionOverviewDto,
   SubmissionResultKey,
@@ -582,6 +585,25 @@ export function getAnalyticsOverview(
 
 export function getSystemStatus(session: Session): Promise<SystemStatusDto> {
   return request<SystemStatusDto>(session, "/api/admin/system/status");
+}
+
+// --- Platform settings -----------------------------------------------------
+
+export function getSettingsOverview(
+  session: Session,
+): Promise<SettingsOverviewDto> {
+  return request<SettingsOverviewDto>(session, "/api/admin/settings");
+}
+
+export function updatePlatformSettings(
+  session: Session,
+  payload: PlatformSettingsUpdatePayload,
+): Promise<PlatformSettingsDto> {
+  return request<PlatformSettingsDto>(
+    session,
+    "/api/admin/settings",
+    json("PATCH", payload),
+  );
 }
 
 export function listAuditLog(

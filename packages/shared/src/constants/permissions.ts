@@ -38,6 +38,8 @@ export const PERMISSION_MATRIX: Record<Permission, readonly Role[]> = {
     Role.ADMIN,
     Role.SUPER_ADMIN,
   ],
+  "settings.view": [Role.ADMIN, Role.SUPER_ADMIN],
+  "settings.manage": [Role.ADMIN, Role.SUPER_ADMIN],
 };
 
 export function getRolesForPermission(

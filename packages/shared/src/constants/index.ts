@@ -1,4 +1,5 @@
 export * from "./permissions";
+export * from "./settings";
 
 export const APP_NAME = "CTF Platform";
 export const APP_VERSION = "0.1.0";

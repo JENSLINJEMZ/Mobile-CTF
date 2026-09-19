@@ -22,6 +22,7 @@ import {
   updateUserSchema,
   adminSubmissionQuerySchema,
   adminAnnouncementQuerySchema,
+  updatePlatformSettingsSchema,
 } from "@ctf/shared";
 
 import { asyncHandler } from "../middleware/errors";
@@ -67,6 +68,10 @@ import {
 import { listEvents } from "../services/eventQueries";
 import { getAnalyticsOverview } from "../services/analytics";
 import { getSystemStatus } from "../services/systemStatus";
+import {
+  getSettingsOverview,
+  updatePlatformSettings,
+} from "../services/platformSettings";
 import { listAuditLog, recordAudit } from "../services/auditLog";
 import { listUsers, createAdminUser, updateUser } from "../services/adminUsers";
 import {
@@ -614,6 +619,36 @@ adminRouter.get(
   requirePermission("analytics.view"),
   asyncHandler(async (req, res) => {
     const data = await getSystemStatus();
+    res.json({ success: true, data });
+  }),
+);
+
+// --- Platform settings ------------------------------------------------------
+
+adminRouter.get(
+  "/settings",
+  requirePermission("settings.view"),
+  asyncHandler(async (_req, res) => {
+    const data = await getSettingsOverview();
+    res.json({ success: true, data });
+  }),
+);
+
+adminRouter.patch(
+  "/settings",
+  requirePermission("settings.manage"),
+  validateBody(updatePlatformSettingsSchema),
+  asyncHandler(async (req, res) => {
+    const actor = me(req);
+    const data = await updatePlatformSettings(actor, req.body);
+    await recordAudit({
+      actorId: actor.id,
+      actorUsername: actor.username,
+      action: "settings.update",
+      entityType: "setting",
+      details: { changed: Object.keys(req.body) },
+      ipAddress: req.ip,
+    });
     res.json({ success: true, data });
   }),
 );

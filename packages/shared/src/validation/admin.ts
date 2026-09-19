@@ -119,3 +119,24 @@ export const adminAnnouncementQuerySchema = z.object({
     .transform((v) => (v === undefined ? undefined : v === "true")),
   sort: z.enum(["newest", "oldest"]).default("newest"),
 });
+
+export const updatePlatformSettingsSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    tagline: z.string().trim().min(1).max(160),
+    description: z.string().trim().min(1).max(1000),
+    websiteUrl: z.string().trim().max(300),
+    supportEmail: z.string().trim().email().max(200).or(z.literal("")),
+    timezone: z.string().trim().min(1).max(80),
+    language: z.string().trim().min(1).max(60),
+    dateFormat: z.string().trim().min(1).max(80),
+    timeFormat: z.string().trim().min(1).max(40),
+    registrationEnabled: z.boolean(),
+    requireEmailVerification: z.boolean(),
+    allowGuestAccess: z.boolean(),
+    maintenanceMode: z.boolean(),
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, {
+    message: "Provide at least one setting to update",
+  });

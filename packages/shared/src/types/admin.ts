@@ -9,7 +9,9 @@ export type Permission =
   | "analytics.view"
   | "audit.view"
   | "notifications.broadcast"
-  | "files.upload";
+  | "files.upload"
+  | "settings.view"
+  | "settings.manage";
 
 export interface AuditLogDto {
   id: number;
@@ -643,3 +645,40 @@ export interface SandboxSnapshot {
   activity: SandboxActivityDto[];
   limits: SandboxLimitsDto;
 }
+
+// --- Platform settings -----------------------------------------------------
+
+export interface PlatformSettingsDto {
+  name: string;
+  tagline: string;
+  description: string;
+  websiteUrl: string;
+  supportEmail: string;
+  timezone: string;
+  language: string;
+  dateFormat: string;
+  timeFormat: string;
+  registrationEnabled: boolean;
+  requireEmailVerification: boolean;
+  allowGuestAccess: boolean;
+  maintenanceMode: boolean;
+  updatedBy: { id: number; username: string } | null;
+  updatedAt: string | null;
+}
+
+export interface SettingsKpisDto {
+  operational: boolean;
+  environment: "production" | "development" | "test";
+  totalUsers: number;
+  totalChallenges: number;
+  activeSandboxes: number;
+}
+
+export interface SettingsOverviewDto {
+  settings: PlatformSettingsDto;
+  kpis: SettingsKpisDto;
+}
+
+export type PlatformSettingsUpdatePayload = Partial<
+  Omit<PlatformSettingsDto, "updatedBy" | "updatedAt">
+>;

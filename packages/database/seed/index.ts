@@ -6,6 +6,12 @@ import { fileURLToPath } from "node:url";
 
 import { Difficulty, Role, type Prisma } from "@prisma/client";
 
+import {
+  DEFAULT_SETTINGS,
+  SETTING_KEYS,
+  type PlatformSettingKey,
+} from "@ctf/shared";
+
 import { hashFlag, randomSalt } from "../src/flag";
 import { prisma } from "../src/client";
 
@@ -66,6 +72,7 @@ async function main() {
   const eventId = await seedEvent(admin.id);
   const demoTeam = await seedDemoTeam(user.id, eventId);
   await seedAnnouncements(admin.id);
+  await seedPlatformSettings(admin.id);
 
   console.log(
     `[seed] demo admin: ${admin.username} <${admin.email}> (role=${admin.role})`,
@@ -733,4 +740,19 @@ async function seedAnnouncements(authorId: number): Promise<void> {
       },
     });
   }
+}
+
+async function seedPlatformSettings(actorId: number): Promise<void> {
+  for (const key of SETTING_KEYS) {
+    await prisma.platformSetting.upsert({
+      where: { key },
+      update: {},
+      create: {
+        key,
+        value: DEFAULT_SETTINGS[key as PlatformSettingKey],
+        updatedById: actorId,
+      },
+    });
+  }
+  console.log(`[seed] platform settings: ${SETTING_KEYS.length} keys seeded`);
 }

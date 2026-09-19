@@ -11,6 +11,7 @@ import { ChallengesView } from "./views/ChallengesView";
 import { DashboardView } from "./views/DashboardView";
 import { EventsView } from "./views/EventsView";
 import { SandboxView } from "./views/sandbox/SandboxView";
+import { SettingsView } from "./views/SettingsView";
 import { SubmissionsView } from "./views/SubmissionsView";
 import { TeamsView } from "./views/TeamsView";
 import { UsersView } from "./views/UsersView";
@@ -42,6 +43,7 @@ const WIRED = new Set([
   "Announcements",
   "Analytics",
   "Sandbox Manager",
+  "Settings",
   "Audit Log",
 ]);
 
@@ -436,7 +438,9 @@ function Dashboard({
                           ? " an-shell"
                           : activeView === "Analytics"
                             ? " aly-shell"
-                            : ""
+                            : activeView === "Settings"
+                              ? " set-shell"
+                              : ""
           }`}
         >
           <div key={activeView} style={{ display: "contents" }}>
@@ -461,6 +465,12 @@ function Dashboard({
               />
             ) : null}
             {activeView === "Sandbox Manager" ? <SandboxView session={session} /> : null}
+            {activeView === "Settings" ? (
+              <SettingsView
+                session={session}
+                onNavigate={(v) => setActiveView(v)}
+              />
+            ) : null}
             {activeView === "Audit Log" ? <AuditLogView session={session} /> : null}
             {!WIRED.has(activeView) ? <Placeholder name={activeView} /> : null}
           </div>

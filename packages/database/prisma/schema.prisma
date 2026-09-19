@@ -102,6 +102,7 @@ model User {
   fileUploads        FileAsset[] @relation("FileUploader")
   notifications      Notification[]
   pushSubscriptions  PushSubscription[]
+  settingsUpdated    PlatformSetting[] @relation("SettingsUpdater")
 
   @@index([role])
   @@index([createdAt])
@@ -600,4 +601,16 @@ model PushSubscription {
 
   @@unique([userId, token])
   @@index([userId, enabled])
+}
+
+model PlatformSetting {
+  id          Int       @id @default(autoincrement())
+  key         String    @unique
+  value       Json
+  updatedById Int?
+  updatedAt   DateTime  @updatedAt
+
+  updatedBy User? @relation("SettingsUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([updatedById])
 }
